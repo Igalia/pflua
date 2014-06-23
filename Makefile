@@ -10,7 +10,7 @@ $(LUAJIT_O): check_luajit deps/luajit/Makefile
 	 $(MAKE) PREFIX=`pwd`/usr/local \
 	         CFLAGS="$(LUAJIT_CFLAGS)" && \
 	 $(MAKE) DESTDIR=`pwd` install)
-	(cd deps/luajit/usr/local/bin; ln -fs luajit-2.1.0-alpha luajit)
+	(cd deps/luajit/usr/local/bin; ln -fs luajit-2.0.3 luajit)
 
 check_luajit:
 	@if [ ! -f deps/luajit/Makefile ]; then \
