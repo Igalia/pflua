@@ -17,6 +17,9 @@ check_luajit:
 	    echo "Can't find deps/luajit/. You might need to: git submodule update --init"; exit 1; \
 	fi
 
+check:
+	(cd src && $(MAKE) check)
+
 clean:
 	(cd deps/luajit && $(MAKE) clean)
 	(cd src; $(MAKE) clean)
