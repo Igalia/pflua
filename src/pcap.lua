@@ -34,47 +34,29 @@ function pcap_compile (filter_str, dlt_name)
    assert(p, "pcap_open_dead failed")
 
    -- pcap_compile
-   local fp  = pf.bpf_program()
-   err = pcap.pcap_compile(p, fp, filter_str, 0, 0)
+   local program = pf.bpf_program()
+   local err = pcap.pcap_compile(p, program, filter_str, 0, 0)
 
    if err ~= 0 then
       pcap.pcap_perror(p, "pcap_compile failed!")
+      error("pcap_compile failed")
    end
 
-   local ins = pf.bpf_insn(fp.bf_len)
-
-   -- generate bytecode
-   local fp_arr = {}
-   fp_arr[0] = fp.bf_len - 1
-   for i = 0,fp.bf_len-2 do
-      fp_arr[4*i+1] = fp.bf_insns[i+1].code
-      fp_arr[4*i+2] = fp.bf_insns[i+1].jt
-      fp_arr[4*i+3] = fp.bf_insns[i+1].jf
-      fp_arr[4*i+4] = fp.bf_insns[i+1].k
-   end
-
-   return false, fp_arr
+   return program
 end
 
-function dump_bytecode (fp_arr)
-   io.write(fp_arr[0])
-   for i = 1,#fp_arr-1,4 do
-      io.write(",")
-      io.write(fp_arr[i]   .. " ")
-      io.write(fp_arr[i+1] .. " ")
-      io.write(fp_arr[i+2] .. " ")
-      io.write(fp_arr[i+3])
+function dump_bytecode (prog)
+   io.write(#prog .. ':\n')
+   for i = 0, #prog-1 do
+      io.write(string.format('  {0x%x, %u, %u, %d}\n',
+                             prog[i].code, prog[i].jt, prog[i].jf, prog[i].k))
    end
    io.write("\n")
 end
 
 function selftest ()
    print("selftest: pcap")
-   local err, str = pcap_compile("icmp")
-   if not err then
-      dump_bytecode(str)
-   else
-      print(str)
-   end
+   prog = pcap_compile("icmp")
+   dump_bytecode(prog)
    print("OK")
 end
