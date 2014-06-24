@@ -373,8 +373,9 @@ local function pcap_compile (filter_str, dlt_name)
 
    -- pcap_compile
    local program = pf.bpf_program()
+   local optimize = true
    local netmask = MAX_UINT32
-   local err = pcap.pcap_compile(p, program, filter_str, true, netmask)
+   local err = pcap.pcap_compile(p, program, filter_str, optimize, netmask)
 
    if err ~= 0 then
       pcap.pcap_perror(p, "pcap_compile failed!")
