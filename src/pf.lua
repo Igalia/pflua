@@ -358,7 +358,7 @@ end
 --
 -- You probably want "RAW" for raw IP (v4 or v6) frames.  If you don't
 -- supply a dlt_name, "RAW" is the default.
-function pcap_compile (filter_str, dlt_name)
+local function pcap_compile (filter_str, dlt_name)
    if verbose then print(filter_str) end
    if not pcap then pcap = ffi.load("pcap") end
 
@@ -385,6 +385,10 @@ function pcap_compile (filter_str, dlt_name)
    return program
 end
 
+function compile_pcap_filter(filter_str, dlt_name)
+   return compile_bpf_prog(pcap_compile(filter_str, dlt_name))
+end
+
 local Buffer = {
    __index = {
       u8 = function(self, idx)
@@ -408,7 +412,7 @@ local function string_buffer(str)
    return buf
 end
 
-local function count_accepted_packets(pred, file)
+local function filter_count(pred, file)
    local count = 0
    local records = savefile.records(file)
    while true do
@@ -420,16 +424,20 @@ end
 
 function selftest ()
    print("selftest: pf")
-   local function test_pcap_filter(str)
-      local f = compile_bpf_prog(pcap_compile(str))
+   local function test_null(str)
+      local f = compile_pcap_filter(str)
       assert(f(string_buffer("")) == 0, "null packet should be rejected")
    end
-   test_pcap_filter("icmp")
-   test_pcap_filter("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
+   test_null("icmp")
+   test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
 
-   local function accept_all(P) return true end
-   assert(count_accepted_packets(accept_all, "samples/v4.pcap") == 43,
-          "bad count")
+   local function assert_count(filter, file, expected)
+      local pred = compile_pcap_filter(filter)
+      local actual = filter_count(pred, file)
+      assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)
+   end
+
+   assert_count('', "samples/v4.pcap", 43)
 
    print("OK")
 end
