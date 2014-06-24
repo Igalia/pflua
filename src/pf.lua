@@ -220,7 +220,7 @@ local function compile_bpf_prog (instructions)
       elseif op == BPF_OR  then rhs = bor(A(), b)
       elseif op == BPF_AND then rhs = band(A(), b)
       elseif op == BPF_LSH then rhs = lsh(A(), b)
-      elseif op == BPF_RSH then rhs = rhs(A(), b)
+      elseif op == BPF_RSH then rhs = rsh(A(), b)
       elseif op == BPF_NEG then rhs = neg(A())
       else error('bad op ' .. op)
       end
@@ -339,9 +339,13 @@ end
 
 function selftest ()
    print("selftest: pf")
-   prog = pcap_compile("icmp")
-   dump_bytecode(prog)
-   print(compile_bpf_prog(prog))
-   print(loadstring(compile_bpf_prog(prog))())
+   local function test_pcap_filter(str)
+      local prog = pcap_compile(str)
+      dump_bytecode(prog)
+      print(compile_bpf_prog(prog))
+      loadstring(compile_bpf_prog(prog))()
+   end
+   test_pcap_filter("icmp")
+   test_pcap_filter("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
    print("OK")
 end
