@@ -105,17 +105,21 @@ local function compile_bpf_prog (instructions)
    local function write_body(code) body = body .. '  ' .. code .. '\n' end
    local write = write_body
 
+   local jump_targets = {}
+
    local function bin(op, a, b) return '(' .. a .. op .. b .. ')' end
-   local function prop(a, b) return bin('.', a, b) end
    local function call(proc, args) return proc .. '(' .. args .. ')' end
-   local function comma(a1, a2) return a1 .. ',' .. a2 end
+   local function comma(a1, a2) return a1 .. ', ' .. a2 end
    local function s32(a) return call('bit.tobit', a) end
-   local function u32(a) return call('runtime_u32', a) end
+   local function u32(a)
+      if (tonumber(a)) then return runtime_u32(a) end
+      return call('runtime_u32', a)
+   end
    local function add(a, b) return s32(bin('+', a, b)) end
    local function sub(a, b) return s32(bin('-', a, b)) end
    local function mul(a, b) return call('runtime_mul', comma(a, b)) end
    local function div(a, b) return call('runtime_div', comma(a, b)) end
-   local function bit(op, a, b) return call(prop('bit', op), comma(a, b)) end
+   local function bit(op, a, b) return call('bit.' .. op, comma(a, b)) end
    local function bor(a, b) return bit('bor', a, b) end
    local function band(a, b) return bit('band', a, b) end
    local function lsh(a, b) return bit('lshift', a, b) end
@@ -124,16 +128,19 @@ local function compile_bpf_prog (instructions)
    local function ee(a, b) return bin('==', a, b) end
    local function ge(a, b) return bin('>=', a, b) end
    local function gt(a, b) return bin('>', a, b) end
-   local function assign(lhs, rhs) return lhs .. '=' .. rhs end
+   local function assign(lhs, rhs) return lhs .. ' = ' .. rhs end
    local function label(i) return '::L' .. i .. '::' end
-   local function jump(i) return 'goto ' .. label(i) end
+   local function jump(i)
+      jump_targets[i] = true;
+      return 'goto ' .. label(i)
+   end
    local function cond(test, kt, kf, fallthrough)
       if fallthrough == kf then
-         return 'if ' .. test .. ' then ' .. jump(kt) .. 'end'
+         return 'if ' .. test .. ' then ' .. jump(kt) .. ' end'
       elseif fallthrough == kt then
          return cond('not '..test, kf, kt, fallthrough)
       else
-         return cond(test, kt, kf, kf) .. jump(kf)
+         return cond(test, kt, kf, kf) .. '\n  ' .. jump(kf)
       end
    end
 
@@ -148,7 +155,7 @@ local function compile_bpf_prog (instructions)
    local state = {}
    local function declare(name, init)
       if not state[name] then
-         H(assign('local ' .. name, init or '0'))
+         write_head(assign('local ' .. name, init or '0'))
          state[name] = true
       end
       return name
@@ -169,8 +176,6 @@ local function compile_bpf_prog (instructions)
       else                        error('bad mode ' .. mode)
       end
    end
-
-   local jump_targets = {}
 
    local function ld(size, mode, k)
       local rhs
@@ -241,13 +246,13 @@ local function compile_bpf_prog (instructions)
       jf = jf + i
 
       if op == BPF_JEQ then
-         write(cond(ee(u32(A()), u32(src)), jt, jf))
+         write(cond(ee(u32(A()), u32(src)), jt, jf, i))
       elseif op == BPF_JGT then
-         write(cond(gt(u32(A()), u32(src)), jt, jf))
+         write(cond(gt(u32(A()), u32(src)), jt, jf, i))
       elseif op == BPF_JGE then
-         write(cond(ge(u32(A()), u32(src)), jt, jf))
+         write(cond(ge(u32(A()), u32(src)), jt, jf, i))
       elseif op == BPF_JSET then
-         write(cond(ee(band(A(), src), 0), jt, jf))
+         write(cond(ee(band(A(), src), 0), jt, jf, i))
       else
          error('bad op ' .. op)
       end
@@ -336,5 +341,6 @@ function selftest ()
    print("selftest: pf")
    prog = pcap_compile("icmp")
    dump_bytecode(prog)
+   print(compile_bpf_prog(prog))
    print("OK")
 end
