@@ -373,6 +373,7 @@ end
 function selftest ()
    print("selftest: pf")
    local function test_pcap_filter(str)
+      print(str)
       local prog = pcap_compile(str)
       dump_bytecode(prog)
       print(compile_bpf_prog(prog))
