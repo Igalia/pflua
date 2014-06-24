@@ -4,34 +4,41 @@ local ffi  = require("ffi")
 local pf  = require("pf")
 local pcap = ffi.load("pcap")
 
-function pcap_compile (filter_str)
+-- The dlt_name is a "datalink type name" and specifies the link-level
+-- wrapping to expect.  E.g., for raw ethernet frames, you would specify
+-- "EN10MB" (even though you have a 10G card), which corresponds to the
+-- numeric DLT_EN10MB value from pcap/bpf.h.  See
+-- http://www.tcpdump.org/linktypes.html for more details on possible
+-- names.
+--
+-- You probably want "RAW" for raw IP (v4 or v6) frames.  If you don't
+-- supply a dlt_name, "RAW" is the default.
+function pcap_compile (filter_str, dlt_name)
 
    ffi.cdef[[
       typedef struct pcap pcap_t;
 
-      pcap_t *pcap_create(const char *source, char *errbuf);
-      int pcap_activate(pcap_t *p);
+      int pcap_datalink_name_to_val(const char *name);
+      pcap_t *pcap_open_dead(int linktype, int snaplen);
+      void pcap_perror(pcap_t *p, const char *suffix);
       int pcap_compile(pcap_t *p, struct bpf_program *fp, const char *str,
                        int optimize, uint32_t netmask);
    ]]
 
-   -- pcap_create
-   local errbuf = ffi.new("char[?]", 256)
-   local p = pcap.pcap_create("any", errbuf)
+   dlt_name = dlt_name or "RAW"
+   local dlt = pcap.pcap_datalink_name_to_val(dlt_name)
+   assert(dlt >= 0, "bad datalink type name " .. dlt_name)
+   local snaplen = 65535 -- Maximum packet size.
+   local p = pcap.pcap_open_dead(dlt, snaplen)
 
-   -- pcap_activate
-   err = pcap.pcap_activate(p)
-
-   if err ~= 0 then
-      return true, "pcap_activate failed!"
-   end
+   assert(p, "pcap_open_dead failed")
 
    -- pcap_compile
    local fp  = pf.bpf_program()
    err = pcap.pcap_compile(p, fp, filter_str, 0, 0)
 
    if err ~= 0 then
-      return true, "pcap_compile failed!"
+      pcap.pcap_perror(p, "pcap_compile failed!")
    end
 
    local ins = pf.bpf_insn(fp.bf_len)
@@ -60,9 +67,6 @@ function dump_bytecode (fp_arr)
    end
    io.write("\n")
 end
-
--- pcap requires root privileges
--- run 'sudo make check' to test
 
 function selftest ()
    print("selftest: pcap")
