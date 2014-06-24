@@ -83,7 +83,8 @@ local BPF_TXA = 0x80
 
 local BPF_MEMWORDS = 16
 
-local MAX_UINT32_PLUS_1 = 0x10000000
+local MAX_UINT32 = 0xffffffff
+local MAX_UINT32_PLUS_1 = MAX_UINT32 + 1
 
 local function runtime_u32(s32)
    if (s32 < 0) then return s32 + MAX_UINT32_PLUS_1 end
@@ -346,7 +347,8 @@ function pcap_compile (filter_str, dlt_name)
 
    -- pcap_compile
    local program = pf.bpf_program()
-   local err = pcap.pcap_compile(p, program, filter_str, 1, 0)
+   local netmask = MAX_UINT32
+   local err = pcap.pcap_compile(p, program, filter_str, true, netmask)
 
    if err ~= 0 then
       pcap.pcap_perror(p, "pcap_compile failed!")
