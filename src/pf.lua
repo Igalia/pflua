@@ -9,8 +9,19 @@ local band = bit.band
 -- values including the "k" field in BPF instructions.
 
 ffi.cdef[[
-struct sock_filter { uint16_t code; uint8_t jt, jf; int32_t k; };
+struct bpf_insn { uint16_t code; uint8_t jt, jf; int32_t k; };
+struct bpf_program { uint32_t bf_len; struct bpf_insn *bf_insns; };
 ]]
+local bpf_program_mt = {
+  __len = function (program) return program.bf_len end,
+  __index = function (program, idx)
+     assert(idx >= 0 and idx < #program)
+     return program.bf_insns[idx]
+  end
+}
+
+bpf_insn = ffi.typeof("struct bpf_insn")
+bpf_program = ffi.metatype("struct bpf_program", bpf_program_mt)
 
 local function BPF_CLASS(code) return band(code, 0x07) end
 local BPF_LD   = 0x00
@@ -70,14 +81,20 @@ local function runtime_u32(s32)
 end
 
 local function runtime_div(a, b)
+   -- FIXME: Redo code generator to allow div-by-zero to bail.
    return bit.tobit(math.floor(runtime_u32(a) / runtime_u32(b)))
+end
+
+local function runtime_mul(a, b)
+   -- FIXME: This can overflow.  We need a math.imul.
+   return bit.tobit(runtime_u32(a) * runtime_u32(b))
 end
 
 local function compile_bpf_prog (instructions)
    local head = '';
    local body = '';
-   local function write_head(code) head = head .. code .. '\n' end
-   local function write_body(code) body = body .. code .. '\n' end
+   local function write_head(code) head = head .. '  ' .. code .. '\n' end
+   local function write_body(code) body = body .. '  ' .. code .. '\n' end
    local write = write_body
 
    local function bin(op, a, b) return '(' .. a .. op .. b .. ')' end
@@ -88,8 +105,7 @@ local function compile_bpf_prog (instructions)
    local function u32(a) return call('runtime_u32', a) end
    local function add(a, b) return s32(bin('+', a, b)) end
    local function sub(a, b) return s32(bin('-', a, b)) end
-   local function mul(a, b) return s32(bin('*', u32(a), u32(b))) end
-   -- FIXME: Redo code generator to allow div-by-zero to bail.
+   local function mul(a, b) return call('runtime_mul', comma(a, b)) end
    local function div(a, b) return call('runtime_div', comma(a, b)) end
    local function bit(op, a, b) return call(prop('bit', op), comma(a, b)) end
    local function bor(a, b) return bit('bor', a, b) end
@@ -103,8 +119,14 @@ local function compile_bpf_prog (instructions)
    local function assign(lhs, rhs) return lhs .. '=' .. rhs end
    local function label(i) return '::L' .. i .. '::' end
    local function jump(i) return 'goto ' .. label(i) end
-   local function cond(test, kt, kf)
-      return 'if '..test..' then '..jump(kt)..' else '..jump(kf)..' end'
+   local function cond(test, kt, kf, fallthrough)
+      if fallthrough == kf then
+         return 'if ' .. test .. ' then ' .. jump(kt) .. 'end'
+      elseif fallthrough == kt then
+         return cond('not '..test, kf, kt, fallthrough)
+      else
+         return cond(test, kt, kf, kf) .. jump(kf)
+      end
    end
 
    local function P_ref(size)
@@ -257,8 +279,8 @@ local function compile_bpf_prog (instructions)
       else error('bad class ' .. class)
       end
       if jump_targets[i] then write(label(i)) end
-  end
-  return head .. body
+   end
+   return 'function ()\n' .. head .. body .. '  error ("end of bpf?")\nend'
 end
 
 function selftest ()

@@ -1,6 +1,7 @@
 module("pcap",package.seeall)
 
 local ffi  = require("ffi")
+local pf  = require("pf")
 local pcap = ffi.load("pcap")
 
 function pcap_compile (filter_str)
@@ -8,23 +9,10 @@ function pcap_compile (filter_str)
    ffi.cdef[[
       typedef struct pcap pcap_t;
 
-      typedef unsigned int bpf_u_int32;
-
-      struct bpf_insn {
-        unsigned short code;
-        unsigned char jt;
-        unsigned char jf;
-        bpf_u_int32 k;
-      };
-
-      struct bpf_program {
-        unsigned int bf_len;
-        struct bpf_insn *bf_insns;
-      };
-
       pcap_t *pcap_create(const char *source, char *errbuf);
       int pcap_activate(pcap_t *p);
-      int pcap_compile(pcap_t *p, struct bpf_program *fp, const char *str, int optimize, bpf_u_int32 netmask);
+      int pcap_compile(pcap_t *p, struct bpf_program *fp, const char *str,
+                       int optimize, uint32_t netmask);
    ]]
 
    -- pcap_create
@@ -39,14 +27,14 @@ function pcap_compile (filter_str)
    end
 
    -- pcap_compile
-   local fp  = ffi.new("struct bpf_program",1)
+   local fp  = pf.bpf_program()
    err = pcap.pcap_compile(p, fp, filter_str, 0, 0)
 
    if err ~= 0 then
       return true, "pcap_compile failed!"
    end
 
-   local ins = ffi.new("struct bpf_insn", fp.bf_len)
+   local ins = pf.bpf_insn(fp.bf_len)
 
    -- generate bytecode
    local fp_arr = {}
