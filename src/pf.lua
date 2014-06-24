@@ -10,6 +10,8 @@ local pcap -- The pcap library, lazily loaded.
 -- as negative int32_t values, so we do the same for all of our 32-bit
 -- values including the "k" field in BPF instructions.
 
+local verbose = true;
+
 ffi.cdef[[
 struct bpf_insn { uint16_t code; uint8_t jt, jf; int32_t k; };
 struct bpf_program { uint32_t bf_len; struct bpf_insn *bf_insns; };
@@ -169,9 +171,9 @@ local function compile_bpf_prog (instructions)
    end
 
    local function P_ref(size)
-      if size == BPF_W then return 'P.s32'
-      elseif size == BPF_H then return 'P.u16'
-      elseif size == BPF_B then return 'P.u8'
+      if size == BPF_W then return 'P:s32'
+      elseif size == BPF_H then return 'P:u16'
+      elseif size == BPF_B then return 'P:u8'
       else error('bad size ' .. size)
       end
    end
@@ -224,7 +226,7 @@ local function compile_bpf_prog (instructions)
       elseif mode == BPF_MSH then
          assert(k >= 0, "packet size >= 2G???")
          write('if ' .. k .. ' >= P.length then return 0 end')
-         rhs = lsh(band(call('P.u8', k), 0xf), 2)
+         rhs = lsh(band(call('P:u8', k), 0xf), 2)
       else
          error('bad mode ' .. mode)
       end
@@ -330,10 +332,21 @@ local function compile_bpf_prog (instructions)
       end
       if jump_targets[i] then write(label(i)) end
    end
-   return ('return function (P)\n' ..
-               head .. body ..
-           '   error("end of bpf")\n' ..
-           'end')
+   local ret = ('return function (P)\n' ..
+                   head .. body ..
+                '   error("end of bpf")\n' ..
+                'end')
+   if verbose then print(ret) end
+   return loadstring(ret)()
+end
+
+function dump_bytecode (prog)
+   io.write(#prog .. ':\n')
+   for i = 0, #prog-1 do
+      io.write(string.format('  {0x%x, %u, %u, %d}\n',
+                             prog[i].code, prog[i].jt, prog[i].jf, prog[i].k))
+   end
+   io.write("\n")
 end
 
 -- The dlt_name is a "datalink type name" and specifies the link-level
@@ -346,6 +359,7 @@ end
 -- You probably want "RAW" for raw IP (v4 or v6) frames.  If you don't
 -- supply a dlt_name, "RAW" is the default.
 function pcap_compile (filter_str, dlt_name)
+   if verbose then print(filter_str) end
    if not pcap then pcap = ffi.load("pcap") end
 
    dlt_name = dlt_name or "RAW"
@@ -366,27 +380,23 @@ function pcap_compile (filter_str, dlt_name)
       error("pcap_compile failed")
    end
 
-   return program
-end
+   if verbose then dump_bytecode(program) end
 
-function dump_bytecode (prog)
-   io.write(#prog .. ':\n')
-   for i = 0, #prog-1 do
-      io.write(string.format('  {0x%x, %u, %u, %d}\n',
-                             prog[i].code, prog[i].jt, prog[i].jf, prog[i].k))
-   end
-   io.write("\n")
+   return program
 end
 
 local Buffer = {
    __index = {
       u8 = function(self, idx)
+         print('u8', self, idx)
          return self.buf[idx]
       end,
       u16 = function(self, idx)
+         print('u16', self, idx)
          return bit.bor(bit.lshift(self.buf[idx+1], 8), self.buf[idx]) -- ntohs
       end,
       s32 = function(self, idx)
+         print('s32', self, idx)
          return bit.bswap(ffi.cast('int32_t*', self.buf[idx])[0]) -- ntohl
       end
    }
@@ -404,18 +414,14 @@ local function count_accepted_packets(pred, file)
    while true do
       local data = records()
       if not data then return count end
-      if (pred(string_buffer(data))) then count = count + 1 end
+      if (pred(string_buffer(data)) ~= 0) then count = count + 1 end
    end
 end
 
 function selftest ()
    print("selftest: pf")
    local function test_pcap_filter(str)
-      print(str)
-      local prog = pcap_compile(str)
-      dump_bytecode(prog)
-      print(compile_bpf_prog(prog))
-      local f = loadstring(compile_bpf_prog(prog))()
+      local f = compile_bpf_prog(pcap_compile(str))
       assert(f(string_buffer("")) == 0, "null packet should be rejected")
    end
    test_pcap_filter("icmp")
@@ -424,5 +430,6 @@ function selftest ()
    local function accept_all(P) return true end
    assert(count_accepted_packets(accept_all, "samples/v4.pcap") == 43,
           "bad count")
+
    print("OK")
 end
