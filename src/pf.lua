@@ -316,6 +316,7 @@ local function compile_bpf_prog (instructions)
    end
 
    for i=0, #instructions-1 do
+      -- for debugging: write('print('..i..')')
       local inst = instructions[i]
       local code = inst.code
       local class = BPF_CLASS(code)
@@ -392,15 +393,12 @@ end
 local Buffer = {
    __index = {
       u8 = function(self, idx)
-         print('u8', self, idx)
          return self.buf[idx]
       end,
       u16 = function(self, idx)
-         print('u16', self, idx)
-         return bit.bor(bit.lshift(self.buf[idx+1], 8), self.buf[idx]) -- ntohs
+         return bit.bor(bit.lshift(self.buf[idx], 8), self.buf[idx+1]) -- ntohs
       end,
       s32 = function(self, idx)
-         print('s32', self, idx)
          return bit.bswap(ffi.cast('int32_t*', self.buf[idx])[0]) -- ntohl
       end
    }
@@ -431,13 +429,14 @@ function selftest ()
    test_null("icmp")
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
 
-   local function assert_count(filter, file, expected)
-      local pred = compile_pcap_filter(filter)
+   local function assert_count(filter, file, expected, dlt)
+      local pred = compile_pcap_filter(filter, dlt)
       local actual = filter_count(pred, file)
       assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)
    end
 
-   assert_count('', "samples/v4.pcap", 43)
+   assert_count('', "samples/v4.pcap", 43, "EN10MB")
+   assert_count('ip', "samples/v4.pcap", 43, "EN10MB")
 
    print("OK")
 end
