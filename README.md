@@ -7,5 +7,5 @@
 ```shell
 $ git clone --recursive git@github.com:Igalia/pflua.git
 $ cd pflua; make             # Builds embedded LuaJIT
-$ cd src; make test          # Run builtin basic tests
+$ make check                 # Run builtin basic tests
 ```
