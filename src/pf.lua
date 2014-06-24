@@ -83,19 +83,19 @@ local BPF_TXA = 0x80
 
 local BPF_MEMWORDS = 16
 
-local MAX_UINT32 = 0x10000000
+local MAX_UINT32_PLUS_1 = 0x10000000
 
 local function runtime_u32(s32)
-   if (s32 < 0) then return s32 + MAX_UINT32 end
+   if (s32 < 0) then return s32 + MAX_UINT32_PLUS_1 end
    return s32
 end
 
 local function runtime_add(a, b)
-   return bit.tobit((runtime_u32(a) + runtime_u32(b)) % MAX_UINT32)
+   return bit.tobit((runtime_u32(a) + runtime_u32(b)) % MAX_UINT32_PLUS_1)
 end
 
 local function runtime_sub(a, b)
-   return bit.tobit((runtime_u32(a) - runtime_u32(b)) % MAX_UINT32)
+   return bit.tobit((runtime_u32(a) - runtime_u32(b)) % MAX_UINT32_PLUS_1)
 end
 
 local function runtime_mul(a, b)
@@ -104,8 +104,16 @@ local function runtime_mul(a, b)
 end
 
 local function runtime_div(a, b)
-   -- FIXME: Redo code generator to allow div-by-zero to bail.
+   -- The code generator already asserted b is a non-zero constant.
    return bit.tobit(math.floor(runtime_u32(a) / runtime_u32(b)))
+end
+
+local function is_power_of_2(k)
+   if k == 0 then return false end
+   if bit.band(k, runtime_u32(k) - 1) ~= 0 then return false end
+   for shift = 0, 31 do
+      if bit.lshift(1, shift) == k then return shift end
+   end
 end
 
 local function compile_bpf_prog (instructions)
@@ -134,6 +142,7 @@ local function compile_bpf_prog (instructions)
    local function band(a, b) return bit('band', a, b) end
    local function lsh(a, b) return bit('lshift', a, b) end
    local function rsh(a, b) return bit('rshift', a, b) end
+   local function rol(a, b) return bit('rol', a, b) end
    local function neg(a) return s32('-' .. a) end -- FIXME: Is this right?
    local function ee(a, b) return bin('==', a, b) end
    local function ge(a, b) return bin('>=', a, b) end
@@ -228,8 +237,14 @@ local function compile_bpf_prog (instructions)
       local rhs
       if     op == BPF_ADD then rhs = add(A(), b)
       elseif op == BPF_SUB then rhs = sub(A(), b)
-      elseif op == BPF_MUL then rhs = mul(A(), b)
-      elseif op == BPF_DIV then rhs = div(A(), b)
+      elseif op == BPF_MUL then
+         local bits = is_power_of_2(b)
+         if bits then rhs = rol(A(), bits) else rhs = mul(A(), b) end
+      elseif op == BPF_DIV then
+         assert(src == BPF_K, "division by non-constant value is unsupported")
+         assert(k ~= 0, "program contains division by constant zero")
+         local bits = is_power_of_2(k)
+         if bits then rhs = shr(A(), bits) else rhs = div(A(), k) end
       elseif op == BPF_OR  then rhs = bor(A(), b)
       elseif op == BPF_AND then rhs = band(A(), b)
       elseif op == BPF_LSH then rhs = lsh(A(), b)
@@ -331,7 +346,7 @@ function pcap_compile (filter_str, dlt_name)
 
    -- pcap_compile
    local program = pf.bpf_program()
-   local err = pcap.pcap_compile(p, program, filter_str, 0, 0)
+   local err = pcap.pcap_compile(p, program, filter_str, 1, 0)
 
    if err ~= 0 then
       pcap.pcap_perror(p, "pcap_compile failed!")
