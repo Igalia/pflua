@@ -291,7 +291,7 @@ local function compile_bpf_prog (instructions)
       elseif op == BPF_JGE then
          write(cond(ge(u32(A()), u32(rhs)), jt, jf, i))
       elseif op == BPF_JSET then
-         write(cond(ee(band(A(), rhs), 0), jt, jf, i))
+         write(cond(ee(band(A(), rhs), 0), jf, jt, i))
       else
          error('bad op ' .. op)
       end
@@ -437,6 +437,8 @@ function selftest ()
 
    assert_count('', "samples/v4.pcap", 43, "EN10MB")
    assert_count('ip', "samples/v4.pcap", 43, "EN10MB")
+   assert_count('tcp', "samples/v4.pcap", 41, "EN10MB")
+   assert_count('tcp port 80', "samples/v4.pcap", 41, "EN10MB")
 
    print("OK")
 end
