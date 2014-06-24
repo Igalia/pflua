@@ -83,19 +83,29 @@ local BPF_TXA = 0x80
 
 local BPF_MEMWORDS = 16
 
+local MAX_UINT32 = 0x10000000
+
 local function runtime_u32(s32)
-   if (s32 < 0) then return s32 + 0x10000000 end
+   if (s32 < 0) then return s32 + MAX_UINT32 end
    return s32
 end
 
-local function runtime_div(a, b)
-   -- FIXME: Redo code generator to allow div-by-zero to bail.
-   return bit.tobit(math.floor(runtime_u32(a) / runtime_u32(b)))
+local function runtime_add(a, b)
+   return bit.tobit((runtime_u32(a) + runtime_u32(b)) % MAX_UINT32)
+end
+
+local function runtime_sub(a, b)
+   return bit.tobit((runtime_u32(a) - runtime_u32(b)) % MAX_UINT32)
 end
 
 local function runtime_mul(a, b)
    -- FIXME: This can overflow.  We need a math.imul.
    return bit.tobit(runtime_u32(a) * runtime_u32(b))
+end
+
+local function runtime_div(a, b)
+   -- FIXME: Redo code generator to allow div-by-zero to bail.
+   return bit.tobit(math.floor(runtime_u32(a) / runtime_u32(b)))
 end
 
 local function compile_bpf_prog (instructions)
@@ -115,8 +125,8 @@ local function compile_bpf_prog (instructions)
       if (tonumber(a)) then return runtime_u32(a) end
       return call('runtime_u32', a)
    end
-   local function add(a, b) return s32(bin('+', a, b)) end
-   local function sub(a, b) return s32(bin('-', a, b)) end
+   local function add(a, b) return call('runtime_add', comma(a, b)) end
+   local function sub(a, b) return call('runtime_sub', comma(a, b)) end
    local function mul(a, b) return call('runtime_mul', comma(a, b)) end
    local function div(a, b) return call('runtime_div', comma(a, b)) end
    local function bit(op, a, b) return call('bit.' .. op, comma(a, b)) end
@@ -124,7 +134,7 @@ local function compile_bpf_prog (instructions)
    local function band(a, b) return bit('band', a, b) end
    local function lsh(a, b) return bit('lshift', a, b) end
    local function rsh(a, b) return bit('rshift', a, b) end
-   local function neg(a) return s32('-' .. a) end
+   local function neg(a) return s32('-' .. a) end -- FIXME: Is this right?
    local function ee(a, b) return bin('==', a, b) end
    local function ge(a, b) return bin('>=', a, b) end
    local function gt(a, b) return bin('>', a, b) end
@@ -164,9 +174,12 @@ local function compile_bpf_prog (instructions)
       if (k >= BPF_MEMWORDS or k < 0) then error("bad k" .. k) end
       return declare('M'..k)
    end
+   local function ind(x, k)
+      if k == 0 then return x else return add(x, k) end
+   end
    local function P(size, mode, k)                   -- packet
       if     mode == BPF_ABS then return call(P_ref(size), k)
-      elseif mode == BPF_IND then return call(P_ref(size), add(X(), k))
+      elseif mode == BPF_IND then return call(P_ref(size), ind(X(), k))
       elseif mode == BPF_LEN then return 'bit.tobit(P.length)'
       elseif mode == BPF_IMM then return k
       elseif mode == BPF_MEM then return M(k)
@@ -177,7 +190,7 @@ local function compile_bpf_prog (instructions)
    local function ld(size, mode, k)
       local rhs
       if     mode == BPF_ABS then rhs = call(P_ref(size), k)
-      elseif mode == BPF_IND then rhs = call(P_ref(size), add(X(), k))
+      elseif mode == BPF_IND then rhs = call(P_ref(size), ind(X(), k))
       elseif mode == BPF_LEN then rhs = 'bit.tobit(P.length)'
       elseif mode == BPF_IMM then rhs = k
       elseif mode == BPF_MEM then rhs = M(k)
