@@ -272,13 +272,13 @@ local function compile_bpf_prog (instructions)
       jf = jf + i
 
       if op == BPF_JEQ then
-         write(cond(ee(A(), src), jt, jf, i))  -- No need for u32().
+         write(cond(ee(A(), rhs), jt, jf, i))  -- No need for u32().
       elseif op == BPF_JGT then
-         write(cond(gt(u32(A()), u32(src)), jt, jf, i))
+         write(cond(gt(u32(A()), u32(rhs)), jt, jf, i))
       elseif op == BPF_JGE then
-         write(cond(ge(u32(A()), u32(src)), jt, jf, i))
+         write(cond(ge(u32(A()), u32(rhs)), jt, jf, i))
       elseif op == BPF_JSET then
-         write(cond(ee(band(A(), src), 0), jt, jf, i))
+         write(cond(ee(band(A(), rhs), 0), jt, jf, i))
       else
          error('bad op ' .. op)
       end
