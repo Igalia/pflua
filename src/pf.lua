@@ -3,6 +3,7 @@ module("pf",package.seeall)
 local ffi = require("ffi")
 local bit = require("bit")
 local band = bit.band
+local savefile = require("pf.savefile")
 local pcap -- The pcap library, lazily loaded.
 
 -- Note: the bit module represents uint32_t values with the high-bit set
@@ -397,6 +398,16 @@ local function string_buffer(str)
    return buf
 end
 
+local function count_accepted_packets(pred, file)
+   local count = 0
+   local records = savefile.records(file)
+   while true do
+      local data = records()
+      if not data then return count end
+      if (pred(string_buffer(data))) then count = count + 1 end
+   end
+end
+
 function selftest ()
    print("selftest: pf")
    local function test_pcap_filter(str)
@@ -409,5 +420,9 @@ function selftest ()
    end
    test_pcap_filter("icmp")
    test_pcap_filter("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
+
+   local function accept_all(P) return true end
+   assert(count_accepted_packets(accept_all, "samples/v4.pcap") == 43,
+          "bad count")
    print("OK")
 end
