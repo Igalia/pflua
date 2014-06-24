@@ -101,8 +101,8 @@ end
 local function compile_bpf_prog (instructions)
    local head = '';
    local body = '';
-   local function write_head(code) head = head .. '  ' .. code .. '\n' end
-   local function write_body(code) body = body .. '  ' .. code .. '\n' end
+   local function write_head(code) head = head .. '   ' .. code .. '\n' end
+   local function write_body(code) body = body .. '   ' .. code .. '\n' end
    local write = write_body
 
    local jump_targets = {}
@@ -130,17 +130,14 @@ local function compile_bpf_prog (instructions)
    local function gt(a, b) return bin('>', a, b) end
    local function assign(lhs, rhs) return lhs .. ' = ' .. rhs end
    local function label(i) return '::L' .. i .. '::' end
-   local function jump(i)
-      jump_targets[i] = true;
-      return 'goto ' .. label(i)
-   end
+   local function jump(i) jump_targets[i] = true; return 'goto L' .. i end
    local function cond(test, kt, kf, fallthrough)
       if fallthrough == kf then
          return 'if ' .. test .. ' then ' .. jump(kt) .. ' end'
       elseif fallthrough == kt then
          return cond('not '..test, kf, kt, fallthrough)
       else
-         return cond(test, kt, kf, kf) .. '\n  ' .. jump(kf)
+         return cond(test, kt, kf, kf) .. '\n   ' .. jump(kf)
       end
    end
 
@@ -264,7 +261,7 @@ local function compile_bpf_prog (instructions)
       elseif src == BPF_A then rhs = A()
       else error('bad src ' .. src)
       end
-      write('return ' .. u32(rhs))
+      write('do return ' .. u32(rhs) .. ' end')
    end
 
    local function misc(op)
@@ -293,7 +290,10 @@ local function compile_bpf_prog (instructions)
       end
       if jump_targets[i] then write(label(i)) end
    end
-   return 'function (P)\n' .. head .. body .. '  error ("end of bpf?")\nend'
+   return ('return function (P)\n' ..
+               head .. body ..
+           '   error("end of bpf")\n' ..
+           'end')
 end
 
 -- The dlt_name is a "datalink type name" and specifies the link-level
@@ -342,5 +342,6 @@ function selftest ()
    prog = pcap_compile("icmp")
    dump_bytecode(prog)
    print(compile_bpf_prog(prog))
+   print(loadstring(compile_bpf_prog(prog))())
    print("OK")
 end
