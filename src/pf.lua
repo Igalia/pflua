@@ -377,6 +377,26 @@ function dump_bytecode (prog)
    io.write("\n")
 end
 
+local Buffer = {
+   __index = {
+      u8 = function(self, idx)
+         return self.buf[idx]
+      end,
+      u16 = function(self, idx)
+         return bit.bor(bit.lshift(self.buf[idx+1], 8), self.buf[idx]) -- ntohs
+      end,
+      s32 = function(self, idx)
+         return bit.bswap(ffi.cast('int32_t*', self.buf[idx])[0]) -- ntohl
+      end
+   }
+}
+
+local function string_buffer(str)
+   local buf = { buf = ffi.cast("uint8_t*", str), str = str, length = #str }
+   setmetatable(buf, Buffer)
+   return buf
+end
+
 function selftest ()
    print("selftest: pf")
    local function test_pcap_filter(str)
@@ -384,7 +404,8 @@ function selftest ()
       local prog = pcap_compile(str)
       dump_bytecode(prog)
       print(compile_bpf_prog(prog))
-      loadstring(compile_bpf_prog(prog))()
+      local f = loadstring(compile_bpf_prog(prog))()
+      assert(f(string_buffer("")) == 0, "null packet should be rejected")
    end
    test_pcap_filter("icmp")
    test_pcap_filter("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
