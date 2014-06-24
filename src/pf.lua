@@ -191,7 +191,7 @@ local function compile_bpf_prog (instructions)
       if     mode == BPF_LEN then rhs = 'P.length'
       elseif mode == BPF_IMM then rhs = k
       elseif mode == BPF_MEM then rhs = M(k)
-      elseif mode == BPF_MSH then rhs = mul(4, band(call('P.u8', k), 0xf))
+      elseif mode == BPF_MSH then rhs = lsh(band(call('P.u8', k), 0xf), 2)
       else                        error('bad mode ' .. mode)
       end
       write(assign(X(), rhs))
@@ -243,7 +243,7 @@ local function compile_bpf_prog (instructions)
       jf = jf + i
 
       if op == BPF_JEQ then
-         write(cond(ee(u32(A()), u32(src)), jt, jf, i))
+         write(cond(ee(A(), src), jt, jf, i))  -- No need for u32().
       elseif op == BPF_JGT then
          write(cond(gt(u32(A()), u32(src)), jt, jf, i))
       elseif op == BPF_JGE then
