@@ -264,7 +264,7 @@ local function compile_bpf_prog (instructions)
       elseif src == BPF_A then rhs = A()
       else error('bad src ' .. src)
       end
-      write('return ' .. u32(src))
+      write('return ' .. u32(rhs))
    end
 
    local function misc(op)
@@ -293,7 +293,7 @@ local function compile_bpf_prog (instructions)
       end
       if jump_targets[i] then write(label(i)) end
    end
-   return 'function ()\n' .. head .. body .. '  error ("end of bpf?")\nend'
+   return 'function (P)\n' .. head .. body .. '  error ("end of bpf?")\nend'
 end
 
 -- The dlt_name is a "datalink type name" and specifies the link-level
