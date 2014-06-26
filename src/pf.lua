@@ -338,7 +338,7 @@ local function compile_bpf_prog (instructions)
                 '   error("end of bpf")\n' ..
                 'end')
    if verbose then print(ret) end
-   return loadstring(ret)()
+   return assert(loadstring(ret))()
 end
 
 function dump_bytecode (prog)
