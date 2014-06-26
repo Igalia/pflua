@@ -107,7 +107,7 @@ function run_test_plan(p)
       io.write("enabled: ")
       if t['enabled'] then
          print("true")
-         print("tc id " .. i .. " " .. assert_count(t['filter'], "ts/pcaps/ws/"..t['pcap_file'], t['expected_result'], "EN10MB"))
+         print("tc id " .. i .. " " .. assert_count(t['filter'], "ts/pcaps/"..t['pcap_file'], t['expected_result'], "EN10MB"))
       else
          print("false")
          print("tc id " .. i .. " SKIP")
