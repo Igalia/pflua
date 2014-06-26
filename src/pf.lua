@@ -411,7 +411,7 @@ local function string_buffer(str)
    return buf
 end
 
-local function filter_count(pred, file)
+function filter_count(pred, file)
    local count = 0
    local records = savefile.records(file)
    while true do
