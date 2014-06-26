@@ -436,10 +436,10 @@ function selftest ()
       assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)
    end
 
-   assert_count('', "samples/v4.pcap", 43, "EN10MB")
-   assert_count('ip', "samples/v4.pcap", 43, "EN10MB")
-   assert_count('tcp', "samples/v4.pcap", 41, "EN10MB")
-   assert_count('tcp port 80', "samples/v4.pcap", 41, "EN10MB")
+   assert_count('', "ts/pcaps/ws/v4.pcap", 43, "EN10MB")
+   assert_count('ip', "ts/pcaps/ws/v4.pcap", 43, "EN10MB")
+   assert_count('tcp', "ts/pcaps/ws/v4.pcap", 41, "EN10MB")
+   assert_count('tcp port 80', "ts/pcaps/ws/v4.pcap", 41, "EN10MB")
 
    print("OK")
 end
