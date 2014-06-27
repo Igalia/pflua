@@ -112,6 +112,7 @@ function run_test_plan(p)
          print("false")
          print("tc id " .. i .. " SKIP")
       end
+      print("tc id " .. i .. " AVG ET " .. pf.avg_elapsed_time)
    end
 end
 
@@ -121,5 +122,4 @@ function run()
       print("\n[*] Running test plan: ".. p .. "\n")
       local stat = run_test_plan(p)
    end
-   print("OK")
 end
