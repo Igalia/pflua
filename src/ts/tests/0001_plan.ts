@@ -60,21 +60,21 @@ description:host check test
 filter:host 192.168.0.13
 pcap_file:ws/tftp_wrq.pcap
 expected_result:100
-enabled:false
+enabled:true
 
 id:8
 description:net mask test success
 filter:net 192.168.0.0 mask 255.255.255.0
 pcap_file:ws/telnet-cooked.pcap
 expected_result:92
-enabled:false
+enabled:true
 
 id:9
 description:net mask test failure
 filter:net 192.168.50.0 mask 255.255.255.0
 pcap_file:ws/telnet-cooked.pcap
 expected_result:0
-enabled:false
+enabled:true
 
 id:10
 description:no packets

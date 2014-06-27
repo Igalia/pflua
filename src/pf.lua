@@ -397,10 +397,15 @@ local Buffer = {
          return self.buf[idx]
       end,
       u16 = function(self, idx)
-         return bit.bor(bit.lshift(self.buf[idx], 8), self.buf[idx+1]) -- ntohs
+         -- ntohs
+         return bit.bor(bit.lshift(self.buf[idx], 8), self.buf[idx+1])
       end,
       s32 = function(self, idx)
-         return bit.bswap(ffi.cast('int32_t*', self.buf[idx])[0]) -- ntohl
+         -- ntohl
+         return bit.bor(bit.lshift(self.buf[idx], 24),
+                        bit.lshift(self.buf[idx+1], 16),
+                        bit.lshift(self.buf[idx+2], 8),
+                        self.buf[idx+3])
       end
    }
 }
