@@ -89,3 +89,17 @@ filter:tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 
 pcap_file:igalia/empty.pcap
 expected_result:0
 enabled:true
+
+#
+# before enabling this test you must uncompress the proper pcap.
+#
+# WARNING: one-gigabyte.pcap.xz will expand from 10MB to 1GB! :)
+#
+# $ unxz src/ts/tests/one-gigabyte.pcap.xz
+#
+id:12
+description:1 GB test
+filter:
+pcap_file:igalia/one-gigabyte.pcap
+expected_result:1166716
+enabled:false
