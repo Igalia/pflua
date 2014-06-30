@@ -8,3 +8,6 @@ check:
 
 test:
 	luajit -l pf_test -e 'pf_test.run()'
+
+trace:
+	luajit -jdump -l pf_test -e 'pf_test.run()'
