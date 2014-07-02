@@ -100,24 +100,28 @@ local function os_exec(cmd, raw)
    return s
 end
 
-local function assert_count(filter, file, expected)
-   local actual = 0
+local function assert_count(filter, file, pkg_expected)
+   local pkt_seen = 0
    local et = 0
    local pass = false
    local data
 
    -- $ ./pf_test_native 'ip' ts/pcaps/ws/v4.pcap 43
    -- pkt_seen:43, elapsed_time: 0.000036, pass: TRUE
-   local cmd = "./pf_test_native '" .. filter .. "' " .. file .. " " .. expected
+   local cmd = "./pf_test_native '" .. filter .. "' " .. file .. " " .. pkg_expected
    local data = os_exec(cmd, true)
 
    local t = data:split(", ")
 
-   actual = tonumber(t[1]:split(":")[2])
-   et     = t[2]:split(":")[2]
-   pass   = t[3]:split(":")[2]
+   pkt_seen = tonumber(t[1]:split(":")[2])
 
-   return actual, et, pass
+   if pkg_expected ~= 0 then
+      et = tonumber(t[2]:split(":")[2]) / pkg_expected
+   end
+
+   pass = t[3]:split(":")[2]
+
+   return pkt_seen, et, pass
 end
 
 function run_test_plan(p)
