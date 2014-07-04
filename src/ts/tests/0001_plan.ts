@@ -1,7 +1,10 @@
 #
-# This is a simple test plan
+# This test plan keeps the focus on regression testing. Please, add new test
+# cases to cover new code and keep the old test cases working
 #
-# Set 'enabled' to 'false' in order to skip test cases
+# Those test cases are a minimum set. They should run fast and pass
+#
+# Set 'enabled' to 'false' in order to skip test cases while hacking
 #
 # Use "make test | grep 'tc id'" to identify test cases failing quickly
 #
@@ -89,24 +92,3 @@ filter:tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 
 pcap_file:igalia/empty.pcap
 expected_result:0
 enabled:true
-
-#
-# before enabling those tests you must uncompress the proper pcap.
-#
-# WARNING: one-gigabyte.pcap.xz will expand from 10MB to 1GB! :)
-#
-# $ unxz src/ts/tests/one-gigabyte.pcap.xz
-#
-id:12
-description:1 GB test - baseline
-filter:
-pcap_file:igalia/one-gigabyte.pcap
-expected_result:1166716
-enabled:false
-
-id:13
-description:1 GB test - ip
-filter: ip
-pcap_file:igalia/one-gigabyte.pcap
-expected_result:1166716
-enabled:false
