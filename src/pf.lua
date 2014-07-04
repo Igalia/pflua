@@ -420,21 +420,21 @@ end
 elapsed_time = 0
 
 function filter_count(pred, file)
-   elapsed_time = 0
    local count = 0
    local records = savefile.records(file)
+
+   elapsed_time = os.clock()
+
    while true do
       local data = records()
-      if not data then
-         return count
-      end
-      local d = string_buffer(data)
-      local et = os.clock()
-      t = pred(d)
-      et = os.clock() - et
-      elapsed_time = elapsed_time + et
+      if not data then break end
+      t = pred(string_buffer(data))
       if (t ~= 0) then count = count + 1 end
    end
+
+   elapsed_time = os.clock() - elapsed_time
+
+   return count
 end
 
 function selftest ()
