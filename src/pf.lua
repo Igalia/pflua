@@ -417,10 +417,10 @@ local function string_buffer(str)
 end
 
 -- average elapsed time last filter ran
-avg_elapsed_time = 0
+elapsed_time = 0
 
 function filter_count(pred, file)
-   avg_elapsed_time = 0
+   elapsed_time = 0
    local count = 0
    local records = savefile.records(file)
    while true do
@@ -432,7 +432,7 @@ function filter_count(pred, file)
       local et = os.clock()
       t = pred(d)
       et = os.clock() - et
-      avg_elapsed_time = avg_elapsed_time + et
+      elapsed_time = elapsed_time + et
       if (t ~= 0) then count = count + 1 end
    end
 end

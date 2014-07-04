@@ -112,7 +112,7 @@ function run_test_plan(p)
          print("false")
          print("tc id " .. i .. " SKIP")
       end
-      print("tc id " .. i .. " AVG ET " .. pf.avg_elapsed_time)
+      print("tc id " .. i .. " AVG ET " .. pf.elapsed_time)
    end
 end
 
