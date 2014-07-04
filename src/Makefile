@@ -12,6 +12,9 @@ check:
 test:
 	luajit -l pf_test -e 'pf_test.run()'
 
+test_jit_off:
+	luajit -joff -l pf_test -e 'pf_test.run()'
+
 test_native:
 	luajit -l pf_test_native -e 'pf_test_native.run()'
 
