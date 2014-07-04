@@ -422,14 +422,10 @@ avg_elapsed_time = 0
 function filter_count(pred, file)
    avg_elapsed_time = 0
    local count = 0
-   local total = 0
    local records = savefile.records(file)
    while true do
       local data = records()
       if not data then
-         if total ~= 0 then
-            avg_elapsed_time = avg_elapsed_time / total
-         end
          return count
       end
       local d = string_buffer(data)
@@ -438,7 +434,6 @@ function filter_count(pred, file)
       et = os.clock() - et
       avg_elapsed_time = avg_elapsed_time + et
       if (t ~= 0) then count = count + 1 end
-      total = total + 1
    end
 end
 

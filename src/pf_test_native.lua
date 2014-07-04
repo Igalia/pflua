@@ -115,9 +115,7 @@ local function assert_count(filter, file, pkg_expected)
 
    pkt_seen = tonumber(t[1]:split(":")[2])
 
-   if pkg_expected ~= 0 then
-      et = tonumber(t[2]:split(":")[2]) / pkg_expected
-   end
+   et = tonumber(t[2]:split(":")[2])
 
    pass = t[3]:split(":")[2]
 
