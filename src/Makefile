@@ -21,5 +21,8 @@ test_jit_off:
 test_native:
 	luajit -l pf_test_native -e 'pf_test_native.run()'
 
+test_offline:
+	luajit -l pf_testing -e 'pf_testing.run()'
+
 trace:
 	luajit -jdump -l pf_test -e 'pf_test.run()'

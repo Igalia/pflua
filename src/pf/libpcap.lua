@@ -14,13 +14,18 @@ local MAX_UINT32 = 0xffffffff
 ffi.cdef[[
 struct bpf_insn { uint16_t code; uint8_t jt, jf; int32_t k; };
 struct bpf_program { uint32_t bf_len; struct bpf_insn *bf_insns; };
+struct pcap_pkthdr { uint32_t ts_sec; uint32_t ts_usec; uint32_t caplen; uint32_t len; };
 
 typedef struct pcap pcap_t;
+typedef unsigned char u_char;
+
 int pcap_datalink_name_to_val(const char *name);
 pcap_t *pcap_open_dead(int linktype, int snaplen);
 void pcap_perror(pcap_t *p, const char *suffix);
 int pcap_compile(pcap_t *p, struct bpf_program *fp, const char *str,
                  int optimize, uint32_t netmask);
+int pcap_offline_filter(const struct bpf_program *fp,
+                        const struct pcap_pkthdr *h, const u_char *pkt);
 ]]
 local bpf_program_mt = {
   __len = function (program) return program.bf_len end,
@@ -32,6 +37,10 @@ local bpf_program_mt = {
 
 bpf_insn = ffi.typeof("struct bpf_insn")
 bpf_program = ffi.metatype("struct bpf_program", bpf_program_mt)
+
+function pcap_offline_filter(bpf, hdr, pkt)
+   return pcap.pcap_offline_filter(ffi.cast("const struct bpf_program *", bpf), ffi.cast("const struct pcap_pkthdr *", hdr), pkt)
+end
 
 -- The dlt_name is a "datalink type name" and specifies the link-level
 -- wrapping to expect.  E.g., for raw ethernet frames, you would specify
