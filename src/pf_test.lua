@@ -71,9 +71,13 @@ function get_all_tests(p)
    return plan
 end
 
+local elapsed_time
+
 local function assert_count(filter, file, expected, dlt)
    local pred = pf.compile_pcap_filter(filter, dlt)
+   local start = os.clock()
    local actual = pf.filter_count(pred, file)
+   elapsed_time = os.clock() - start
    if actual == expected then
        return "PASS"
    else
@@ -112,7 +116,7 @@ function run_test_plan(p)
          print("false")
          print("tc id " .. i .. " SKIP")
       end
-      print("tc id " .. i .. " AVG ET " .. pf.elapsed_time)
+      print("tc id " .. i .. " AVG ET " .. elapsed_time)
    end
 end
 

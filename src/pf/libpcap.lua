@@ -7,7 +7,7 @@ local pcap -- The pcap library, lazily loaded.
 -- as negative int32_t values, so we do the same for all of our 32-bit
 -- values including the "k" field in BPF instructions.
 
-local verbose = true
+verbose = os.getenv("PF_VERBOSE");
 
 local MAX_UINT32 = 0xffffffff
 
@@ -42,7 +42,7 @@ bpf_program = ffi.metatype("struct bpf_program", bpf_program_mt)
 --
 -- You probably want "RAW" for raw IP (v4 or v6) frames.  If you don't
 -- supply a dlt_name, "RAW" is the default.
-function compile_bpf(filter_str, dlt_name)
+function compile(filter_str, dlt_name)
    if verbose then print(filter_str) end
    if not pcap then pcap = ffi.load("pcap") end
 
@@ -55,26 +55,26 @@ function compile_bpf(filter_str, dlt_name)
    assert(p, "pcap_open_dead failed")
 
    -- pcap_compile
-   local program = bpf_program()
+   local bpf = bpf_program()
    local optimize = true
    local netmask = MAX_UINT32
-   local err = pcap.pcap_compile(p, program, filter_str, optimize, netmask)
+   local err = pcap.pcap_compile(p, bpf, filter_str, optimize, netmask)
 
    if err ~= 0 then
       pcap.pcap_perror(p, "pcap_compile failed!")
       error("pcap_compile failed")
    end
 
-   return program
+   return bpf
 end
 
 function selftest ()
    print("selftest: pf")
 
-   compile_bpf("", "EN10MB")
-   compile_bpf("ip", "EN10MB")
-   compile_bpf("tcp", "EN10MB")
-   compile_bpf("tcp port 80", "EN10MB")
+   compile("", "EN10MB")
+   compile("ip", "EN10MB")
+   compile("tcp", "EN10MB")
+   compile("tcp port 80", "EN10MB")
 
    print("OK")
 end
