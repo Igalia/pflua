@@ -10,6 +10,7 @@ check:
 	luajit -l pf.buffer -e 'pf.buffer.selftest()'
 	luajit -l pf.libpcap -e 'pf.libpcap.selftest()'
 	luajit -l pf.bpf -e 'pf.bpf.selftest()'
+	luajit -l pf.lang -e 'pf.lang.selftest()'
 	luajit -l pf -e 'pf.selftest()'
 
 test:
