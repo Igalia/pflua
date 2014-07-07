@@ -22,6 +22,7 @@ struct pcap_record {
     uint32_t incl_len;       /* number of octets of packet saved in file */
     uint32_t orig_len;       /* actual length of packet */
 };
+typedef struct pcap_record pcap_pkthdr_t;
 
 struct pcap_record_extra {
    /* Extra metadata that we append to the pcap record, after the payload. */
