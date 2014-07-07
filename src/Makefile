@@ -7,6 +7,7 @@ clean:
 	rm -r -f pf_test_native
 
 check:
+	luajit -l pf.libpcap -e 'pf.libpcap.selftest()'
 	luajit -l pf -e 'pf.selftest()'
 
 test:
