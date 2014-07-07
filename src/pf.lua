@@ -5,6 +5,7 @@ local bit = require("bit")
 local band = bit.band
 local savefile = require("pf.savefile")
 local libpcap = require("pf.libpcap")
+local buffer = require("pf.buffer")
 
 -- Note: the bit module represents uint32_t values with the high-bit set
 -- as negative int32_t values, so we do the same for all of our 32-bit
@@ -332,31 +333,6 @@ function compile_pcap_filter(filter_str, dlt_name)
    return compile_bpf_prog(libpcap.compile_bpf(filter_str, dlt_name))
 end
 
-local Buffer = {
-   __index = {
-      u8 = function(self, idx)
-         return self.buf[idx]
-      end,
-      u16 = function(self, idx)
-         -- ntohs
-         return bit.bor(bit.lshift(self.buf[idx], 8), self.buf[idx+1])
-      end,
-      s32 = function(self, idx)
-         -- ntohl
-         return bit.bor(bit.lshift(self.buf[idx], 24),
-                        bit.lshift(self.buf[idx+1], 16),
-                        bit.lshift(self.buf[idx+2], 8),
-                        self.buf[idx+3])
-      end
-   }
-}
-
-local function string_buffer(str)
-   local buf = { buf = ffi.cast("uint8_t*", str), str = str, length = #str }
-   setmetatable(buf, Buffer)
-   return buf
-end
-
 -- average elapsed time last filter ran
 elapsed_time = 0
 
@@ -369,7 +345,7 @@ function filter_count(pred, file)
    while true do
       local data = records()
       if not data then break end
-      t = pred(string_buffer(data))
+      t = pred(buffer.from_string(data))
       if (t ~= 0) then count = count + 1 end
    end
 
@@ -382,7 +358,7 @@ function selftest ()
    print("selftest: pf")
    local function test_null(str)
       local f = compile_pcap_filter(str)
-      assert(f(string_buffer("")) == 0, "null packet should be rejected")
+      assert(f(buffer.from_string("")) == 0, "null packet should be rejected")
    end
    test_null("icmp")
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
