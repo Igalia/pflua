@@ -205,6 +205,8 @@ function selftest ()
    lex_test("len", {"len"}, {})
    lex_test("len-1", {"len-1"}, {})
    lex_test("len-1", {"len", "-", 1}, {maybe_arithmetic=true})
+   lex_test("1-len", {1, "-", "len"}, {maybe_arithmetic=true})
+   lex_test("1-len", {"1-len"}, {})
    lex_test("tcp port 80", {"tcp", "port", 80}, {})
    lex_test("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)",
             { 'tcp', 'port', 80, 'and',
