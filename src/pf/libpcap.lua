@@ -1,41 +1,23 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local types = require("pf.types") -- Load FFI declarations.
 local pcap -- The pcap library, lazily loaded.
-
--- Note: the bit module represents uint32_t values with the high-bit set
--- as negative int32_t values, so we do the same for all of our 32-bit
--- values including the "k" field in BPF instructions.
 
 verbose = os.getenv("PF_VERBOSE");
 
 local MAX_UINT32 = 0xffffffff
 
 ffi.cdef[[
-struct bpf_insn { uint16_t code; uint8_t jt, jf; int32_t k; };
-struct bpf_program { uint32_t bf_len; struct bpf_insn *bf_insns; };
-struct pcap_pkthdr { uint32_t ts_sec; uint32_t ts_usec; uint32_t caplen; uint32_t len; };
-
 typedef struct pcap pcap_t;
-
 int pcap_datalink_name_to_val(const char *name);
 pcap_t *pcap_open_dead(int linktype, int snaplen);
 void pcap_perror(pcap_t *p, const char *suffix);
 int pcap_compile(pcap_t *p, struct bpf_program *fp, const char *str,
                  int optimize, uint32_t netmask);
 int pcap_offline_filter(const struct bpf_program *fp,
-                        const pcap_pkthdr_t *h, const uint8_t *pkt);
+                        const struct pcap_record *h, const uint8_t *pkt);
 ]]
-local bpf_program_mt = {
-  __len = function (program) return program.bf_len end,
-  __index = function (program, idx)
-     assert(idx >= 0 and idx < #program)
-     return program.bf_insns[idx]
-  end
-}
-
-bpf_insn = ffi.typeof("struct bpf_insn")
-bpf_program = ffi.metatype("struct bpf_program", bpf_program_mt)
 
 function pcap_offline_filter(bpf, hdr, pkt)
    return pcap.pcap_offline_filter(bpf, hdr, pkt)
@@ -63,7 +45,7 @@ function compile(filter_str, dlt_name)
    assert(p, "pcap_open_dead failed")
 
    -- pcap_compile
-   local bpf = bpf_program()
+   local bpf = types.bpf_program()
    local optimize = true
    local netmask = MAX_UINT32
    local err = pcap.pcap_compile(p, bpf, filter_str, optimize, netmask)
