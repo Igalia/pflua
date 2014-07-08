@@ -1,7 +1,7 @@
 module("pf.lang",package.seeall)
 
 local function skip_whitespace(str, pos)
-   while pos <= #str and str:sub(pos,pos+1):match('%s') do
+   while pos <= #str and str:match('^%s', pos) do
       pos = pos + 1
    end
    return pos
@@ -12,28 +12,78 @@ local punctuation = {
    '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||'
 }
 
-local function parse_addr(str, pos)
-   local digits, dot = str:match("^(%d+)()%.", pos)
-   if dot then
-      -- IPV4
-      
+local function lex_host_or_keyword(str, pos)
+   local name, next_pos = str:match("^([%w_-.]+)()", pos)
+   assert(name, "failed to parse hostname or keyword at "..pos)
+   return name, next_pos
+end
+
+local function lex_ipv4_or_host(str, pos)
+   local function lex_byte(str)
+      local byte = tonumber(str, 10)
+      if byte >= 256 then return nil end
+      return byte
+   end
+   local digits, dot = str:match("^(%d%d?%d?)()%.", pos)
+   if not digits then return lex_host_or_keyword(str, start_pos) end
+   local addr = { type='ipv4' }
+   local byte = lex_byte(digits)
+   if not byte then return lex_host_or_keyword(str, pos) end
+   addr:insert(byte)
+   pos = dot
+   for i=1,3 do
+      local digits, dot = str:match("^%.(%d%d?%d?)()", pos)
+      if not digits then break end
+      addr:insert(assert(lex_byte(digits), "failed to parse ipv4 addr"))
+      pos = dot
+   end
+   local terminators = " \t\r\n)/"
+   assert(pos > #str or terminators:find(str:sub(pos, pos+1), 1, true),
+          "unexpected terminator for ipv4 address")
+   return addr, pos
+end
+
+local function lex_ipv6(str, pos)
+   local addr = { type='ipv6' }
+   -- FIXME: Currently only supporting fully-specified IPV6 names.
+   local digits, dot = str:match("^(%x%x?)()%:", pos)
+   assert(digits, "failed to parse ipv6 address at "..pos)
+   addr:insert(tonumber(digits, 16))
+   pos = dot
+   for i=1,15 do
+      local digits, dot = str:match("^%:(%x%x?)()", pos)
+      assert(digits, "failed to parse ipv6 address at "..pos)
+      addr:insert(tonumber(digits, 16))
+      pos = dot
+   end
+   local terminators = " \t\r\n)/"
+   assert(pos > #str or terminators:find(str:sub(pos, pos+1), 1, true),
+          "unexpected terminator for ipv6 address")
+   return addr, pos
+end
+
+local function lex_addr(str, pos)
+   local start_pos = pos
+   if str:match("^%d%d?%d?%.", pos) then
+      return lex_ipv4_or_host(str, pos)
+   elseif str:match("^%x?%x?%:", pos) then
+      return lex_ipv6(str, pos)
    else
-      local digits, colon = str:match("^(%x+)()%:", pos)
-      assert(colon, "failed to parse address at "..pos)
-      -- IPV6
+      return lex_host_or_keyword(str, pos)
    end
 end
 
-local function parse_number(str, pos, base)
+local number_terminators = " \t\r\n)]!<>=+-*/%&|^"
+
+local function lex_number(str, pos, base)
    local res = 0
    local i = pos
-   local terminators = " \t\r\n)]!<>=+-*/%&|^"
    while i <= #str do
       local chr = str:sub(i,i+1)
       local n = tonumber(chr, base)
       if n then
          res = res * base + n
-      elseif terminators:find(chr, 1, true) then
+      elseif number_terminators:find(chr, 1, true) then
          return res, i
       else
          return nil, i
@@ -41,25 +91,25 @@ local function parse_number(str, pos, base)
    end
 end
 
-local function parse_hex(str, pos)
-   local ret, next_pos = parse_number(str, pos, 16)
+local function lex_hex(str, pos)
+   local ret, next_pos = lex_number(str, pos, 16)
    assert(ret, "unexpected end of hex literal at "..pos)
    return ret, next_pos
 end
 
-local function parse_octal_or_addr(str, pos)
-   local ret, next_pos = parse_number(str, pos, 8)
-   if not ret then return parse_addr(str, pos) end
+local function lex_octal_or_addr(str, pos)
+   local ret, next_pos = lex_number(str, pos, 8)
+   if not ret then return lex_addr(str, pos) end
    return ret, next_pos
 end
 
-local function parse_decimal_or_addr(str, pos)
-   local ret, next_pos = parse_number(str, pos, 10)
-   if not ret then return parse_addr(str, pos) end
+local function lex_decimal_or_addr(str, pos)
+   local ret, next_pos = lex_number(str, pos, 10)
+   if not ret then return lex_addr(str, pos) end
    return ret, next_pos
 end
 
-local function peek_token(str, pos)
+local function peek_token(str, pos, len_is_keyword)
    -- EOF.
    if pos > #str then return nil, pos end
 
@@ -70,13 +120,30 @@ local function peek_token(str, pos)
    if punctuation[one] then return one end
 
    -- Numeric literals or net addresses.
-   if one:match('%d') then
-      if two == ('0x') then return parse_hex(str, pos+2) end
-      if two:match('0%d') then return parse_octal_or_addr(str, pos) end
-      return parse_decimal_or_addr(str, pos)
+   if one:match('^%d') then
+      if two == ('0x') then return lex_hex(str, pos+2) end
+      if two:match('^0%d') then return lex_octal_or_addr(str, pos) end
+      return lex_decimal_or_addr(str, pos)
    end
 
-   -- Everything else: keywords (which are alphanumeric)
+   -- IPV6 net address beginning with [a-fA-F].
+   if str:match('^%x?%x?%:', pos) then
+      return lex_ipv6(str, pos)
+   end
+
+   -- Unhappily, a special case for "len", which is the only bare name
+   -- that can appear in an arithmetic expression.  "len-1" lexes as {
+   -- 'len', '-', 1 } in arithmetic contexts, but "len-1" otherwise.
+   -- Clownshoes grammar!
+   if str:match("^len", pos) and len_is_keyword then
+      local ch = str:sub(pos+3, pos+4)
+      if ch == '' or number_terminators:find(ch, 1, true) then
+         return 'len', pos+3
+      end
+   end
+
+   -- Keywords or hostnames.
+   return lex_host_or_keyword(str, pos)
 end
 
 function tokens(str)
