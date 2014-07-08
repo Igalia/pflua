@@ -2,6 +2,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local types = require("pf.types")
+local file = require("pf.file")
 
 function write_file_header(file)
    local pcap_file = ffi.new("struct pcap_file")
@@ -62,4 +63,39 @@ function readc(file, type)
       error("short read of " .. type .. " from " .. tostring(file))
    end
    return ffi.cast(type.."*", string)
+end
+
+function records_mm(filename)
+   local fd = file.open(filename, O_RDONLY)
+   if fd == -1 then
+      error("Error opening " .. filename)
+   end
+   local size = file.size(fd)
+   local ptr = file.mmap(fd, size)
+   if ptr == ffi.cast("void *", -1) then
+      error("Error mmapping " .. filename)
+   end
+   ptr = ffi.cast("unsigned char *", ptr)
+   local ptr_end = ptr + size
+   local header = ffi.cast("struct pcap_file *", ptr)
+   if header.magic_number == 0xD4C3B2A1 then
+      error("Endian mismatch in " .. filename)
+   elseif header.magic_number ~= 0xA1B2C3D4 then
+      error("Bad PCAP magic number in " .. filename)
+   end
+   ptr = ptr + ffi.sizeof("struct pcap_file")
+   local function pcap_records_it()
+      local record = ffi.cast("struct pcap_record *", ptr)
+      if ptr >= ptr_end then return nil end
+      local datalen = math.min(record.orig_len, record.incl_len)
+      local packet = ffi.cast("unsigned char *", record + 1)
+      ptr = packet + datalen
+      local extra = nil
+      if record.incl_len == datalen + ffi.sizeof("struct pcap_record_extra") then
+	 extra = ffi.cast("struct pcap_record_extra *", ptr)
+	 ptr = ptr + ffi.sizeof("struct pcap_record_extra")
+      end
+      return packet, record, extra
+   end
+   return pcap_records_it, true, true
 end
