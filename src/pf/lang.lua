@@ -40,7 +40,8 @@ local function lex_ipv4_or_host(str, pos)
    for i=1,3 do
       local digits, dot = str:match("^%.(%d%d?%d?)()", pos)
       if not digits then break end
-      table.insert(addr, assert(lex_byte(digits), "failed to parse ipv4 addr"))
+      local byte = assert(lex_byte(digits), "failed to parse ipv4 addr")
+      table.insert(addr, byte)
       pos = dot
    end
    local terminators = " \t\r\n)/"
@@ -133,6 +134,8 @@ local function lex(str, pos, opts, in_brackets)
    local one = str:sub(pos,pos)
    if punctuation[one] then return one, pos+1 end
 
+   -- If we are in brackets, then : separates an expression from an
+   -- access size.  Otherwise it separates parts of an IPv6 address.
    if in_brackets and one == ':' then return one, pos+1 end
 
    -- Numeric literals or net addresses.
@@ -160,8 +163,11 @@ local function lex(str, pos, opts, in_brackets)
       end
    end
 
-   -- Keywords or hostnames.
-   return lex_host_or_keyword(str, pos)
+   -- Again, if we're in brackets, there won't be an IPv6 address.
+   if in_brackets then return lex_host_or_keyword(str, pos) end
+
+   -- Keywords or addresses.
+   return lex_addr(str, pos)
 end
 
 function tokens(str)
@@ -192,11 +198,19 @@ end
 
 function selftest ()
    print("selftest: pf.lang")
+   local function check(expected, actual)
+      assert(type(expected) == type(actual),
+             "expected "..type(expected).." but got "..type(actual))
+      if type(expected) == 'table' then
+         for k, v in pairs(expected) do check(v, actual[k]) end
+      else
+         assert(expected == actual, "expected "..expected.." but got "..actual)
+      end
+   end
    local function lex_test(str, elts, opts)
       local lexer = tokens(str)
-      for i, val in pairs(elts) do
-         local tok = lexer.next(opts)
-         assert(tok == val, "expected "..val.." but got "..tok)
+      for i, val in ipairs(elts) do
+         check(val, lexer.next(opts))
       end
       assert(not lexer.peek(opts), "more tokens, yo")
    end
@@ -219,5 +233,6 @@ function selftest ()
               '(', '(', 'tcp', '[', 12, ']', '&', 240, ')', '>>', 2, ')',
               ')', '!=', 0, ')'
             }, {maybe_arithmetic=true})
+   lex_test("host 127.0.0.1", { 'host', { type='ipv4', 127, 0, 0, 1 } })
    print("OK")
 end
