@@ -28,6 +28,12 @@ function from_string(str)
    return buf
 end
 
+function from_uchar(str, len)
+   local buf = { buf = ffi.cast("uint8_t*", str), str = str, length = len }
+   setmetatable(buf, Buffer)
+   return buf
+end
+
 function selftest()
    print("selftest: pf.buffer")
    assert(#from_string("") == 0)

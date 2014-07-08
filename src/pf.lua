@@ -11,11 +11,11 @@ end
 
 function filter_count(pred, file)
    local count = 0
-   local records = savefile.records(file)
+   local records = savefile.records_mm(file)
    while true do
-      local data = records()
-      if not data then break end
-      if pred(buffer.from_string(data)) ~= 0 then
+      local pkt, hdr = records()
+      if not pkt then break end
+      if pred(buffer.from_uchar(pkt, hdr.incl_len)) ~= 0 then
          count = count + 1
       end
    end
