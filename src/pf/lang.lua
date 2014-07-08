@@ -7,14 +7,20 @@ local function skip_whitespace(str, pos)
    return pos
 end
 
-local punctuation = {}
-do
-   local ops = {
-      '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
-      '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
-   }
-   for k, v in pairs(ops) do punctuation[v] = true end
+local function set(...)
+   local ret = {}
+   for k, v in pairs({...}) do ret[v] = true end
+   return ret
 end
+
+local function record(type, ...)
+   return { type = type, ... }
+end
+
+local punctuation = set(
+   '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
+   '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
+)
 
 local function lex_host_or_keyword(str, pos)
    local name, next_pos = str:match("^([%w.-]+)()", pos)
@@ -32,7 +38,7 @@ local function lex_ipv4_or_host(str, pos)
    end
    local digits, dot = str:match("^(%d%d?%d?)()%.", pos)
    if not digits then return lex_host_or_keyword(str, start_pos) end
-   local addr = { type='ipv4' }
+   local addr = record('ipv4')
    local byte = lex_byte(digits)
    if not byte then return lex_host_or_keyword(str, pos) end
    table.insert(addr, byte)
@@ -51,7 +57,7 @@ local function lex_ipv4_or_host(str, pos)
 end
 
 local function lex_ipv6(str, pos)
-   local addr = { type='ipv6' }
+   local addr = record('ipv6')
    -- FIXME: Currently only supporting fully-specified IPV6 names.
    local digits, dot = str:match("^(%x%x?)()%:", pos)
    assert(digits, "failed to parse ipv6 address at "..pos)
@@ -170,7 +176,7 @@ local function lex(str, pos, opts, in_brackets)
    return lex_addr(str, pos)
 end
 
-function tokens(str)
+local function tokens(str)
    local pos, next_pos = 1, nil
    local peeked = nil
    local brackets = 0
@@ -189,11 +195,202 @@ function tokens(str)
       pos, next_pos = next_pos, nil
       return tok
    end
-   return { peek = peek, next = next }
+   local function consume(expected, opts)
+      local tok = next(opts)
+      assert(tok == expected, "expected "..expected..", got:", tok)
+   end
+   local function check(expected, opts)
+      if peek(opts) ~= expected then return false end
+      return true
+   end
+   return { peek = peek, next = next, consume = consume }
+end
+
+local addressables = set(
+   'arp', 'rarp', 'wlan', 'ether', 'fddi', 'tr', 'ppp',
+   'slip', 'link', 'radio', 'ip', 'ip6', 'tcp', 'udp', 'icmp'
+)
+
+local function unimplemented(lexer, tok)
+   error("not implemented: "..tok)
+end
+
+local function unary(parse_arg)
+   return function(lexer, tok)
+      return record(tok, parse_arg(lexer))
+   end
+end
+
+function parse_host_arg(lexer)
+   local arg = lexer.next()
+   if type(arg) == 'string' or arg.type == 'ipv4' or arg.type == 'ipv6' then
+      return arg
+   end
+   error('invalid host', arg)
+end
+
+function parse_int_arg(lexer, max_len)
+   local ret = lexer.next()
+   assert(type(ret) == 'number', 'expected a number', ret)
+   if max_len then assert(ret <= max_len, 'out of range '..ret) end
+   return ret
+end
+
+function parse_uint16_arg(lexer) return parse_int_arg(lexer, 0xffff) end
+
+function parse_net_arg(lexer)
+   local arg = lexer.next()
+   if host.type == 'ipv4' or host.type == 'ipv6' then
+      if lexer.check('/') then
+         local len = parse_int_arg(lexer, host.type == 'ipv4' and 32 or 128)
+         return record(host.type..'/len', host, len)
+      elseif lexer.check('mask') then
+         lexer.next()
+         local mask = lexer.next()
+         assert(mask.type == host.type, 'bad mask', mask)
+         return record(host.type..'/mask', host, mask)
+      else
+         return host
+      end
+   elseif type(host) == 'string' then
+      error('named nets currently unsupported ' .. host)
+   else
+      assert(type(host) == 'number')  -- `net 10'
+      error('bare numbered nets currently unsupported', host)
+   end
+end
+
+local parse_port_arg = parse_uint16_arg
+
+local function parse_portrange_arg(lexer)
+   local start = parse_port_arg(lexer)
+   lexer.consume('-')
+   return record('portrange', start, parse_port_arg(lexer))
+end
+
+local src_or_dst_types = {
+   host = unary(parse_host_arg),
+   net = unary(parse_net_arg),
+   port = unary(parse_port_arg),
+   portrange = unary(parse_portrange_arg)
+}
+
+local function parse_src_or_dst(lexer, tok)
+   local type = lexer.next()
+   local parser = assert(src_or_dst_types[type],
+                         "unknown "..tok.." type "..type)
+   return parser(lexer, tok..'-'..type)
+end
+
+local primitives = {
+   dst = parse_src_or_dst,
+   src = parse_src_or_dst,
+   host = unary(parse_host_arg),
+   ether = unimplemented,
+   gateway = unimplemented,
+   net = unimplemented,
+   port = unimplemented,
+   portrange = unimplemented,
+   less = unimplemented,
+   greater = unimplemented,
+   ip = unimplemented,
+   ip6 = unimplemented,
+   proto = unimplemented,
+   tcp = unimplemented,
+   udp = unimplemented,
+   icmp = unimplemented,
+   protochain = unimplemented,
+   arp = unimplemented,
+   rarp = unimplemented,
+   atalk = unimplemented,
+   aarp = unimplemented,
+   decnet = unimplemented,
+   iso = unimplemented,
+   stp = unimplemented,
+   ipx = unimplemented,
+   netbeui = unimplemented,
+   lat = unimplemented,
+   moprc = unimplemented,
+   mopdl = unimplemented,
+   llc = unimplemented,
+   ifname = unimplemented,
+   on = unimplemented,
+   rnr = unimplemented,
+   rulenum = unimplemented,
+   reason = unimplemented,
+   rset = unimplemented,
+   ruleset = unimplemented,
+   srnr = unimplemented,
+   subrulenum = unimplemented,
+   action = unimplemented,
+   wlan = unimplemented,
+   type = unimplemented,
+   subtype = unimplemented,
+   dir = unimplemented,
+   vlan = unimplemented,
+   mpls = unimplemented,
+   pppoed = unimplemented,
+   pppoes = unimplemented,
+   iso = unimplemented,
+   clnp = unimplemented,
+   esis = unimplemented,
+   isis = unimplemented,
+   l1 = unimplemented,
+   l2 = unimplemented,
+   iih = unimplemented,
+   lsp = unimplemented,
+   snp = unimplemented,
+   csnp = unimplemented,
+   psnp = unimplemented,
+   vpi = unimplemented,
+   vci = unimplemented,
+   lane = unimplemented,
+   oamf4s = unimplemented,
+   oamf4e = unimplemented,
+   oamf4 = unimplemented,
+   oam = unimplemented,
+   metac = unimplemented,
+   bcc = unimplemented,
+   sc = unimplemented,
+   ilmic = unimplemented,
+   connectmsg = unimplemented,
+   metaconnect = unimplemented
+}
+
+local function parse_primitive_or_relop(lexer, tok)
+   if type(tok) == 'string' then
+      if addressables[tok] and lexer.peek() == '[' then
+         return parse_relop(lexer, peeked)
+      end
+      local parser = primitives[tok]
+      if parser then return parser(lexer, tok) end
+
+      -- At this point the official pcap grammar is squirrely.  It says:
+      -- "If an identifier is given without a keyword, the most recent
+      -- keyword is assumed.  For example, `not host vs and ace' is
+      -- short for `not host vs and host ace` and which should not be
+      -- confused with `not (host vs or ace)`."  For now we punt on this
+      -- part of the grammar.
+      error("keyword elision not implemented")
+   end
+
+end
+
+local function parse_expr(lexer)
+   local tok = lexer.peek({maybe_arithmetic=true})
+   if not tok then return nil end
+   lexer.next()
+   if tok == '(' then
+      local expr = parse_expr(lexer)
+      assert(lexer.next() == ')', "expected )")
+      return expr
+   end
+   local expr = parse_primitive_or_relop(lexer, tok)
+   return expr
 end
 
 function compile(str)
-   local ast = parse(str)
+   return parse_expr(tokens(str))
 end
 
 function selftest ()
@@ -207,6 +404,7 @@ function selftest ()
          assert(expected == actual, "expected "..expected.." but got "..actual)
       end
    end
+
    local function lex_test(str, elts, opts)
       local lexer = tokens(str)
       for i, val in ipairs(elts) do
@@ -235,5 +433,9 @@ function selftest ()
             }, {maybe_arithmetic=true})
    lex_test("host 127.0.0.1", { 'host', { type='ipv4', 127, 0, 0, 1 } })
    lex_test("net 10.0.0.0/24", { 'net', { type='ipv4', 10, 0, 0, 0 }, '/', 24 })
+
+   local function compile_test(str, elts) check(elts, compile(str)) end
+   compile_test("host 127.0.0.1",
+                { type='host', { type='ipv4', 127, 0, 0, 1 } })
    print("OK")
 end
