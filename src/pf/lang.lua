@@ -7,12 +7,13 @@ local function skip_whitespace(str, pos)
    return pos
 end
 
-local punctuation = {
-   '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
-   '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
-}
-for k, v in ipairs(punctuation) do
-   punctuation[v] = true
+local punctuation = {}
+do
+   local ops = {
+      '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
+      '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
+   }
+   for k, v in pairs(ops) do punctuation[v] = true end
 end
 
 local function lex_host_or_keyword(str, pos)
