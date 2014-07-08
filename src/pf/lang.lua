@@ -11,9 +11,13 @@ local punctuation = {
    '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
    '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||'
 }
+for k, v in ipairs(punctuation) do
+   table.remove(punctuation, k)
+   punctuation[v] = true
+end
 
 local function lex_host_or_keyword(str, pos)
-   local name, next_pos = str:match("^([%w_-.]+)()", pos)
+   local name, next_pos = str:match("^([%w_.-]+)()", pos)
    assert(name, "failed to parse hostname or keyword at "..pos)
    return name, next_pos
 end
@@ -38,7 +42,7 @@ local function lex_ipv4_or_host(str, pos)
       pos = dot
    end
    local terminators = " \t\r\n)/"
-   assert(pos > #str or terminators:find(str:sub(pos, pos+1), 1, true),
+   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
           "unexpected terminator for ipv4 address")
    return addr, pos
 end
@@ -57,7 +61,7 @@ local function lex_ipv6(str, pos)
       pos = dot
    end
    local terminators = " \t\r\n)/"
-   assert(pos > #str or terminators:find(str:sub(pos, pos+1), 1, true),
+   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
           "unexpected terminator for ipv6 address")
    return addr, pos
 end
@@ -79,16 +83,18 @@ local function lex_number(str, pos, base)
    local res = 0
    local i = pos
    while i <= #str do
-      local chr = str:sub(i,i+1)
+      local chr = str:sub(i,i)
       local n = tonumber(chr, base)
       if n then
          res = res * base + n
+         i = i + 1
       elseif number_terminators:find(chr, 1, true) then
          return res, i
       else
          return nil, i
       end
    end
+   return res, i  -- EOS
 end
 
 local function lex_hex(str, pos)
@@ -109,15 +115,15 @@ local function lex_decimal_or_addr(str, pos)
    return ret, next_pos
 end
 
-local function peek_token(str, pos, len_is_keyword)
+local function lex(str, pos, len_is_keyword)
    -- EOF.
    if pos > #str then return nil, pos end
 
    -- Non-alphanumeric tokens.
-   local two = str:sub(pos,pos+2)
-   if punctuation[two] then return two end
-   local one = str:sub(pos,pos+1)
-   if punctuation[one] then return one end
+   local two = str:sub(pos,pos+1)
+   if punctuation[two] then return two, pos+2 end
+   local one = str:sub(pos,pos)
+   if punctuation[one] then return one, pos+1 end
 
    -- Numeric literals or net addresses.
    if one:match('^%d') then
@@ -136,7 +142,7 @@ local function peek_token(str, pos, len_is_keyword)
    -- 'len', '-', 1 } in arithmetic contexts, but "len-1" otherwise.
    -- Clownshoes grammar!
    if str:match("^len", pos) and len_is_keyword then
-      local ch = str:sub(pos+3, pos+4)
+      local ch = str:sub(pos+3, pos+3)
       if ch == '' or number_terminators:find(ch, 1, true) then
          return 'len', pos+3
       end
@@ -149,15 +155,17 @@ end
 function tokens(str)
    local pos, next_pos = 1, nil
    local peeked = nil
-   local function peek()
+   local function peek(len_is_keyword)
       if not next_pos then
          pos = skip_whitespace(str, pos)
-         peeked, next_pos = peek_token(str, pos)
+         peeked, next_pos = lex(str, pos, len_is_keyword)
+         assert(next_pos, "next pos is nil")
       end
       return peeked
    end
-   local function next()
-      local tok = assert(peek(), "unexpected end of filter string")
+   local function next(len_is_keyword)
+      local tok = assert(peek(len_is_keyword),
+                         "unexpected end of filter string")
       pos, next_pos = next_pos, nil
       return tok
    end
@@ -170,6 +178,18 @@ end
 
 function selftest ()
    print("selftest: pf.lang")
-   
+   local function lex_test(str, elts, len_is_keyword)
+      local lexer = tokens(str)
+      for i, val in pairs(elts) do
+         local tok = lexer.next(len_is_keyword)
+         assert(tok == val, "expected "..val.." but got "..tok)
+      end
+      assert(not lexer.peek(len_is_keyword), "more tokens, yo")
+   end
+   lex_test("ip", {"ip"}, true)
+   lex_test("len", {"len"}, true)
+   lex_test("len", {"len"}, false)
+   lex_test("len-1", {"len-1"}, false)
+   lex_test("len-1", {"len", "-", 1}, true)
    print("OK")
 end
