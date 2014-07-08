@@ -77,8 +77,7 @@ local function assert_count(filter, file, pkt_expected)
    local lapse = 0
    local pass = false
    local f = libpcap.compile(filter, 'EN10MB')
-   print(f)
-   local records = savefile.records(file)
+   local records = savefile.records_mm(file)
    local start = os.clock()
    while true do
       local pkt, hdr = records()
