@@ -234,5 +234,6 @@ function selftest ()
               ')', '!=', 0, ')'
             }, {maybe_arithmetic=true})
    lex_test("host 127.0.0.1", { 'host', { type='ipv4', 127, 0, 0, 1 } })
+   lex_test("net 10.0.0.0/24", { 'net', { type='ipv4', 10, 0, 0, 0 }, '/', 24 })
    print("OK")
 end
