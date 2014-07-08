@@ -201,9 +201,10 @@ local function tokens(str)
    end
    local function check(expected, opts)
       if peek(opts) ~= expected then return false end
+      next()
       return true
    end
-   return { peek = peek, next = next, consume = consume }
+   return { peek = peek, next = next, consume = consume, check = check }
 end
 
 local addressables = set(
@@ -240,23 +241,23 @@ function parse_uint16_arg(lexer) return parse_int_arg(lexer, 0xffff) end
 
 function parse_net_arg(lexer)
    local arg = lexer.next()
-   if host.type == 'ipv4' or host.type == 'ipv6' then
+   if arg.type == 'ipv4' or arg.type == 'ipv6' then
       if lexer.check('/') then
-         local len = parse_int_arg(lexer, host.type == 'ipv4' and 32 or 128)
-         return record(host.type..'/len', host, len)
+         local len = parse_int_arg(lexer, arg.type == 'ipv4' and 32 or 128)
+         return record(arg.type..'/len', arg, len)
       elseif lexer.check('mask') then
          lexer.next()
          local mask = lexer.next()
-         assert(mask.type == host.type, 'bad mask', mask)
-         return record(host.type..'/mask', host, mask)
+         assert(mask.type == arg.type, 'bad mask', mask)
+         return record(arg.type..'/mask', arg, mask)
       else
-         return host
+         return arg
       end
-   elseif type(host) == 'string' then
-      error('named nets currently unsupported ' .. host)
+   elseif type(arg) == 'string' then
+      error('named nets currently unsupported ' .. arg)
    else
-      assert(type(host) == 'number')  -- `net 10'
-      error('bare numbered nets currently unsupported', host)
+      assert(type(arg) == 'number')  -- `net 10'
+      error('bare numbered nets currently unsupported', arg)
    end
 end
 
@@ -437,5 +438,10 @@ function selftest ()
    local function compile_test(str, elts) check(elts, compile(str)) end
    compile_test("host 127.0.0.1",
                 { type='host', { type='ipv4', 127, 0, 0, 1 } })
+   compile_test("src host 127.0.0.1",
+                { type='src-host', { type='ipv4', 127, 0, 0, 1 } })
+   compile_test("src net 10.0.0.0/24",
+                { type='src-net',
+                  { type='ipv4/len', { type='ipv4', 10, 0, 0, 0 }, 24 }})
    print("OK")
 end
