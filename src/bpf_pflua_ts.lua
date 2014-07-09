@@ -1,4 +1,4 @@
-module("pf_test",package.seeall)
+module("bpf_pflua_ts",package.seeall)
 
 local pf = require("pf")
 

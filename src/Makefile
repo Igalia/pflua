@@ -13,10 +13,10 @@ check:
 	luajit -l pf -e 'pf.selftest()'
 
 test:
-	luajit -l pf_test -e 'pf_test.run()'
+	luajit -l bpf_pflua_ts -e 'bpf_pflua_ts.run()'
 
 test_jit_off:
-	luajit -joff -l pf_test -e 'pf_test.run()'
+	luajit -joff -l bpf_pflua_ts -e 'bpf_pflua_ts.run()'
 
 trace:
-	luajit -jdump -l pf_test -e 'pf_test.run()'
+	luajit -jdump -l bpf_pflua_ts -e 'bpf_pflua_ts.run()'
