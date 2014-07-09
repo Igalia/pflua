@@ -1,10 +1,8 @@
 PATH := .:../deps/luajit/usr/local/bin:$(PATH)
 
 all:
-	gcc -o pf_test_native pf_test_native.c -lpcap
 
 clean:
-	rm -r -f pf_test_native
 
 check:
 	luajit -l pf.buffer -e 'pf.buffer.selftest()'
@@ -19,9 +17,6 @@ test:
 
 test_jit_off:
 	luajit -joff -l pf_test -e 'pf_test.run()'
-
-test_native:
-	luajit -l pf_test_native -e 'pf_test_native.run()'
 
 trace:
 	luajit -jdump -l pf_test -e 'pf_test.run()'
