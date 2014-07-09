@@ -348,6 +348,17 @@ end
 
 local parse_string_arg = simple_typed_arg_parser('string')
 
+local function parse_decnet_host_arg(lexer)
+   local arg = lexer.next()
+   if type(arg) == 'string' then return arg end
+   if arg.type == 'ipv4' then
+      arg.type = 'decnet'
+      assert(#arg == 2, "bad decnet address", arg)
+      return arg
+   end
+   error('invalid decnet host', arg)
+end
+
 local src_or_dst_types = {
    host = unary(parse_host_arg),
    net = unary(parse_net_arg),
@@ -377,6 +388,12 @@ local ip6_types = {
    multicast = nullary(),
 }
 
+local decnet_types = {
+   src = unary(parse_decnet_host_arg),
+   dst = unary(parse_decnet_host_arg),
+   host = unary(parse_decnet_host_arg),
+}
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
@@ -394,12 +411,12 @@ local primitives = {
    tcp = nullary(),
    udp = nullary(),
    icmp = nullary(),
-   protochain = unimplemented,
-   arp = unimplemented,
-   rarp = unimplemented,
-   atalk = unimplemented,
-   aarp = unimplemented,
-   decnet = unimplemented,
+   protochain = unary(parse_proto_arg),
+   arp = unary(),
+   rarp = unary(),
+   atalk = unary(),
+   aarp = unary(),
+   decnet = table_parser(decnet_types),
    iso = unimplemented,
    stp = unimplemented,
    ipx = unimplemented,
@@ -539,5 +556,7 @@ function selftest ()
                 { type='ipv4/len', { type='ipv4', 10, 0, 0, 0 }, 24 }})
    parse_test("ether proto rarp",
               { type='ether-proto', 'rarp' })
+   parse_test("decnet host 10.23",
+              { type='decnet-host', { type='decnet', 10, 23 } })
    print("OK")
 end
