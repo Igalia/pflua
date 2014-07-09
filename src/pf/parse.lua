@@ -1,4 +1,4 @@
-module("pf.lang",package.seeall)
+module(...,package.seeall)
 
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
@@ -605,12 +605,12 @@ local function parse_expr(lexer)
    return expr
 end
 
-function compile(str)
+function parse(str)
    return parse_expr(tokens(str))
 end
 
 function selftest ()
-   print("selftest: pf.lang")
+   print("selftest: pf.parse")
    local function check(expected, actual)
       assert(type(expected) == type(actual),
              "expected type "..type(expected).." but got "..type(actual))

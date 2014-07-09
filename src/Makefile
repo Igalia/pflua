@@ -9,7 +9,7 @@ check:
 	luajit -l pf.types -e 'pf.types.selftest()'
 	luajit -l pf.libpcap -e 'pf.libpcap.selftest()'
 	luajit -l pf.bpf -e 'pf.bpf.selftest()'
-	luajit -l pf.lang -e 'pf.lang.selftest()'
+	luajit -l pf.parse -e 'pf.parse.selftest()'
 	luajit -l pf -e 'pf.selftest()'
 
 test:
