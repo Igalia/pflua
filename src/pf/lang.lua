@@ -304,12 +304,15 @@ local function parse_ehost_arg(lexer)
    error('invalid ethernet host', arg)
 end
 
-local function table_parser(table)
+local function table_parser(table, default)
    return function (lexer, tok)
-      local type = lexer.next()
-      local parser = assert(table[type],
-                            "unknown "..tok.." type "..type)
-      return parser(lexer, tok..'-'..type)
+      local subtok = lexer.peek()
+      if table[subtok] then
+         lexer.consume(subtok)
+         return table[subtok](lexer, tok..'-'..subtok)
+      end
+      if default then return default(lexer, tok) end
+      error("unknown "..tok.." type "..subtok)
    end
 end
 
@@ -359,6 +362,80 @@ local function parse_decnet_host_arg(lexer)
    error('invalid decnet host', arg)
 end
 
+local llc_types = set(
+   'i', 's', 'u', 'rr', 'rnr', 'rej', 'ui', 'ua',
+   'disc', 'sabme', 'test', 'xis', 'frmr'
+)
+
+local function parse_llc(lexer, tok)
+   local type = lexer.peek()
+   if llc_types[type] then return record(tok, type) end
+   return record(tok)
+end
+
+local pf_reasons = set(
+   'match', 'bad-offset', 'fragment', 'short', 'normalize', 'memory'
+)
+
+local pf_actions = set(
+   'pass', 'block', 'nat', 'rdr', 'binat', 'scrub'
+)
+
+local wlan_frame_types = set('mgt', 'ctl', 'data')
+local wlan_frame_mgt_subtypes = set(
+   'assoc-req', 'assoc-resp', 'reassoc-req', 'reassoc-resp',
+   'probe-req', 'probe-resp', 'beacon', 'atim', 'disassoc', 'auth', 'deauth'
+)
+local wlan_frame_ctl_subtypes = set(
+   'ps-poll', 'rts', 'cts', 'ack', 'cf-end', 'cf-end-ack'
+)
+local wlan_frame_data_subtypes = set(
+   'data', 'data-cf-ack', 'data-cf-poll', 'data-cf-ack-poll', 'null',
+   'cf-ack', 'cf-poll', 'cf-ack-poll', 'qos-data', 'qos-data-cf-ack',
+   'qos-data-cf-poll', 'qos-data-cf-ack-poll', 'qos', 'qos-cf-poll',
+   'quos-cf-ack-poll'
+)
+
+local wlan_directions = set('nods', 'tods', 'fromds', 'dstods')
+
+local function parse_enum_arg(lexer, set)
+   local arg = lexer.next()
+   assert(set[arg], 'invalid argument: '..arg)
+   return arg
+end
+
+local function enum_arg_parser(set)
+   return function(lexer) return parse_enum_arg(lexer, set) end
+end
+
+local function parse_wlan_type(lexer, tok)
+   local type = enum_arg_parser(wlan_frame_types)(lexer)
+   if lexer.check('subtype') then
+      local set
+      if type == 'mgt' then set = wlan_frame_mgt_subtypes
+      elseif type == 'mgt' then set = wlan_frame_ctl_subtypes
+      else set = wlan_frame_data_subtypes end
+      return record('type', type, enum_arg_parser(set)(lexer))
+   end
+   return record(tok, type)
+end
+
+local function parse_wlan_subtype(lexer, tok)
+   local subtype = lexer.next()
+   assert(wlan_frame_mgt_subtypes[subtype]
+             or wlan_frame_ctl_subtypes[subtype]
+             or wlan_frame_data_subtypes[subtype],
+          'bad wlan subtype '..subtype)
+   return record(tok, subtype)
+end
+
+local function parse_wlan_dir(lexer, tok)
+   if (type(lexer.peek()) == 'number') then
+      return unary(tok, lexer.next())
+   end
+   return record(tok, parse_enum_arg(lexer, wlan_directions))
+end
+
 local src_or_dst_types = {
    host = unary(parse_host_arg),
    net = unary(parse_net_arg),
@@ -394,6 +471,15 @@ local decnet_types = {
    host = unary(parse_decnet_host_arg),
 }
 
+local wlan_types = {
+   ra = unary(parse_ehost_arg),
+   ta = unary(parse_ehost_arg),
+   addr1 = unary(parse_ehost_arg),
+   addr2 = unary(parse_ehost_arg),
+   addr3 = unary(parse_ehost_arg),
+   addr4 = unary(parse_ehost_arg),
+}
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
@@ -405,8 +491,8 @@ local primitives = {
    portrange = unary(parse_portrange_arg),
    less = unary(parse_int_arg),
    greater = unary(parse_int_arg),
-   ip = table_parser(ip_types),
-   ip6 = table_parser(ip6_types),
+   ip = table_parser(ip_types, nullary()),
+   ip6 = table_parser(ip6_types, nullary()),
    proto = unary(parse_proto_arg),
    tcp = nullary(),
    udp = nullary(),
@@ -417,28 +503,28 @@ local primitives = {
    atalk = unary(),
    aarp = unary(),
    decnet = table_parser(decnet_types),
-   iso = unimplemented,
-   stp = unimplemented,
-   ipx = unimplemented,
-   netbeui = unimplemented,
-   lat = unimplemented,
-   moprc = unimplemented,
-   mopdl = unimplemented,
-   llc = unimplemented,
-   ifname = unimplemented,
-   on = unimplemented,
-   rnr = unimplemented,
-   rulenum = unimplemented,
-   reason = unimplemented,
-   rset = unimplemented,
-   ruleset = unimplemented,
-   srnr = unimplemented,
-   subrulenum = unimplemented,
-   action = unimplemented,
-   wlan = unimplemented,
-   type = unimplemented,
-   subtype = unimplemented,
-   dir = unimplemented,
+   iso = unary(),
+   stp = unary(),
+   ipx = unary(),
+   netbeui = unary(),
+   lat = unary(),
+   moprc = unary(),
+   mopdl = unary(),
+   llc = parse_llc,
+   ifname = unary(parse_string_arg),
+   on = unary(parse_string_arg),
+   rnr = unary(parse_int_arg),
+   rulenum = unary(parse_int_arg),
+   reason = unary(enum_arg_parser(pf_reasons)),
+   rset = unary(parse_string_arg),
+   ruleset = unary(parse_string_arg),
+   srnr = unary(parse_int_arg),
+   subrulenum = unary(parse_int_arg),
+   action = unary(enum_arg_parser(pf_actions)),
+   wlan = table_parser(wlan_types),
+   type = parse_wlan_type,
+   subtype = parse_wlan_subtype,
+   dir = unary(enum_arg_parser(wlan_directions)),
    vlan = unimplemented,
    mpls = unimplemented,
    pppoed = unimplemented,
@@ -509,7 +595,7 @@ function selftest ()
    print("selftest: pf.lang")
    local function check(expected, actual)
       assert(type(expected) == type(actual),
-             "expected "..type(expected).." but got "..type(actual))
+             "expected type "..type(expected).." but got "..type(actual))
       if type(expected) == 'table' then
          for k, v in pairs(expected) do check(v, actual[k]) end
       else
@@ -558,5 +644,13 @@ function selftest ()
               { type='ether-proto', 'rarp' })
    parse_test("decnet host 10.23",
               { type='decnet-host', { type='decnet', 10, 23 } })
+   parse_test("ip proto icmp",
+              { type='ip-proto', 'icmp' })
+   parse_test("ip",
+              { type='ip' })
+   parse_test("type mgt",
+              { type='type', 'mgt' })
+   parse_test("type mgt subtype deauth",
+              { type='type', 'mgt', 'deauth' })
    print("OK")
 end
