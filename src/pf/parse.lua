@@ -573,23 +573,76 @@ local primitives = {
    metaconnect = nullary()
 }
 
-local function parse_primitive_or_relop(lexer, tok)
-   if type(tok) == 'string' then
-      if addressables[tok] and lexer.peek() == '[' then
-         return parse_relop(lexer, peeked)
+local function parse_primary_arithmetic(lexer, tok)
+   tok = tok or lexer.next({maybe_arithmetic=true})
+   if tok == '(' then
+      local expr = parse_arithmetic(lexer)
+      lexer.consume(')')
+      return expr
+   elseif tok == 'len' or type(tok) == 'number' then
+      return tok
+   elseif addressables[tok] then
+      lexer.consume('[')
+      local pos = parse_arithmetic(lexer)
+      local size = 1
+      if lexer.check(':') then
+         if lexer.check(1) then size = 1
+         elseif lexer.check(2) then size = 1
+         else lexer.consume(4); size = 1 end
       end
-      local parser = primitives[tok]
-      if parser then return parser(lexer, tok) end
+      lexer.consume(']')
+      return record('['..tok..']', pos, size)
+   else
+      error('bad token while parsing arithmetic expression', tok)
+   end
+end
 
-      -- At this point the official pcap grammar is squirrely.  It says:
-      -- "If an identifier is given without a keyword, the most recent
-      -- keyword is assumed.  For example, `not host vs and ace' is
-      -- short for `not host vs and host ace` and which should not be
-      -- confused with `not (host vs or ace)`."  For now we punt on this
-      -- part of the grammar.
-      error("keyword elision not implemented")
+local arithmetic_precedence = {
+   ['*'] = 1, ['/'] = 1, ['%'] = 1,
+   ['+'] = 2, ['-'] = 2,
+   ['<<'] = 3, ['>>'] = 3,
+   ['&'] = 4,
+   ['^'] = 5,
+   ['|'] = 6
+}
+
+local function parse_arithmetic(lexer, tok, max_precedence)
+   local exp = parse_primary_arithmetic(lexer, tok)
+   max_precedence = max_precedence or math.huge
+   while true do
+      local op = lexer.peek()
+      local prec = arithmetic_precedence[op]
+      if not prec or prec > max_precedence then return exp end
+      lexer.consume(op)
+      local rhs = parse_arithmetic(lexer, nil, prec - 1)
+      exp = record(op, exp, rhs)
+   end
+end
+
+local function parse_relop(lexer, tok)
+   local lhs = parse_arithmetic(lexer, tok)
+   local op = lexer.next()
+   assert(set('>', '<', '>=', '<=', '=', '!=')[op],
+          "expected a comparison operator, got", op)
+   return record(op, lhs, parse_arithmetic(lexer))
+end
+
+local function parse_primitive_or_relop(lexer, tok)
+   if (type(tok) == 'number' or tok == 'len' or
+       addressables[tok] and lexer.peek() == '[') then
+      return parse_relop(lexer, tok)
    end
 
+   local parser = primitives[tok]
+   if parser then return parser(lexer, tok) end
+
+   -- At this point the official pcap grammar is squirrely.  It says:
+   -- "If an identifier is given without a keyword, the most recent
+   -- keyword is assumed.  For example, `not host vs and ace' is
+   -- short for `not host vs and host ace` and which should not be
+   -- confused with `not (host vs or ace)`."  For now we punt on this
+   -- part of the grammar.
+   error("keyword elision not implemented")
 end
 
 local function parse_expr(lexer)
@@ -598,7 +651,7 @@ local function parse_expr(lexer)
    lexer.next()
    if tok == '(' then
       local expr = parse_expr(lexer)
-      assert(lexer.next() == ')', "expected )")
+      lexer.consume(')')
       return expr
    end
    local expr = parse_primitive_or_relop(lexer, tok)
@@ -670,5 +723,9 @@ function selftest ()
               { type='type', 'mgt' })
    parse_test("type mgt subtype deauth",
               { type='type', 'mgt', 'deauth' })
+   parse_test("1+1=2",
+              { type='=', { type='+', 1, 1 }, 2 })
+   parse_test("1+2*3+4=5",
+              { type='=', { type='+', { type='+', 1, { type='*', 2, 3 } }, 4 }, 5 })
    print("OK")
 end
