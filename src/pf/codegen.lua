@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+verbose = os.getenv("PF_VERBOSE");
+
 -- stubs
 local function set() end
 
@@ -54,7 +56,22 @@ local wlan_directions = set('nods', 'tods', 'fromds', 'dstods')
 
 local iso_proto_types = set('clnp', 'esis', 'isis')
 
-local function function_builder(...)
+-- TODO: Do a source-to-source transform that lifts assertions caused by
+-- e.g. ip[0] accesses out to the nearest "or" expression.  Lift tests
+-- out to the nearest logical expression.  Transform access like ip[0]
+-- into raw byte accesses, given a link encapsulation, and do the same
+-- for logical predicates like "ip".
+local offsets_by_dlt = {
+   EN10MB = { ether = 0, ip = 14 }
+}
+
+local function offsetof(dlt, level)
+   local offsets = offsets_by_dlt[dlt]
+   assert(offsets, "unimplemented link type "..dlt)
+   return assert(offsets[level])
+end
+
+local function filter_builder(dlt, ...)
    local written = 'return function('
    local vcount = 0
    local lcount = 0
@@ -69,6 +86,7 @@ local function function_builder(...)
    local function v(str)
       vcount = vcount + 1
       writeln('local v'..vcount..' = '..str)
+      return 'v'..vcount
    end
    local function label()
       lcount = lcount + 1
@@ -82,18 +100,31 @@ local function function_builder(...)
    end
    local function test(cond, kt, kf, k)
       if kt == k then
-         writeln('if not '..comp..' then '..jump(kf)..' end')
-         writeln('if not '..comp..' then '..jump(kf)..' end')
+         writeln('if not '..cond..' then '..jump(kf)..' end')
+         writeln('if not '..cond..' then '..jump(kf)..' end')
       else
-         writeln('if '..comp..' then '..jump(kt)..' end')
-         if kf ~= k then builder.writeln('do '..jump(kf)..' end') end
+         writeln('if '..cond..' then '..jump(kt)..' end')
+         if kf ~= k then writeln('do '..jump(kf)..' end') end
       end
+   end
+   local function ref(level, pos, size, kf)
+      size = size or 1
+      kf = kf or 'REJECT'
+      local offset = offsetof(dlt, level)
+      test((offset+size)..'+'..pos..' > P.length', kf)
+      local accessor
+      if size == 1 then accessor = 'u8'
+      elseif size == 2 then accessor = 'u16'
+      elseif size == 4 then accessor = 's32'
+      else error("bad size", size) end
+      return 'P:'..accessor..'('..offset..'+'..pos..')'
    end
    local function writelabel(label)
       if jumps[label] then write('::'..label..'::\n') end
    end
    local function finish(str)
       write('end')
+      if verbose then print(written) end
       return written
    end
    local needs_comma = false
@@ -103,8 +134,8 @@ local function function_builder(...)
       needs_comma = true
    end
    write(')\n')
-   return { write = write, writeln = writeln,
-            v = v, label = label, test = test, writelabel = writelabel,
+   return { write = write, writeln = writeln, v = v, ref = ref,
+            label = label, test = test, writelabel = writelabel,
             finish = finish }
 end
 
@@ -134,7 +165,9 @@ local primitive_codegens = {
    portrange = unimplemented,
    less = unimplemented,
    greater = unimplemented,
-   ip = unimplemented,
+   ip = function(builder, expr, kt, kf, k)
+      builder.test(builder.ref('ether', 12, 2, kf)..'= 2048', kt, kf, k)
+   end,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
    ip_broadcast = unimplemented,
@@ -246,8 +279,9 @@ local function compile_bool(builder, expr, kt, kf, k)
    end
 end
 
-function compile_lua(parsed)
-   local builder = function_builder('P')
+function compile_lua(parsed, dlt)
+   dlt = dlt or 'RAW'
+   local builder = filter_builder(dlt, 'P')
    compile_bool(builder, parsed, 'ACCEPT', 'REJECT')
    return builder.finish()
 end
@@ -259,6 +293,6 @@ end
 function selftest ()
    print("selftest: pf.codegen")
    local parse = require('pf.parse').parse
-   -- print(compile_lua(parse("ip")))
+   compile_lua(parse("ip"), 'EN10MB')
    print("OK")
 end
