@@ -59,12 +59,12 @@ end
 local function lex_ipv6(str, pos)
    local addr = record('ipv6')
    -- FIXME: Currently only supporting fully-specified IPV6 names.
-   local digits, dot = str:match("^(%x%x?)()%:", pos)
+   local digits, dot = str:match("^(%x%x%x%x)()%:", pos)
    assert(digits, "failed to parse ipv6 address at "..pos)
    table.insert(addr, tonumber(digits, 16))
    pos = dot
    for i=1,15 do
-      local digits, dot = str:match("^%:(%x%x?)()", pos)
+      local digits, dot = str:match("^%:(%x%x%x%x)()", pos)
       assert(digits, "failed to parse ipv6 address at "..pos)
       table.insert(addr, tonumber(digits, 16))
       pos = dot
@@ -75,12 +75,32 @@ local function lex_ipv6(str, pos)
    return addr, pos
 end
 
+local function lex_ehost(str, pos)
+   local addr = record('ehost')
+   local digits, dot = str:match("^(%x%x)()%:", pos)
+   assert(digits, "failed to parse ethernet host address at "..pos)
+   table.insert(addr, tonumber(digits, 16))
+   pos = dot
+   for i=1,5 do
+      local digits, dot = str:match("^%:(%x%x)()", pos)
+      assert(digits, "failed to parse ethernet host address at "..pos)
+      table.insert(addr, tonumber(digits, 16))
+      pos = dot
+   end
+   local terminators = " \t\r\n)/"
+   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
+          "unexpected terminator for ethernet host address")
+   return addr, pos
+end
+
 local function lex_addr(str, pos)
    local start_pos = pos
    if str:match("^%d%d?%d?%.", pos) then
       return lex_ipv4_or_host(str, pos)
-   elseif str:match("^%x?%x?%:", pos) then
+   elseif str:match("^%x%x%x%x%:", pos) then
       return lex_ipv6(str, pos)
+   elseif str:match("^%x%x%:", pos) then
+      return lex_ehost(str, pos)
    else
       return lex_host_or_keyword(str, pos)
    end
@@ -216,6 +236,12 @@ local function unimplemented(lexer, tok)
    error("not implemented: "..tok)
 end
 
+local function nullary()
+   return function(lexer, tok)
+      return record(tok)
+   end
+end
+
 local function unary(parse_arg)
    return function(lexer, tok)
       return record(tok, parse_arg(lexer))
@@ -269,6 +295,36 @@ local function parse_portrange_arg(lexer)
    return record('portrange', start, parse_port_arg(lexer))
 end
 
+local function parse_ehost_arg(lexer)
+   local arg = lexer.next()
+   if type(arg) == 'string' or arg.type == 'ehost' then
+      return arg
+   end
+   error('invalid ethernet host', arg)
+end
+
+local function table_parser(table)
+   return function (lexer, tok)
+      local type = lexer.next()
+      local parser = assert(table[type],
+                            "unknown "..tok.." type "..type)
+      return parser(lexer, tok..'-'..type)
+   end
+end
+
+local ether_protos = set(
+   'ip', 'ip6', 'arp', 'rarp', 'atalk', 'aarp', 'decnet', 'sca', 'lat',
+   'mopdl', 'moprc', 'iso', 'stp', 'ipx', 'netbeui'
+)
+
+local function parse_ether_proto_arg(lexer)
+   local arg = lexer.next()
+   if type(arg) == 'number' or ether_protos[arg] then
+      return arg
+   end
+   error('invalid ethernet proto', arg)
+end
+
 local src_or_dst_types = {
    host = unary(parse_host_arg),
    net = unary(parse_net_arg),
@@ -276,18 +332,20 @@ local src_or_dst_types = {
    portrange = unary(parse_portrange_arg)
 }
 
-local function parse_src_or_dst(lexer, tok)
-   local type = lexer.next()
-   local parser = assert(src_or_dst_types[type],
-                         "unknown "..tok.." type "..type)
-   return parser(lexer, tok..'-'..type)
-end
+local ether_types = {
+   dst = unary(parse_ehost_arg),
+   src = unary(parse_ehost_arg),
+   host = unary(parse_ehost_arg),
+   broadcast = nullary(),
+   multicast = nullary(),
+   proto = unary(parse_ether_proto_arg),
+}
 
 local primitives = {
-   dst = parse_src_or_dst,
-   src = parse_src_or_dst,
+   dst = table_parser(src_or_dst_types),
+   src = table_parser(src_or_dst_types),
    host = unary(parse_host_arg),
-   ether = unimplemented,
+   ether = table_parser(ether_types),
    gateway = unimplemented,
    net = unimplemented,
    port = unimplemented,
@@ -435,13 +493,15 @@ function selftest ()
    lex_test("host 127.0.0.1", { 'host', { type='ipv4', 127, 0, 0, 1 } })
    lex_test("net 10.0.0.0/24", { 'net', { type='ipv4', 10, 0, 0, 0 }, '/', 24 })
 
-   local function compile_test(str, elts) check(elts, compile(str)) end
-   compile_test("host 127.0.0.1",
-                { type='host', { type='ipv4', 127, 0, 0, 1 } })
-   compile_test("src host 127.0.0.1",
-                { type='src-host', { type='ipv4', 127, 0, 0, 1 } })
-   compile_test("src net 10.0.0.0/24",
-                { type='src-net',
-                  { type='ipv4/len', { type='ipv4', 10, 0, 0, 0 }, 24 }})
+   local function parse_test(str, elts) check(elts, parse_expr(tokens(str))) end
+   parse_test("host 127.0.0.1",
+              { type='host', { type='ipv4', 127, 0, 0, 1 } })
+   parse_test("src host 127.0.0.1",
+              { type='src-host', { type='ipv4', 127, 0, 0, 1 } })
+   parse_test("src net 10.0.0.0/24",
+              { type='src-net',
+                { type='ipv4/len', { type='ipv4', 10, 0, 0, 0 }, 24 }})
+   parse_test("ether proto rarp",
+              { type='ether-proto', 'rarp' })
    print("OK")
 end
