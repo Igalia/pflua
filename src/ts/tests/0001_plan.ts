@@ -20,6 +20,7 @@ id:1
 description:baseline
 filter:
 pcap_file:ws/v4.pcap
+pcap_pkts:43
 expected_result:43
 enabled:true
 
@@ -27,6 +28,7 @@ id:2
 description:ip
 filter:ip
 pcap_file:ws/v4.pcap
+pcap_pkts:43
 expected_result:43
 enabled:true
 
@@ -34,6 +36,7 @@ id:3
 description:tcp
 filter:tcp
 pcap_file:ws/v4.pcap
+pcap_pkts:43
 expected_result:41
 enabled:true
 
@@ -41,6 +44,7 @@ id:4
 description:tcp port
 filter:tcp port 80
 pcap_file:ws/v4.pcap
+pcap_pkts:43
 expected_result:41
 enabled:true
 
@@ -48,6 +52,7 @@ id:5
 description:tcp dst port
 filter:tcp dst port 23
 pcap_file:ws/telnet-cooked.pcap
+pcap_pkts:92
 expected_result:48
 enabled:true
 
@@ -55,6 +60,7 @@ id:6
 description:udp dst port
 filter:udp dst port 2087
 pcap_file:ws/tftp_wrq.pcap
+pcap_pkts:100
 expected_result:49
 enabled:true
 
@@ -62,6 +68,7 @@ id:7
 description:host check
 filter:host 192.168.0.13
 pcap_file:ws/tftp_wrq.pcap
+pcap_pkts:100
 expected_result:100
 enabled:true
 
@@ -69,6 +76,7 @@ id:8
 description:net mask test success
 filter:net 192.168.0.0 mask 255.255.255.0
 pcap_file:ws/telnet-cooked.pcap
+pcap_pkts:92
 expected_result:92
 enabled:true
 
@@ -76,6 +84,7 @@ id:9
 description:net mask test failure
 filter:net 192.168.50.0 mask 255.255.255.0
 pcap_file:ws/telnet-cooked.pcap
+pcap_pkts:92
 expected_result:0
 enabled:true
 
@@ -83,6 +92,7 @@ id:10
 description:no packets
 filter:icmp
 pcap_file:igalia/empty.pcap
+pcap_pkts:0
 expected_result:0
 enabled:true
 
@@ -90,5 +100,6 @@ id:11
 description:no packets
 filter:tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)
 pcap_file:igalia/empty.pcap
+pcap_pkts:0
 expected_result:0
 enabled:true

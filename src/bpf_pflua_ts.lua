@@ -40,7 +40,7 @@ function get_all_plans()
 end
 
 function prefix(p, s)
-   return s:sub(1,#p) == p 
+   return s:sub(1,#p) == p
 end
 
 function get_all_tests(p)
@@ -60,6 +60,9 @@ function get_all_tests(p)
       -- pcap_file
       elseif prefix("pcap_file:", line) then
          plan[current]['pcap_file'] = line:sub(#"pcap_file:"+1)
+      -- pcap_pkts
+      elseif prefix("pcap_pkts:", line) then
+         plan[current]['pcap_pkts'] = tonumber(line:sub(#"pcap_pkts:"+1))
       -- expected_result
       elseif prefix("expected_result:", line) then
          plan[current]['expected_result'] = tonumber(line:sub(#"expected_result:"+1))
@@ -107,6 +110,7 @@ function run_test_plan(p)
       print("description: " .. t['description'])
       print("filter: " .. t['filter'])
       print("pcap_file: " .. t['pcap_file'])
+      print("pcap_pkts: " .. t['pcap_pkts'])
       print("expected_result: " .. t['expected_result'])
       io.write("enabled: ")
       if t['enabled'] then
@@ -116,7 +120,12 @@ function run_test_plan(p)
          print("false")
          print("tc id " .. i .. " SKIP")
       end
-      print("tc id " .. i .. " AVG ET " .. elapsed_time)
+      print("tc id " .. i .. " ET " .. elapsed_time)
+      local pps = 0
+      if t['pcap_pkts'] ~= 0 then
+	 pps = t['pcap_pkts'] / elapsed_time
+      end
+      print("tc id " .. i .. " PPS " .. pps)
    end
 end
 
