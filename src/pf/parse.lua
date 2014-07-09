@@ -627,7 +627,8 @@ local function parse_relop(lexer, tok)
    return record(op, lhs, parse_arithmetic(lexer))
 end
 
-local function parse_primitive_or_relop(lexer, tok)
+local function parse_primitive_or_relop(lexer)
+   local tok = lexer.next({maybe_arithmetic=true})
    if (type(tok) == 'number' or tok == 'len' or
        addressables[tok] and lexer.peek() == '[') then
       return parse_relop(lexer, tok)
@@ -645,21 +646,43 @@ local function parse_primitive_or_relop(lexer, tok)
    error("keyword elision not implemented")
 end
 
+local logical_precedence = {
+   ['&&'] = 1, ['and'] = 1,
+   ['||'] = 2, ['or'] = 2
+}
+
+local function parse_logical(lexer, max_precedence)
+   local exp = parse_primitive_or_relop(lexer)
+   max_precedence = max_precedence or math.huge
+   while true do
+      local op = lexer.peek()
+      local prec = logical_precedence[op]
+      if not prec or prec > max_precedence then return exp end
+      lexer.consume(op)
+      local rhs = parse_logical(lexer, prec - 1)
+      exp = record(op, exp, rhs)
+   end
+end
+
 local function parse_expr(lexer)
-   local tok = lexer.peek({maybe_arithmetic=true})
-   if not tok then return nil end
-   lexer.next()
-   if tok == '(' then
+   if not lexer.peek({maybe_arithmetic=true}) then
+      return nil
+   elseif lexer.check('(') then
       local expr = parse_expr(lexer)
       lexer.consume(')')
       return expr
+   elseif lexer.check('not') then
+      return record('not', parse_expr(lexer))
+   else
+      return parse_logical(lexer)
    end
-   local expr = parse_primitive_or_relop(lexer, tok)
-   return expr
 end
 
 function parse(str)
-   return parse_expr(tokens(str))
+   local lexer = tokens(str)
+   local expr = parse_expr(tokens(str))
+   assert(not lexer.peek(), "unexpected token", lexer.peek())
+   return expr
 end
 
 function selftest ()
@@ -727,5 +750,7 @@ function selftest ()
               { type='=', { type='+', 1, 1 }, 2 })
    parse_test("1+2*3+4=5",
               { type='=', { type='+', { type='+', 1, { type='*', 2, 3 } }, 4 }, 5 })
+   parse_test("1+1=2 and tcp",
+              { type='and', { type='=', { type='+', 1, 1 }, 2 }, { type='tcp' } })
    print("OK")
 end
