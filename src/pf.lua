@@ -10,16 +10,18 @@ function compile_pcap_filter(filter_str, dlt_name)
 end
 
 function filter_count(pred, file)
+   local total_pkt = 0
    local count = 0
    local records = savefile.records_mm(file)
    while true do
       local pkt, hdr = records()
       if not pkt then break end
+      total_pkt = total_pkt + 1
       if pred(buffer.from_uchar(pkt, hdr.incl_len)) ~= 0 then
          count = count + 1
       end
    end
-   return count
+   return count, total_pkt
 end
 
 function selftest ()

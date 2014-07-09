@@ -76,12 +76,12 @@ local elapsed_time
 local function assert_count(filter, file, expected, dlt)
    local pred = pf.compile_pcap_filter(filter, dlt)
    local start = os.clock()
-   local actual = pf.filter_count(pred, file)
+   local actual, seen = pf.filter_count(pred, file)
    elapsed_time = os.clock() - start
    if actual == expected then
-       return "PASS"
+       return "PASS", seen
    else
-       return "FAIL (".. actual.. " != ".. expected .. ")"
+       return "FAIL (".. actual.. " != ".. expected .. ")", seen
    end
 end
 
@@ -108,15 +108,22 @@ function run_test_plan(p)
       print("filter: " .. t['filter'])
       print("pcap_file: " .. t['pcap_file'])
       print("expected_result: " .. t['expected_result'])
+      local pass_str, pkt_total = assert_count(t['filter'], "ts/pcaps/"..t['pcap_file'], t['expected_result'], "EN10MB")
       io.write("enabled: ")
       if t['enabled'] then
          print("true")
-         print("tc id " .. i .. " " .. assert_count(t['filter'], "ts/pcaps/"..t['pcap_file'], t['expected_result'], "EN10MB"))
+         print("tc id " .. i .. " " .. pass_str)
       else
          print("false")
          print("tc id " .. i .. " SKIP")
       end
-      print("tc id " .. i .. " AVG ET " .. elapsed_time)
+      print("tc id " .. i .. " ET " .. elapsed_time)
+      print("tc id " .. i .. " TP " .. pkt_total)
+      local pps = 0
+      if elapsed_time ~= 0 then
+	 pps = pkt_total / elapsed_time
+      end
+      print("tc id " .. i .. " PPS " .. pps)
    end
 end
 
