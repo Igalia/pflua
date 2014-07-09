@@ -398,6 +398,8 @@ local wlan_frame_data_subtypes = set(
 
 local wlan_directions = set('nods', 'tods', 'fromds', 'dstods')
 
+local iso_proto_types = set('clnp', 'esis', 'isis')
+
 local function parse_enum_arg(lexer, set)
    local arg = lexer.next()
    assert(set[arg], 'invalid argument: '..arg)
@@ -431,9 +433,16 @@ end
 
 local function parse_wlan_dir(lexer, tok)
    if (type(lexer.peek()) == 'number') then
-      return unary(tok, lexer.next())
+      return record(tok, lexer.next())
    end
    return record(tok, parse_enum_arg(lexer, wlan_directions))
+end
+
+local function parse_optional_int(lexer, tok)
+   if (type(lexer.peek()) == 'number') then
+      return parser(tok, lexer.next())
+   end
+   return parser(tok)
 end
 
 local src_or_dst_types = {
@@ -480,6 +489,15 @@ local wlan_types = {
    addr4 = unary(parse_ehost_arg),
 }
 
+local iso_types = {
+   proto = unary(enum_arg_parser(iso_proto_types)),
+   ta = unary(parse_ehost_arg),
+   addr1 = unary(parse_ehost_arg),
+   addr2 = unary(parse_ehost_arg),
+   addr3 = unary(parse_ehost_arg),
+   addr4 = unary(parse_ehost_arg),
+}
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
@@ -498,18 +516,18 @@ local primitives = {
    udp = nullary(),
    icmp = nullary(),
    protochain = unary(parse_proto_arg),
-   arp = unary(),
-   rarp = unary(),
-   atalk = unary(),
-   aarp = unary(),
+   arp = nullary(),
+   rarp = nullary(),
+   atalk = nullary(),
+   aarp = nullary(),
    decnet = table_parser(decnet_types),
-   iso = unary(),
-   stp = unary(),
-   ipx = unary(),
-   netbeui = unary(),
-   lat = unary(),
-   moprc = unary(),
-   mopdl = unary(),
+   iso = nullary(),
+   stp = nullary(),
+   ipx = nullary(),
+   netbeui = nullary(),
+   lat = nullary(),
+   moprc = nullary(),
+   mopdl = nullary(),
    llc = parse_llc,
    ifname = unary(parse_string_arg),
    on = unary(parse_string_arg),
@@ -525,34 +543,34 @@ local primitives = {
    type = parse_wlan_type,
    subtype = parse_wlan_subtype,
    dir = unary(enum_arg_parser(wlan_directions)),
-   vlan = unimplemented,
-   mpls = unimplemented,
-   pppoed = unimplemented,
-   pppoes = unimplemented,
-   iso = unimplemented,
-   clnp = unimplemented,
-   esis = unimplemented,
-   isis = unimplemented,
-   l1 = unimplemented,
-   l2 = unimplemented,
-   iih = unimplemented,
-   lsp = unimplemented,
-   snp = unimplemented,
-   csnp = unimplemented,
-   psnp = unimplemented,
-   vpi = unimplemented,
-   vci = unimplemented,
-   lane = unimplemented,
-   oamf4s = unimplemented,
-   oamf4e = unimplemented,
-   oamf4 = unimplemented,
-   oam = unimplemented,
-   metac = unimplemented,
-   bcc = unimplemented,
-   sc = unimplemented,
-   ilmic = unimplemented,
-   connectmsg = unimplemented,
-   metaconnect = unimplemented
+   vlan = parse_optional_int,
+   mpls = parse_optional_int,
+   pppoed = nullary(),
+   pppoes = parse_optional_int,
+   iso = table_parser(iso_types),
+   clnp = nullary(),
+   esis = nullary(),
+   isis = nullary(),
+   l1 = nullary(),
+   l2 = nullary(),
+   iih = nullary(),
+   lsp = nullary(),
+   snp = nullary(),
+   csnp = nullary(),
+   psnp = nullary(),
+   vpi = unary(parse_int_arg),
+   vci = unary(parse_int_arg),
+   lane = nullary(),
+   oamf4s = nullary(),
+   oamf4e = nullary(),
+   oamf4 = nullary(),
+   oam = nullary(),
+   metac = nullary(),
+   bcc = nullary(),
+   sc = nullary(),
+   ilmic = nullary(),
+   connectmsg = nullary(),
+   metaconnect = nullary()
 }
 
 local function parse_primitive_or_relop(lexer, tok)
