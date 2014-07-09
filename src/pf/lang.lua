@@ -116,6 +116,7 @@ local function lex_number(str, pos, base)
       local n = tonumber(chr, base)
       if n then
          res = res * base + n
+         assert(res <= 0xffffffff, 'integer too large: '..res)
          i = i + 1
       elseif str:match("^[%a_.]", i) then
          return nil, i
@@ -325,6 +326,28 @@ local function parse_ether_proto_arg(lexer)
    error('invalid ethernet proto', arg)
 end
 
+local ip_protos = set(
+   'icmp', 'icmp6', 'igmp', 'igrp', 'pim', 'ah', 'esp', 'vrrp', 'udp', 'tcp'
+)
+
+local function parse_ip_proto_arg(lexer)
+   local arg = lexer.next()
+   if type(arg) == 'number' or ip_protos[arg] then
+      return arg
+   end
+   error('invalid ip proto', arg)
+end
+
+local function simple_typed_arg_parser(expected)
+   return function(lexer)
+      local arg = lexer.next()
+      if type(arg) == expected then return arg end
+      error('expected a '..expected..' string, got '..type(arg))
+   end
+end
+
+local parse_string_arg = simple_typed_arg_parser('string')
+
 local src_or_dst_types = {
    host = unary(parse_host_arg),
    net = unary(parse_net_arg),
@@ -341,23 +364,36 @@ local ether_types = {
    proto = unary(parse_ether_proto_arg),
 }
 
+local ip_types = {
+   proto = unary(parse_ip_proto_arg),
+   protochain = unary(parse_proto_arg),
+   broadcast = nullary(),
+   multicast = nullary(),
+}
+
+local ip6_types = {
+   proto = unary(parse_ip_proto_arg),
+   protochain = unary(parse_proto_arg),
+   multicast = nullary(),
+}
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
    host = unary(parse_host_arg),
    ether = table_parser(ether_types),
-   gateway = unimplemented,
-   net = unimplemented,
-   port = unimplemented,
-   portrange = unimplemented,
-   less = unimplemented,
-   greater = unimplemented,
-   ip = unimplemented,
-   ip6 = unimplemented,
-   proto = unimplemented,
-   tcp = unimplemented,
-   udp = unimplemented,
-   icmp = unimplemented,
+   gateway = unary(parse_string_arg),
+   net = unary(parse_net_arg),
+   port = unary(parse_port_arg),
+   portrange = unary(parse_portrange_arg),
+   less = unary(parse_int_arg),
+   greater = unary(parse_int_arg),
+   ip = table_parser(ip_types),
+   ip6 = table_parser(ip6_types),
+   proto = unary(parse_proto_arg),
+   tcp = nullary(),
+   udp = nullary(),
+   icmp = nullary(),
    protochain = unimplemented,
    arp = unimplemented,
    rarp = unimplemented,
