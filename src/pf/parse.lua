@@ -233,10 +233,6 @@ local addressables = set(
    'slip', 'link', 'radio', 'ip', 'ip6', 'tcp', 'udp', 'icmp'
 )
 
-local function unimplemented(lexer, tok)
-   error("not implemented: "..tok)
-end
-
 local function nullary()
    return function(lexer, tok)
       return record(tok)
@@ -309,7 +305,7 @@ local function table_parser(table, default)
       local subtok = lexer.peek()
       if table[subtok] then
          lexer.consume(subtok)
-         return table[subtok](lexer, tok..'-'..subtok)
+         return table[subtok](lexer, tok..'_'..subtok)
       end
       if default then return default(lexer, tok) end
       error("unknown "..tok.." type "..subtok)
@@ -680,7 +676,7 @@ end
 
 function parse(str)
    local lexer = tokens(str)
-   local expr = parse_expr(tokens(str))
+   local expr = parse_expr(lexer)
    assert(not lexer.peek(), "unexpected token", lexer.peek())
    return expr
 end
@@ -726,20 +722,20 @@ function selftest ()
    lex_test("host 127.0.0.1", { 'host', { type='ipv4', 127, 0, 0, 1 } })
    lex_test("net 10.0.0.0/24", { 'net', { type='ipv4', 10, 0, 0, 0 }, '/', 24 })
 
-   local function parse_test(str, elts) check(elts, parse_expr(tokens(str))) end
+   local function parse_test(str, elts) check(elts, parse(str)) end
    parse_test("host 127.0.0.1",
               { type='host', { type='ipv4', 127, 0, 0, 1 } })
    parse_test("src host 127.0.0.1",
-              { type='src-host', { type='ipv4', 127, 0, 0, 1 } })
+              { type='src_host', { type='ipv4', 127, 0, 0, 1 } })
    parse_test("src net 10.0.0.0/24",
-              { type='src-net',
+              { type='src_net',
                 { type='ipv4/len', { type='ipv4', 10, 0, 0, 0 }, 24 }})
    parse_test("ether proto rarp",
-              { type='ether-proto', 'rarp' })
+              { type='ether_proto', 'rarp' })
    parse_test("decnet host 10.23",
-              { type='decnet-host', { type='decnet', 10, 23 } })
+              { type='decnet_host', { type='decnet', 10, 23 } })
    parse_test("ip proto icmp",
-              { type='ip-proto', 'icmp' })
+              { type='ip_proto', 'icmp' })
    parse_test("ip",
               { type='ip' })
    parse_test("type mgt",
