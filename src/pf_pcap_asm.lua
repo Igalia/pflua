@@ -17,9 +17,9 @@
 
 module("pf_pcap_asm", package.seeall)
 
+local ffi = require("ffi")
 local savefile = require("pf.savefile")
 local libpcap = require("pf.libpcap")
-local buffer = require("pf.buffer")
 local bpf = require("pf.bpf")
 
 -- Compiles pcap expression
@@ -38,7 +38,7 @@ function filter_count(pred, file)
       if not pkt then break end
 
       local length = hdr.incl_len
-      local packet = buffer.from_uchar(pkt, length)
+      local packet = ffi.cast("uint8_t*", pkt) 
       execute_pred_ensuring_trace(pred, packet, length)
    end
    return count, total_pkt
