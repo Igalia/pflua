@@ -546,6 +546,5 @@ function selftest ()
       expand(parse("1 = len"), 'EN10MB'))
    check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
-   pp(expand(parse("tcp"), "EN10MB"))
    print("OK")
 end

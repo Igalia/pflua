@@ -44,7 +44,6 @@ local function filter_builder(...)
    function builder.finish(str)
       builder.write('end')
       if verbose then print(written) end
-      print(written)
       return written
    end
    local needs_comma = false
