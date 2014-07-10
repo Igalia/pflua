@@ -564,6 +564,8 @@ local primitives = {
    metaconnect = nullary()
 }
 
+local parse_arithmetic
+
 local function parse_primary_arithmetic(lexer, tok)
    tok = tok or lexer.next({maybe_arithmetic=true})
    if tok == '(' then
@@ -597,7 +599,7 @@ local arithmetic_precedence = {
    ['|'] = 6
 }
 
-local function parse_arithmetic(lexer, tok, max_precedence)
+function parse_arithmetic(lexer, tok, max_precedence)
    local exp = parse_primary_arithmetic(lexer, tok)
    max_precedence = max_precedence or math.huge
    while true do
