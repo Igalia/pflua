@@ -2,7 +2,6 @@ module("pf",package.seeall)
 
 local savefile = require("pf.savefile")
 local libpcap = require("pf.libpcap")
-local buffer = require("pf.buffer")
 local bpf = require("pf.bpf")
 
 function compile_pcap_filter(filter_str, dlt_name)
@@ -18,8 +17,7 @@ function filter_count(pred, file)
       if not pkt then break end
       total_pkt = total_pkt + 1
       local length = hdr.incl_len
-      local packet = buffer.from_uchar(pkt, length)
-      if pred(packet, length) ~= 0 then
+      if pred(pkt, length) ~= 0 then
          count = count + 1
       end
    end
@@ -31,7 +29,7 @@ function selftest ()
    
    local function test_null(str)
       local f = compile_pcap_filter(str)
-      assert(f(buffer.from_string(""), 0) == 0, "null packet should be rejected")
+      assert(f(str, 0) == 0, "null packet should be rejected")
    end
    test_null("icmp")
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
