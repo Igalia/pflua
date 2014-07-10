@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+local bit = require('bit')
+
 verbose = os.getenv("PF_VERBOSE");
 
 local expand_arith, expand_relop, expand_bool
@@ -194,6 +196,9 @@ local addressables = set(
 local binops = set(
    '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
 )
+local associative_binops = set(
+   '+', '*', '&', '|'
+)
 
 local function expand_offset(level, dlt)
    assert(dlt == "EN10MB", "Encapsulation other than EN10MB unimplemented")
@@ -298,9 +303,50 @@ function expand_bool(expr, dlt)
    end
 end
 
+local folders = {
+   ['+'] = function(a, b) return a + b end,
+   ['-'] = function(a, b) return a - b end,
+   ['*'] = function(a, b) return a * b end,
+   ['/'] = function(a, b) return math.floor(a / b) end,
+   ['%'] = function(a, b) return a % b end,
+   ['&'] = function(a, b) return bit.band(a, b) end,
+   ['^'] = function(a, b) return bit.bxor(a, b) end,
+   ['|'] = function(a, b) return bit.bor(a, b) end,
+   ['<<'] = function(a, b) return bit.lshift(a, b) end,
+   ['>>'] = function(a, b) return bit.rshift(a, b) end
+}
+
+function simplify(expr)
+   if type(expr) ~= 'table' then return expr end
+   local op = expr[1]
+   if binops[op] then
+      local lhs = simplify(expr[2])
+      local rhs = simplify(expr[3])
+      if type(lhs) == 'number' and type(rhs) == 'number' then
+         return assert(folders[op])(lhs, rhs)
+      elseif associative_binops[op] then
+         if type(rhs) == 'table' and rhs[1] == op and type(lhs) == 'number' then
+            lhs, rhs = rhs, lhs
+         end
+         if type(lhs) == 'table' and lhs[1] == op and type(rhs) == 'number' then
+            if type(lhs[2]) == 'number' then
+               return { op, assert(folders[op])(lhs[2], rhs), lhs[3] }
+            elseif type(lhs[3]) == 'number' then
+               return { op, lhs[2], assert(folders[op])(lhs[3], rhs) }
+            end
+         end
+      end
+      return { op, lhs, rhs }
+   else
+      local res = { op }
+      for i=2,#expr do table.insert(res, simplify(expr[i])) end
+      return res
+   end
+end
+
 function expand(expr, dlt)
    dlt = dlt or 'RAW'
-   return expand_bool(expr, dlt)
+   return simplify(expand_bool(expr, dlt))
 end
 
 function pp(expr, indent, suffix)
@@ -341,9 +387,7 @@ function selftest ()
    end
    check({ '=', 1, 2 },
       expand(parse("1 = 2"), 'EN10MB'))
-   check({ 'assert',
-           { '<=', { '+', { '+', 0, 0 }, 1 }, 'len'},
-           { '=', { '[]', { '+', 0, 0 }, 1 }, 2 } },
+   check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
    print("OK")
 end
