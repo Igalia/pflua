@@ -493,9 +493,7 @@ end
 
 function expand(expr, dlt)
    dlt = dlt or 'RAW'
-   local ret = simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
-   pp(ret)
-   return ret
+   return simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
 end
 
 function pp(expr, indent, suffix)

@@ -136,7 +136,7 @@ end
 
 function compile_lua(parsed)
    dlt = dlt or 'RAW'
-   local builder = filter_builder('P')
+   local builder = filter_builder('P', 'length')
    compile_bool(builder, parsed, 'ACCEPT', 'REJECT')
    return builder.finish()
 end
