@@ -26,14 +26,27 @@ function scandir(dirname)
    return tabby
 end
 
+local function dir_exist(path)
+   if os.execute("cd "..path) == 0 then
+      return true
+   else
+      return false
+   end
+end
+
 -- retrieve all .ts files under ts/test directory
 -- TODO: ts/tests should be some kind of conf var
 function get_all_plans()
-   local filetab = scandir("ts/tests")
+   local path_tests = "../../../../src/"
+   if not dir_exist(path_tests) then
+      path_tests = ""
+   end
+   path_tests = path_tests .. "ts/tests/"
+   local filetab = scandir(path_tests)
    local plantab = {}
    for _, v in ipairs(filetab) do
       if v:sub(-3) == ".ts" then
-         plantab[#plantab+1] = "ts/tests/".. v
+         plantab[#plantab+1] = path_tests .. v
       end 
    end
    return plantab
@@ -100,6 +113,13 @@ function run_test_plan(p)
    -- show info about the plan
    print("enabled tests: " .. count .. " of " .. #plan)
 
+   -- works in tandem with pflua-bench
+   local path_pcaps = "../../../../src/"
+   if not dir_exist(path_pcaps) then
+      path_pcaps = ""
+   end
+   path_pcaps = path_pcaps .. "ts/pcaps/"
+
    -- execute test case
    for i, t in pairs(plan) do
       print("\nTest case running ...")
@@ -108,7 +128,7 @@ function run_test_plan(p)
       print("filter: " .. t['filter'])
       print("pcap_file: " .. t['pcap_file'])
       print("expected_result: " .. t['expected_result'])
-      local pass_str, pkt_total = assert_count(t['filter'], "ts/pcaps/"..t['pcap_file'], t['expected_result'], "EN10MB")
+      local pass_str, pkt_total = assert_count(t['filter'], path_pcaps..t['pcap_file'], t['expected_result'], "EN10MB")
       io.write("enabled: ")
       if t['enabled'] then
          print("true")
