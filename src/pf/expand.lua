@@ -390,8 +390,8 @@ function simplify(expr)
    elseif op == 'assert' then
       local lhs = simplify(expr[2])
       local rhs = simplify(expr[3])
-      if lhs[1] == 'constant' and lhs[2] then
-         return rhs
+      if lhs[1] == 'constant' then
+         if lhs[2] then return rhs else return { 'fail' } end
       else
          return { 'assert', lhs, rhs } 
       end
@@ -402,9 +402,94 @@ function simplify(expr)
    end
 end
 
+local function dup(db)
+   local ret = {}
+   for k, v in pairs(db) do ret[k] = v end
+   return ret
+end
+
+local function cfkey(expr)
+   if type(expr) == 'table' then
+      local ret = 'table('..cfkey(expr[1])
+      for i=2,#expr do ret = ret..' '..cfkey(expr[i]) end
+      return ret..')'
+   else
+      return type(expr)..'('..tostring(expr)..')'
+   end
+end
+
+-- Conditional folding.
+local function cfold(expr, db)
+   if type(expr) ~= 'table' then return expr end
+   local op = expr[1]
+   if binops[op] then return expr
+   elseif relops[op] then
+      local key = cfkey(expr)
+      if db[key] ~= nil then
+         return { 'constant', db[key] }
+      else
+         return expr
+      end
+   elseif op == 'not' then
+      local rhs = cfold(expr[2], db)
+      local key = cfkey(rhs)
+      if db[key] ~= nil then
+         return { 'constant', not db[key] }
+      else
+         return { op, rhs }
+      end
+   elseif op == 'and' then
+      local lhs = cfold(expr[2], db)
+      local key = cfkey(lhs)
+      if db[key] ~= nil then
+         if db[key] then return cfold(expr[3], db) end
+         return { 'constant', false }
+      else
+         db[key] = true
+         return { op, lhs, cfold(expr[3], db) }
+      end
+   elseif op == 'or' then
+      local lhs = cfold(expr[2], db)
+      local key = cfkey(lhs)
+      if db[key] ~= nil then
+         if db[key] then return { 'constant', true } end
+         return cfold(expr[3], db)
+      else
+         local db = dup(db)
+         db[key] = false
+         return { op, lhs, cfold(expr[3], db) }
+      end
+   elseif op == 'if' then
+      local test = cfold(expr[2], db)
+      local key = cfkey(test)
+      if db[key] ~= nil then
+         if db[key] then return cfold(expr[3], db) end
+         return cfold(expr[4], db)
+      else
+         local db_kt = dup(db)
+         local db_kf = dup(db)
+         db_kt[key] = true
+         db_kf[key] = true
+         return { op, test, cfold(expr[3], db_kt), cfold(expr[4], db_kf) }
+      end
+   elseif op == 'assert' then
+      local test = cfold(expr[2], db)
+      local key = cfkey(test)
+      if db[key] ~= nil then
+         if db[key] then return cfold(expr[3], db) end
+         return { 'fail' }
+      else
+         db[key] = true
+         return { op, test, cfold(expr[3], db) }
+      end
+   else
+      return expr
+   end
+end
+
 function expand(expr, dlt)
    dlt = dlt or 'RAW'
-   return simplify(expand_bool(expr, dlt))
+   return simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
 end
 
 function pp(expr, indent, suffix)
