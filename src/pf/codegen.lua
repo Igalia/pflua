@@ -2,6 +2,12 @@ module(...,package.seeall)
 
 verbose = os.getenv("PF_VERBOSE");
 
+local function dup(db)
+   local ret = {}
+   for k, v in pairs(db) do ret[k] = v end
+   return ret
+end
+
 local function filter_builder(...)
    local written = 'return function('
    local vcount = 0
@@ -9,6 +15,8 @@ local function filter_builder(...)
    local indent = '   '
    local jumps = {}
    local builder = {}
+   local db_stack = {}
+   local db = {}
    function builder.write(str)
       written = written .. str
    end
@@ -16,9 +24,19 @@ local function filter_builder(...)
       builder.write(indent .. str .. '\n')
    end
    function builder.v(str)
+      if db[str] then return db[str] end
       vcount = vcount + 1
-      builder.writeln('local v'..vcount..' = '..str)
-      return 'v'..vcount
+      local var = 'v'..vcount
+      db[str] = var
+      builder.writeln('local '..var..' = '..str)
+      return var
+   end
+   function builder.push_db()
+      table.insert(db_stack, db)
+      db = dup(db)
+   end
+   function builder.pop_db()
+      db = table.remove(db_stack)
    end
    function builder.label()
       lcount = lcount + 1
@@ -69,7 +87,7 @@ local function compile_value(builder, expr)
       elseif rhs == 2 then accessor = 'u16'
       elseif rhs == 4 then accessor = 's32'
       else error('unexpected [] size', rhs) end
-      return builder.v('P:'..lhs..'('..rhs..')')
+      return builder.v('P:'..accessor..'('..lhs..', '..rhs..')')
    elseif op == '+' then return builder.v(lhs..'+'..rhs)
    elseif op == '-' then return builder.v(lhs..'-'..rhs)
    elseif op == '*' then return builder.v(lhs..'*'..rhs)
@@ -101,15 +119,21 @@ local function compile_bool(builder, expr, kt, kf, k)
       local knext = builder.label()
       compile_bool(builder, expr[2], kt, knext, knext)
       builder.writelabel(knext)
+      builder.push_db()
       compile_bool(builder, expr[3], kt, kf, k)
+      builder.pop_db()
    elseif op == 'if' then
       local test_kt = builder.label()
       local test_kf = builder.label()
       compile_bool(builder, expr[2], test_kt, test_kf, test_kt)
       builder.writelabel(test_kt)
+      builder.push_db()
       compile_bool(builder, expr[3], kt, kf, nil)
+      builder.pop_db()
       builder.writelabel(test_kf)
+      builder.push_db()
       compile_bool(builder, expr[4], kt, kf, k)
+      builder.pop_db()
    elseif op == 'assert' then
       compile_bool(builder, expr[2], nil, 'REJECT', nil)
       compile_bool(builder, expr[3], kt, kf, k)
