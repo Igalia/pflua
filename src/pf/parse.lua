@@ -13,10 +13,6 @@ local function set(...)
    return ret
 end
 
-local function record(type, ...)
-   return { type = type, ... }
-end
-
 local punctuation = set(
    '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
    '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
@@ -38,7 +34,7 @@ local function lex_ipv4_or_host(str, pos)
    end
    local digits, dot = str:match("^(%d%d?%d?)()%.", pos)
    if not digits then return lex_host_or_keyword(str, start_pos) end
-   local addr = record('ipv4')
+   local addr = { 'ipv4' }
    local byte = lex_byte(digits)
    if not byte then return lex_host_or_keyword(str, pos) end
    table.insert(addr, byte)
@@ -57,7 +53,7 @@ local function lex_ipv4_or_host(str, pos)
 end
 
 local function lex_ipv6(str, pos)
-   local addr = record('ipv6')
+   local addr = { 'ipv6' }
    -- FIXME: Currently only supporting fully-specified IPV6 names.
    local digits, dot = str:match("^(%x%x%x%x)()%:", pos)
    assert(digits, "failed to parse ipv6 address at "..pos)
@@ -76,7 +72,7 @@ local function lex_ipv6(str, pos)
 end
 
 local function lex_ehost(str, pos)
-   local addr = record('ehost')
+   local addr = { 'ehost' }
    local digits, dot = str:match("^(%x%x)()%:", pos)
    assert(digits, "failed to parse ethernet host address at "..pos)
    table.insert(addr, tonumber(digits, 16))
@@ -235,19 +231,19 @@ local addressables = set(
 
 local function nullary()
    return function(lexer, tok)
-      return record(tok)
+      return { tok }
    end
 end
 
 local function unary(parse_arg)
    return function(lexer, tok)
-      return record(tok, parse_arg(lexer))
+      return { tok, parse_arg(lexer) }
    end
 end
 
 function parse_host_arg(lexer)
    local arg = lexer.next()
-   if type(arg) == 'string' or arg.type == 'ipv4' or arg.type == 'ipv6' then
+   if type(arg) == 'string' or arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       return arg
    end
    error('invalid host', arg)
@@ -264,15 +260,15 @@ function parse_uint16_arg(lexer) return parse_int_arg(lexer, 0xffff) end
 
 function parse_net_arg(lexer)
    local arg = lexer.next()
-   if arg.type == 'ipv4' or arg.type == 'ipv6' then
+   if arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       if lexer.check('/') then
-         local len = parse_int_arg(lexer, arg.type == 'ipv4' and 32 or 128)
-         return record(arg.type..'/len', arg, len)
+         local len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
+         return { arg[1]..'/len', arg, len }
       elseif lexer.check('mask') then
          lexer.next()
          local mask = lexer.next()
-         assert(mask.type == arg.type, 'bad mask', mask)
-         return record(arg.type..'/mask', arg, mask)
+         assert(mask[1] == arg[1], 'bad mask', mask)
+         return { arg[1]..'/mask', arg, mask }
       else
          return arg
       end
@@ -289,12 +285,12 @@ local parse_port_arg = parse_uint16_arg
 local function parse_portrange_arg(lexer)
    local start = parse_port_arg(lexer)
    lexer.consume('-')
-   return record('portrange', start, parse_port_arg(lexer))
+   return { 'portrange', start, parse_port_arg(lexer) }
 end
 
 local function parse_ehost_arg(lexer)
    local arg = lexer.next()
-   if type(arg) == 'string' or arg.type == 'ehost' then
+   if type(arg) == 'string' or arg[1] == 'ehost' then
       return arg
    end
    error('invalid ethernet host', arg)
@@ -350,9 +346,9 @@ local parse_string_arg = simple_typed_arg_parser('string')
 local function parse_decnet_host_arg(lexer)
    local arg = lexer.next()
    if type(arg) == 'string' then return arg end
-   if arg.type == 'ipv4' then
-      arg.type = 'decnet'
-      assert(#arg == 2, "bad decnet address", arg)
+   if arg[1] == 'ipv4' then
+      arg[1] = 'decnet'
+      assert(#arg == 3, "bad decnet address", arg)
       return arg
    end
    error('invalid decnet host', arg)
@@ -364,9 +360,8 @@ local llc_types = set(
 )
 
 local function parse_llc(lexer, tok)
-   local type = lexer.peek()
-   if llc_types[type] then return record(tok, type) end
-   return record(tok)
+   if llc_types[lexer.peek()] then return { tok, lexer.next() } end
+   return { tok }
 end
 
 local pf_reasons = set(
@@ -413,9 +408,9 @@ local function parse_wlan_type(lexer, tok)
       if type == 'mgt' then set = wlan_frame_mgt_subtypes
       elseif type == 'mgt' then set = wlan_frame_ctl_subtypes
       else set = wlan_frame_data_subtypes end
-      return record('type', type, enum_arg_parser(set)(lexer))
+      return { 'type', type, enum_arg_parser(set)(lexer) }
    end
-   return record(tok, type)
+   return { tok, type }
 end
 
 local function parse_wlan_subtype(lexer, tok)
@@ -424,14 +419,14 @@ local function parse_wlan_subtype(lexer, tok)
              or wlan_frame_ctl_subtypes[subtype]
              or wlan_frame_data_subtypes[subtype],
           'bad wlan subtype '..subtype)
-   return record(tok, subtype)
+   return { tok, subtype }
 end
 
 local function parse_wlan_dir(lexer, tok)
    if (type(lexer.peek()) == 'number') then
-      return record(tok, lexer.next())
+      return { tok, lexer.next() }
    end
-   return record(tok, parse_enum_arg(lexer, wlan_directions))
+   return { tok, parse_enum_arg(lexer, wlan_directions) }
 end
 
 local function parse_optional_int(lexer, tok)
@@ -587,7 +582,7 @@ local function parse_primary_arithmetic(lexer, tok)
          else lexer.consume(4); size = 1 end
       end
       lexer.consume(']')
-      return record('['..tok..']', pos, size)
+      return { '['..tok..']', pos, size}
    else
       error('bad token while parsing arithmetic expression', tok)
    end
@@ -611,7 +606,7 @@ local function parse_arithmetic(lexer, tok, max_precedence)
       if not prec or prec > max_precedence then return exp end
       lexer.consume(op)
       local rhs = parse_arithmetic(lexer, nil, prec - 1)
-      exp = record(op, exp, rhs)
+      exp = { op, exp, rhs }
    end
 end
 
@@ -620,7 +615,7 @@ local function parse_relop(lexer, tok)
    local op = lexer.next()
    assert(set('>', '<', '>=', '<=', '=', '!=')[op],
           "expected a comparison operator, got", op)
-   return record(op, lhs, parse_arithmetic(lexer))
+   return { op, lhs, parse_arithmetic(lexer) }
 end
 
 local function parse_primitive_or_relop(lexer)
@@ -656,7 +651,7 @@ local function parse_logical(lexer, max_precedence)
       if not prec or prec > max_precedence then return exp end
       lexer.consume(op)
       local rhs = parse_logical(lexer, prec - 1)
-      exp = record(op, exp, rhs)
+      exp = { op, exp, rhs }
    end
 end
 
@@ -668,7 +663,7 @@ local function parse_expr(lexer)
       lexer.consume(')')
       return expr
    elseif lexer.check('not') then
-      return record('not', parse_expr(lexer))
+      return { 'not', parse_expr(lexer) }
    else
       return parse_logical(lexer)
    end
@@ -719,34 +714,34 @@ function selftest ()
               '(', '(', 'tcp', '[', 12, ']', '&', 240, ')', '>>', 2, ')',
               ')', '!=', 0, ')'
             }, {maybe_arithmetic=true})
-   lex_test("host 127.0.0.1", { 'host', { type='ipv4', 127, 0, 0, 1 } })
-   lex_test("net 10.0.0.0/24", { 'net', { type='ipv4', 10, 0, 0, 0 }, '/', 24 })
+   lex_test("host 127.0.0.1", { 'host', { 'ipv4', 127, 0, 0, 1 } })
+   lex_test("net 10.0.0.0/24", { 'net', { 'ipv4', 10, 0, 0, 0 }, '/', 24 })
 
    local function parse_test(str, elts) check(elts, parse(str)) end
    parse_test("host 127.0.0.1",
-              { type='host', { type='ipv4', 127, 0, 0, 1 } })
+              { 'host', { 'ipv4', 127, 0, 0, 1 } })
    parse_test("src host 127.0.0.1",
-              { type='src_host', { type='ipv4', 127, 0, 0, 1 } })
+              { 'src_host', { 'ipv4', 127, 0, 0, 1 } })
    parse_test("src net 10.0.0.0/24",
-              { type='src_net',
-                { type='ipv4/len', { type='ipv4', 10, 0, 0, 0 }, 24 }})
+              { 'src_net',
+                { 'ipv4/len', { 'ipv4', 10, 0, 0, 0 }, 24 }})
    parse_test("ether proto rarp",
-              { type='ether_proto', 'rarp' })
+              { 'ether_proto', 'rarp' })
    parse_test("decnet host 10.23",
-              { type='decnet_host', { type='decnet', 10, 23 } })
+              { 'decnet_host', { 'decnet', 10, 23 } })
    parse_test("ip proto icmp",
-              { type='ip_proto', 'icmp' })
+              { 'ip_proto', 'icmp' })
    parse_test("ip",
-              { type='ip' })
+              { 'ip' })
    parse_test("type mgt",
-              { type='type', 'mgt' })
+              { 'type', 'mgt' })
    parse_test("type mgt subtype deauth",
-              { type='type', 'mgt', 'deauth' })
+              { 'type', 'mgt', 'deauth' })
    parse_test("1+1=2",
-              { type='=', { type='+', 1, 1 }, 2 })
+              { '=', { '+', 1, 1 }, 2 })
    parse_test("1+2*3+4=5",
-              { type='=', { type='+', { type='+', 1, { type='*', 2, 3 } }, 4 }, 5 })
+              { '=', { '+', { '+', 1, { '*', 2, 3 } }, 4 }, 5 })
    parse_test("1+1=2 and tcp",
-              { type='and', { type='=', { type='+', 1, 1 }, 2 }, { type='tcp' } })
+              { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    print("OK")
 end

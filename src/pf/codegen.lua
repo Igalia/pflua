@@ -190,7 +190,7 @@ local function filter_builder(dlt, ...)
 end
 
 local function unimplemented(builder, expr)
-   error("not implemented: "..expr.type)
+   error("not implemented: "..expr[1])
 end
 
 local primitive_codegens = {
@@ -303,29 +303,29 @@ local relop_map = {
 
 local function compile_bool(builder, expr, kt, kf, k)
    assert(type(expr) == 'table', 'logical expression must be a table')
-   if expr.type == 'not' or expr.type == '!' then
-      return compile_bool(builder, expr[1], kf, kt, k)
-   elseif expr.type == 'and' or expr.type == '&&' then
+   if expr[1] == 'not' or expr[1] == '!' then
+      return compile_bool(builder, expr[2], kf, kt, k)
+   elseif expr[1] == 'and' or expr[1] == '&&' then
       local knext = builder.label()
-      compile_bool(builder, expr[0], knext, kf, knext)
+      compile_bool(builder, expr[2], knext, kf, knext)
       builder.writelabel(knext)
-      compile_bool(builder, expr[1], kt, kf, k)
-   elseif expr.type == 'or' or expr.type == '||' then
+      compile_bool(builder, expr[3], kt, kf, k)
+   elseif expr[1] == 'or' or expr[1] == '||' then
       local knext = builder.label()
-      compile_bool(builder, expr[0], kt, knext, knext)
+      compile_bool(builder, expr[2], kt, knext, knext)
       builder.writelabel(knext)
-      compile_bool(builder, expr[1], kt, kf, k)
-   elseif relop_map[expr.type] then
+      compile_bool(builder, expr[3], kt, kf, k)
+   elseif relop_map[expr[1]] then
       -- An arithmetic relop.
-      local op = relop_map[expr.type]
-      local lhs = compile_value(builder, expr[0])
-      local rhs = compile_value(builder, expr[1])
+      local op = relop_map[expr[1]]
+      local lhs = compile_value(builder, expr[2])
+      local rhs = compile_value(builder, expr[3])
       local comp = lhs..' '..op..' '..rhs
       builder.test(comp, kt, kf, k)
    else
       -- A logical primitive.
-      local codegen = primitive_codegens[expr.type]
-      assert(codegen, "unimplemented code generator: "..expr.type)
+      local codegen = primitive_codegens[expr[1]]
+      assert(codegen, "unimplemented code generator: "..expr[1])
       codegen(builder, expr, kt, kf, k)
    end
 end
