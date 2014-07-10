@@ -313,7 +313,13 @@ local folders = {
    ['^'] = function(a, b) return bit.bxor(a, b) end,
    ['|'] = function(a, b) return bit.bor(a, b) end,
    ['<<'] = function(a, b) return bit.lshift(a, b) end,
-   ['>>'] = function(a, b) return bit.rshift(a, b) end
+   ['>>'] = function(a, b) return bit.rshift(a, b) end,
+   ['='] = function(a, b) return a == b end,
+   ['!='] = function(a, b) return a ~= b end,
+   ['<'] = function(a, b) return a < b end,
+   ['<='] = function(a, b) return a <= b end,
+   ['>='] = function(a, b) return a >= b end,
+   ['>'] = function(a, b) return a > b end
 }
 
 function simplify(expr)
@@ -337,6 +343,58 @@ function simplify(expr)
          end
       end
       return { op, lhs, rhs }
+   elseif relops[op] then
+      local lhs = simplify(expr[2])
+      local rhs = simplify(expr[3])
+      if type(lhs) == 'number' and type(rhs) == 'number' then
+         return { 'constant', assert(folders[op])(lhs, rhs) }
+      else
+         return { op, lhs, rhs }
+      end
+   elseif op == 'not' then
+      local rhs = simplify(expr[2])
+      if rhs[1] == 'constant' then
+         return { 'constant', not rhs[2] }
+      else
+         return { op, rhs }
+      end
+   elseif op == 'and' then
+      local lhs = simplify(expr[2])
+      local rhs = simplify(expr[3])
+      if lhs[1] == 'constant' then
+         if lhs[2] then return rhs else return { 'constant', false } end
+      elseif rhs[1] == 'constant' and rhs[2] then
+         return lhs
+      else
+         return { 'and', lhs, rhs }
+      end
+   elseif op == 'or' then
+      local lhs = simplify(expr[2])
+      local rhs = simplify(expr[3])
+      if lhs[1] == 'constant' then
+         if lhs[2] then return lhs else return rhs end
+      elseif rhs[1] == 'constant' and not rhs[2] then
+         return lhs
+      else
+         return { 'or', lhs, rhs }
+      end
+   elseif op == 'if' then
+      local test = simplify(expr[2])
+      local kt = simplify(expr[3])
+      local kf = simplify(expr[4])
+      if test[1] == 'constant' then
+         if test[2] then return kt else return kf end
+      else
+         return { 'if', test, kt, kf } 
+      end
+   elseif op == 'assert' then
+      local lhs = simplify(expr[2])
+      local rhs = simplify(expr[3])
+      if lhs[1] == 'constant' and lhs[2] then
+         return rhs
+      else
+         return { 'assert', lhs, rhs } 
+      end
    else
       local res = { op }
       for i=2,#expr do table.insert(res, simplify(expr[i])) end
@@ -352,15 +410,23 @@ end
 function pp(expr, indent, suffix)
    indent = indent or ''
    suffix = suffix or ''
-   if type(expr) ~= 'table' then
+   if type(expr) == 'number' then
       print(indent..expr..suffix)
-   elseif #expr == 1 then
-      print(indent..'{ '..expr[1]..' }'..suffix)
+   elseif type(expr) == 'string' then
+      print(indent..'"'..expr..'"'..suffix)
+   elseif type(expr) == 'boolean' then
+      print(indent..(expr and 'true' or 'false')..suffix)
+   elseif type(expr) == 'table' then
+      if #expr == 1 then
+         print(indent..'{ "'..expr[1]..'" }'..suffix)
+      else
+         print(indent..'{ "'..expr[1]..'",')
+         indent = indent..'  '
+         for i=2,#expr-1 do pp(expr[i], indent, ',') end
+         pp(expr[#expr], indent, ' }'..suffix)
+      end
    else
-      print(indent..'{ '..expr[1]..',')
-      indent = indent..'  '
-      for i=2,#expr-1 do pp(expr[i], indent, ',') end
-      pp(expr[#expr], indent, ' }'..suffix)
+      error("unsupported type "..type(expr))
    end
 end
 
@@ -385,9 +451,12 @@ function selftest ()
          error('not equal')
       end
    end
-   check({ '=', 1, 2 },
+   check({ 'constant', false },
       expand(parse("1 = 2"), 'EN10MB'))
+   check({ '=', 1, len },
+      expand(parse("1 = len"), 'EN10MB'))
    check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
+   pp(expand(parse("tcp"), "EN10MB"))
    print("OK")
 end
