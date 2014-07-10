@@ -37,15 +37,16 @@ function filter_count(pred, file)
       local pkt, hdr = records()
       if not pkt then break end
 
-      local packets = buffer.from_uchar(pkt, hdr.incl_len)
-      execute_pred_ensuring_trace(pred, packets)
+      local length = hdr.incl_len
+      local packet = buffer.from_uchar(pkt, length)
+      execute_pred_ensuring_trace(pred, packet, length)
    end
    return count, total_pkt
 end
 
 -- Executing pred within a function ensures a trace for this call
-function execute_pred_ensuring_trace(pred, packets)
-    pred(packets)
+function execute_pred_ensuring_trace(pred, packet, length)
+    pred(packet, length)
 end
 
 -- Calls func() during seconds
