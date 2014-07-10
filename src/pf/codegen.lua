@@ -61,15 +61,7 @@ local iso_proto_types = set('clnp', 'esis', 'isis')
 -- out to the nearest logical expression.  Transform access like ip[0]
 -- into raw byte accesses, given a link encapsulation, and do the same
 -- for logical predicates like "ip".
-local offsets_by_dlt = {
-   EN10MB = { ether = 0, ip = 14 }
-}
-
-local function offsetof(dlt, level)
-   local offsets = offsets_by_dlt[dlt]
-   assert(offsets, "unimplemented link type "..dlt)
-   return assert(offsets[level])
-end
+local function constantly(val) return function() return val end end
 
 local function filter_builder(dlt, ...)
    local written = 'return function('
@@ -77,41 +69,101 @@ local function filter_builder(dlt, ...)
    local lcount = 0
    local indent = '   '
    local jumps = {}
-   local function write(str)
+   local builder = {}
+   function builder.write(str)
       written = written .. str
    end
-   local function writeln(str)
-      write(indent .. str .. '\n')
+   function builder.writeln(str)
+      builder.write(indent .. str .. '\n')
    end
-   local function v(str)
+   function builder.v(str)
       vcount = vcount + 1
-      writeln('local v'..vcount..' = '..str)
+      builder.writeln('local v'..vcount..' = '..str)
       return 'v'..vcount
    end
-   local function label()
+   function builder.label()
       lcount = lcount + 1
       return 'L'..lcount
    end
-   local function jump(label)
+   function builder.jump(label)
       if label == 'ACCEPT' then return 'return true' end
       if label == 'REJECT' then return 'return false' end
       jumps[label] = true
       return 'goto '..label
    end
-   local function test(cond, kt, kf, k)
+   function builder.test(cond, kt, kf, k)
       if kt == k then
-         writeln('if not '..cond..' then '..jump(kf)..' end')
-         writeln('if not '..cond..' then '..jump(kf)..' end')
+         builder.writeln('if not '..cond..' then '..builder.jump(kf)..' end')
       else
-         writeln('if '..cond..' then '..jump(kt)..' end')
-         if kf ~= k then writeln('do '..jump(kf)..' end') end
+         builder.writeln('if '..cond..' then '..builder.jump(kt)..' end')
+         if kf ~= k then builder.writeln('do '..builder.jump(kf)..' end') end
       end
    end
-   local function ref(level, pos, size, kf)
+   function builder.test_ether_proto(proto, kf)
+      builder.test(builder.ref('ether', 12, 2, kf)..'= '..proto, kt, kf, k)
+   end
+   function builder.test_ipv4_proto(proto, kf)
+      builder.test(builder.ref("ip", 9, 1, kf)..' ~= '..proto, kf)
+   end
+   function builder.test_first_ipv4_fragment(kf)
+      builder.test('bit.band('..builder.ref("ip", 6, 2, kf)..', 0x1fff) ~= 0',
+                   kf)
+   end
+   function builder.ipv4_payload_offset(kf)
+      -- FIXME
+      builder.test('bit.band('..builder.ref("ip", 6, 2, kf)..', 0x1fff) ~= 0',
+                   kf)
+   end
+   local offsets_by_dlt = {
+      EN10MB = {
+         ether = function(kf) return 0 end,
+         ip = function(kf)
+            builder.test_ether_proto(2048, kf)
+            return 14
+         end,
+         ip6 = function(kf)
+            builder.test_ether_proto(34525, kf)
+            return 14
+         end,
+         arp = function(kf)
+            builder.test_ether_proto(2054, kf)
+            return 14
+         end,
+         rarp = function(kf)
+            builder.test_ether_proto(32821, kf)
+            return 14
+         end,
+         -- Unlike their corresponding predicates which detect either
+         -- IPv4 or IPv6 traffic, icmp[], udp[], and tcp[] only work for
+         -- IPv4.
+         icmp = function(kf)
+            builder.test_ipv4_proto(1, kf)
+            builder.test_first_ipv4_fragment(kf)
+            return builder.ipv4_payload_offset(kf)
+         end,
+         udp = function(kf)
+            builder.test_ipv4_proto(1, kf)
+            builder.test_first_ipv4_fragment(kf)
+            return builder.ipv4_payload_offset(kf)
+         end,
+         tcp = function(kf)
+            builder.test_ipv4_proto(1, kf)
+            builder.test_first_ipv4_fragment(kf)
+            return builder.ipv4_payload_offset(kf)
+         end,
+      }
+   }
+   function builder.offsetof(level, kf)
+      local offsets = offsets_by_dlt[dlt]
+      assert(offsets, "unimplemented link type "..dlt)
+      assert(offsets[level], "invalid protocol "..level.." for link type "..dlt)
+      return offsets[level](kf)
+   end
+   function builder.ref(level, pos, size, kf)
       size = size or 1
       kf = kf or 'REJECT'
-      local offset = offsetof(dlt, level)
-      test((offset+size)..'+'..pos..' > P.length', kf)
+      local offset = builder.offsetof(level, kf)
+      builder.test((offset+size)..'+'..pos..' > P.length', kf)
       local accessor
       if size == 1 then accessor = 'u8'
       elseif size == 2 then accessor = 'u16'
@@ -119,24 +171,22 @@ local function filter_builder(dlt, ...)
       else error("bad size", size) end
       return 'P:'..accessor..'('..offset..'+'..pos..')'
    end
-   local function writelabel(label)
-      if jumps[label] then write('::'..label..'::\n') end
+   function builder.writelabel(label)
+      if jumps[label] then builder.write('::'..label..'::\n') end
    end
-   local function finish(str)
-      write('end')
+   function builder.finish(str)
+      builder.write('end')
       if verbose then print(written) end
       return written
    end
    local needs_comma = false
    for _, v in ipairs({...}) do
-      if needs_comma then write(',') end
-      write(v)
+      if needs_comma then builder.write(',') end
+      builder.write(v)
       needs_comma = true
    end
-   write(')\n')
-   return { write = write, writeln = writeln, v = v, ref = ref,
-            label = label, test = test, writelabel = writelabel,
-            finish = finish }
+   builder.write(')\n')
+   return builder
 end
 
 local function unimplemented(builder, expr)
@@ -166,7 +216,8 @@ local primitive_codegens = {
    less = unimplemented,
    greater = unimplemented,
    ip = function(builder, expr, kt, kf, k)
-      builder.test(builder.ref('ether', 12, 2, kf)..'= 2048', kt, kf, k)
+      builder.test_ether_proto(2048, kf)
+      if (kt ~= k) then builder.writeln(builder.jump(kt)) end
    end,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
