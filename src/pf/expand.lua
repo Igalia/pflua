@@ -430,6 +430,20 @@ local function cfold(expr, db)
       else
          return expr
       end
+   elseif op == 'assert' then
+      local test = cfold(expr[2], db)
+      local key = cfkey(test)
+      if db[key] ~= nil then
+         if db[key] then return cfold(expr[3], db) end
+         return { 'fail' }
+      else
+         db[key] = true
+         return { op, test, cfold(expr[3], db) }
+      end
+   elseif expr[2] and type(expr[2]) == 'table' and expr[2][1] == 'assert' then
+      local ret = { 'assert', expr[2][2], { op, expr[2][3] } }
+      for i = 3, #expr do table.insert(ret[3], expr[i]) end
+      return cfold(ret, db)
    elseif op == 'not' then
       local rhs = cfold(expr[2], db)
       local key = cfkey(rhs)
@@ -472,16 +486,6 @@ local function cfold(expr, db)
          db_kf[key] = true
          return { op, test, cfold(expr[3], db_kt), cfold(expr[4], db_kf) }
       end
-   elseif op == 'assert' then
-      local test = cfold(expr[2], db)
-      local key = cfkey(test)
-      if db[key] ~= nil then
-         if db[key] then return cfold(expr[3], db) end
-         return { 'fail' }
-      else
-         db[key] = true
-         return { op, test, cfold(expr[3], db) }
-      end
    else
       return expr
    end
@@ -489,7 +493,9 @@ end
 
 function expand(expr, dlt)
    dlt = dlt or 'RAW'
-   return simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
+   local ret = simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
+   pp(ret)
+   return ret
 end
 
 function pp(expr, indent, suffix)
