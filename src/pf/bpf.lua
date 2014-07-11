@@ -142,14 +142,6 @@ function compile_lua(bpf)
       end
    end
 
-   local function P_ref(size)
-      if size == BPF_W then return 'P:s32'
-      elseif size == BPF_H then return 'P:u16'
-      elseif size == BPF_B then return 'P:u8'
-      else error('bad size ' .. size)
-      end
-   end
-
    local state = {}
    local function declare(name, init)
       if not state[name] then
@@ -166,6 +158,31 @@ function compile_lua(bpf)
       return declare('M'..k)
    end
 
+   local function size_to_accessor(size)
+      if size == BPF_W then return 's32'
+      elseif size == BPF_H then return 'u16'
+      elseif size == BPF_B then return 'u8'
+      else error('bad size ' .. size)
+      end
+   end
+
+   local function read_buffer_word_by_type(accessor, buffer, offset)
+      if (accessor == 'u8') then
+         return buffer..'['..offset..']'
+      elseif (accessor == 'u16') then
+         return 'bit.bor(bit.lshift('..buffer..'['..offset..'], 8), '..
+            buffer..'['..offset..'+1])'
+      elseif (accessor == 's32') then
+         return 'bit.bor(bit.lshift('..buffer..'['..offset..'], 24),'..
+            'bit.lshift('..buffer..'['..offset..'+1], 16), bit.lshift('..
+            buffer..'['..offset..'+2], 8), '..buffer..'['..offset..'+3])'
+      end
+   end
+
+   local function P_ref(size, k)
+      return read_buffer_word_by_type(size_to_accessor(size), 'P', k)
+   end
+
    local function ld(size, mode, k)
       local rhs, bytes = 0
       if size == BPF_W then bytes = 4
@@ -176,12 +193,12 @@ function compile_lua(bpf)
       if     mode == BPF_ABS then
          assert(k >= 0, "packet size >= 2G???")
          write('if ' .. k + bytes .. ' > length then return 0 end')
-         rhs = call(P_ref(size), k)
+         rhs = P_ref(size, k)
       elseif mode == BPF_IND then
          write(assign(declare('T'), add(X(), k)))
          -- Assuming packet can't be 2GB in length
          write('if T < 0 or T + ' .. bytes .. ' > length then return 0 end')
-         rhs = call(P_ref(size), 'T')
+         rhs = P_ref(size, 'T')
       elseif mode == BPF_LEN then rhs = 'bit.tobit(length)'
       elseif mode == BPF_IMM then rhs = k
       elseif mode == BPF_MEM then rhs = M(k)
@@ -198,7 +215,7 @@ function compile_lua(bpf)
       elseif mode == BPF_MSH then
          assert(k >= 0, "packet size >= 2G???")
          write('if ' .. k .. ' >= length then return 0 end')
-         rhs = lsh(band(call('P:u8', k), 0xf), 2)
+         rhs = lsh(band(P_ref(BPF_B, k), 0xf), 2)
       else
          error('bad mode ' .. mode)
       end
