@@ -203,5 +203,6 @@ function selftest ()
    compile_lua(expand(parse("ip"), 'EN10MB'))
    compile_lua(expand(parse("tcp"), 'EN10MB'))
    compile_lua(expand(parse("port 80"), 'EN10MB'))
+   compile_lua(expand(parse("tcp port 80"), 'EN10MB'))
    print("OK")
 end
