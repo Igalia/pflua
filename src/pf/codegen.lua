@@ -82,9 +82,17 @@ local function read_buffer_word_by_type(accessor, buffer, offset)
    if (accessor == 'u8') then
       return buffer..'['..offset..']'
    elseif (accessor == 'u16') then
-      return 'bit.bor(bit.lshift('..buffer..'['..offset..'], 8), '..buffer..'['..offset..'+1])'
+      local offset1 = type(offset) == 'number' and offset + 1 or offset..'+1'
+      return ('bit.bor(bit.lshift('..buffer..'['..offset..'], 8), '..
+                 buffer..'['..offset1..'])')
    elseif (accessor == 's32') then
-      return 'bit.bor(bit.lshift('..buffer..'['..offset..'], 24), bit.lshift('..buffer..'['..offset..'+1], 16), bit.lshift('..buffer..'['..offset..'+2], 8), '..buffer..'['..offset..'+3])'
+      local offset1 = type(offset) == 'number' and offset + 1 or offset..'+1'
+      local offset2 = type(offset) == 'number' and offset + 2 or offset..'+2'
+      local offset3 = type(offset) == 'number' and offset + 3 or offset..'+3'
+      return ('bit.bor(bit.lshift('..buffer..'['..offset..'], 24), '..
+                 'bit.lshift('..buffer..'['..offset1..'], 16), '..
+                 'bit.lshift('..buffer..'['..offset2..'], 8), '..
+                 buffer..'['..offset3..'])')
    end
 end
 
