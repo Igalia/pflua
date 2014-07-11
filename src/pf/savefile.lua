@@ -5,9 +5,11 @@ local types = require("pf.types")
 
 ffi.cdef[[
 int open(const char *pathname, int flags);
+int close(int fd);
 typedef long int off_t;
 off_t lseek(int fd, off_t offset, int whence);
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+int munmap(void *addr, size_t length);
 ]]
 
 function open(filename)
@@ -35,9 +37,11 @@ function records_mm(filename)
    end
    local size = size(fd)
    local ptr = mmap(fd, size)
+   ffi.C.close(fd)
    if ptr == ffi.cast("void *", -1) then
       error("Error mmapping " .. filename)
    end
+   local start = ptr
    ptr = ffi.cast("unsigned char *", ptr)
    local ptr_end = ptr + size
    local header = ffi.cast("struct pcap_file *", ptr)
@@ -49,16 +53,13 @@ function records_mm(filename)
    ptr = ptr + ffi.sizeof("struct pcap_file")
    local function pcap_records_it()
       local record = ffi.cast("struct pcap_record *", ptr)
-      if ptr >= ptr_end then return nil end
-      local datalen = math.min(record.orig_len, record.incl_len)
-      local packet = ffi.cast("unsigned char *", record + 1)
-      ptr = packet + datalen
-      local extra = nil
-      if record.incl_len == datalen + ffi.sizeof("struct pcap_record_extra") then
-	 extra = ffi.cast("struct pcap_record_extra *", ptr)
-	 ptr = ptr + ffi.sizeof("struct pcap_record_extra")
+      if ptr >= ptr_end then
+         ffi.C.munmap(start, size)
+         return nil
       end
-      return packet, record, extra
+      local packet = ffi.cast("unsigned char *", record + 1)
+      ptr = packet + record.incl_len
+      return packet, record
    end
    return pcap_records_it, true, true
 end
