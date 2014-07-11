@@ -214,7 +214,7 @@ local function tokens(str)
    end
    local function consume(expected, opts)
       local tok = next(opts)
-      assert(tok == expected, "expected "..expected..", got:", tok)
+      assert(tok == expected, "expected "..expected..", got: "..tok)
    end
    local function check(expected, opts)
       if peek(opts) ~= expected then return false end
@@ -599,8 +599,8 @@ local arithmetic_precedence = {
    ['|'] = 6
 }
 
-function parse_arithmetic(lexer, tok, max_precedence)
-   local exp = parse_primary_arithmetic(lexer, tok)
+function parse_arithmetic(lexer, tok, max_precedence, parsed_exp)
+   local exp = parsed_exp or parse_primary_arithmetic(lexer, tok)
    max_precedence = max_precedence or math.huge
    while true do
       local op = lexer.peek()
@@ -612,19 +612,11 @@ function parse_arithmetic(lexer, tok, max_precedence)
    end
 end
 
-local function parse_relop(lexer, tok)
-   local lhs = parse_arithmetic(lexer, tok)
-   local op = lexer.next()
-   assert(set('>', '<', '>=', '<=', '=', '!=')[op],
-          "expected a comparison operator, got", op)
-   return { op, lhs, parse_arithmetic(lexer) }
-end
-
-local function parse_primitive_or_relop(lexer)
+local function parse_primitive_or_arithmetic(lexer)
    local tok = lexer.next({maybe_arithmetic=true})
    if (type(tok) == 'number' or tok == 'len' or
        addressables[tok] and lexer.peek() == '[') then
-      return parse_relop(lexer, tok)
+      return parse_arithmetic(lexer, tok)
    end
 
    local parser = primitives[tok]
@@ -636,7 +628,7 @@ local function parse_primitive_or_relop(lexer)
    -- short for `not host vs and host ace` and which should not be
    -- confused with `not (host vs or ace)`."  For now we punt on this
    -- part of the grammar.
-   error("keyword elision not implemented")
+   error("keyword elision not implemented "..tok)
 end
 
 local logical_precedence = {
@@ -644,19 +636,38 @@ local logical_precedence = {
    ['||'] = 2, ['or'] = 2
 }
 
-local function parse_logical(lexer, max_precedence)
-   if lexer.check('(') then
-      local expr = parse_logical(lexer)
-      lexer.consume(')')
-      return expr
-   elseif lexer.check('not') then
+local function is_arithmetic(exp)
+   return (exp == 'len' or type(exp) == 'number' or
+              exp[1]:match("^%[") or arithmetic_precedence[exp[1]])
+end
+
+local parse_logical
+
+local function parse_logical_or_arithmetic(lexer, max_precedence)
+   if lexer.check('not') then
       return { 'not', parse_logical(lexer) }
    else
-      local exp = parse_primitive_or_relop(lexer)
+      local exp
+      if lexer.check('(') then
+         exp = parse_logical_or_arithmetic(lexer)
+         lexer.consume(')')
+      else
+         exp = parse_primitive_or_arithmetic(lexer)
+      end
+      if is_arithmetic(exp) then
+         if arithmetic_precedence[lexer.peek()] then
+            exp = parse_arithmetic(lexer, nil, nil, exp)
+         end
+         if lexer.peek() == ')' then return exp end
+         local op = lexer.next()
+         assert(set('>', '<', '>=', '<=', '=', '!=')[op],
+                "expected a comparison operator, got "..op)
+         exp = { op, exp, parse_arithmetic(lexer) }
+      end
       max_precedence = max_precedence or math.huge
       while true do
          local op = lexer.peek()
-         if not op then return exp end
+         if not op or op == ')' then return exp end
          local prec = logical_precedence[op]
          if prec then
             if prec > max_precedence then return exp end
@@ -672,6 +683,12 @@ local function parse_logical(lexer, max_precedence)
          exp = { op, exp, rhs }
       end
    end
+end
+
+function parse_logical(lexer, max_precedence)
+   local expr = parse_logical_or_arithmetic(lexer)
+   assert(not is_arithmetic(expr), "expected a logical expression")
+   return expr
 end
 
 function parse(str)
@@ -751,7 +768,17 @@ function selftest ()
               { '=', { '+', { '+', 1, { '*', 2, 3 } }, 4 }, 5 })
    parse_test("1+1=2 and tcp",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
+   parse_test("1+1=2 and (tcp)",
+              { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    parse_test("tcp port 80",
               { 'and', { 'tcp' }, { 'port', 80 } })
+   parse_test("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)",
+              { "and", { "tcp" },
+                { "and", { "port", 80 },
+                  { "!=",
+                    { "-", { "-", { "[ip]", 2, 1 },
+                             { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
+                      { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } } })
+
    print("OK")
 end
