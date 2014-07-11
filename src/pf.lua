@@ -37,9 +37,10 @@ function selftest ()
    print("selftest: pf")
    
    local function test_null(str)
-      compile_pcap_filter2(str, "EN10MB")
       local f = compile_pcap_filter(str)
+      local f2 = compile_pcap_filter2(str, "EN10MB")
       assert(f(str, 0) == 0, "null packet should be rejected")
+      assert(f2(str, 0) == false, "null packet should be rejected2")
    end
    test_null("icmp")
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
