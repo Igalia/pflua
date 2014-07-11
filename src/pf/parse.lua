@@ -645,35 +645,30 @@ local logical_precedence = {
 }
 
 local function parse_logical(lexer, max_precedence)
-   local exp = parse_primitive_or_relop(lexer)
-   max_precedence = max_precedence or math.huge
-   while true do
-      local op = lexer.peek()
-      local prec = logical_precedence[op]
-      if not prec or prec > max_precedence then return exp end
-      lexer.consume(op)
-      local rhs = parse_logical(lexer, prec - 1)
-      exp = { op, exp, rhs }
-   end
-end
-
-local function parse_expr(lexer)
-   if not lexer.peek({maybe_arithmetic=true}) then
-      return nil
-   elseif lexer.check('(') then
-      local expr = parse_expr(lexer)
+   if lexer.check('(') then
+      local expr = parse_logical(lexer)
       lexer.consume(')')
       return expr
    elseif lexer.check('not') then
-      return { 'not', parse_expr(lexer) }
+      return { 'not', parse_logical(lexer) }
    else
-      return parse_logical(lexer)
+      local exp = parse_primitive_or_relop(lexer)
+      max_precedence = max_precedence or math.huge
+      while true do
+         local op = lexer.peek()
+         local prec = logical_precedence[op]
+         if not prec or prec > max_precedence then return exp end
+         lexer.consume(op)
+         local rhs = parse_logical(lexer, prec - 1)
+         exp = { op, exp, rhs }
+      end
    end
 end
 
 function parse(str)
    local lexer = tokens(str)
-   local expr = parse_expr(lexer)
+   if not lexer.peek({maybe_arithmetic=true}) then return { 'true' } end
+   local expr = parse_logical(lexer)
    assert(not lexer.peek(), "unexpected token", lexer.peek())
    return expr
 end
@@ -720,6 +715,8 @@ function selftest ()
    lex_test("net 10.0.0.0/24", { 'net', { 'ipv4', 10, 0, 0, 0 }, '/', 24 })
 
    local function parse_test(str, elts) check(elts, parse(str)) end
+   parse_test("",
+              { 'true' })
    parse_test("host 127.0.0.1",
               { 'host', { 'ipv4', 127, 0, 0, 1 } })
    parse_test("src host 127.0.0.1",
