@@ -214,6 +214,9 @@ local binops = set(
 local associative_binops = set(
    '+', '*', '&', '|'
 )
+local leaf_primitives = set(
+   'true', 'false', 'fail'
+)
 
 local function expand_offset(level, dlt)
    assert(dlt == "EN10MB", "Encapsulation other than EN10MB unimplemented")
@@ -330,6 +333,8 @@ function expand_bool(expr, dlt)
                expand_bool(expr[2], dlt),
                expand_bool(expr[3], dlt),
                expand_bool(expr[4], dlt) }
+   elseif leaf_primitives[expr[1]] then
+      return expr
    else
       -- A logical primitive.
       local expander = primitive_expanders[expr[1]]
@@ -629,6 +634,8 @@ function selftest ()
       expand(parse("1 = len"), 'EN10MB'))
    check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
-   -- pp(expand(parse("tcp and port 80"), 'EN10MB'))
+   -- Could check this, but it's very large
+   expand(parse("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)"),
+          "EN10MB")
    print("OK")
 end
