@@ -26,7 +26,7 @@ function filter_count(pred, file)
       if not pkt then break end
       total_pkt = total_pkt + 1
       local length = hdr.incl_len
-      if pred(pkt, length) ~= 0 then
+      if pred(pkt, length) then
          count = count + 1
       end
    end
@@ -46,9 +46,11 @@ function selftest ()
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
 
    local function assert_count(filter, file, expected, dlt)
-      compile_pcap_filter2(filter, dlt)
+      local pred2 = compile_pcap_filter2(filter, dlt)
       local pred = compile_pcap_filter(filter, dlt)
-      local actual = filter_count(pred, file)
+      local actual = filter_count(function(P,len) return pred(P,len) ~= 0 end, file)
+      assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)
+      actual = filter_count(pred2, file)
       assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)
    end
    assert_count('', "ts/pcaps/ws/v4.pcap", 43, "EN10MB")
