@@ -3,9 +3,18 @@ module("pf",package.seeall)
 local savefile = require("pf.savefile")
 local libpcap = require("pf.libpcap")
 local bpf = require("pf.bpf")
+local parse = require('pf.parse')
+local expand = require('pf.expand')
+local codegen = require('pf.codegen')
 
 function compile_pcap_filter(filter_str, dlt_name)
    return bpf.compile(libpcap.compile(filter_str, dlt_name))
+end
+
+function compile_pcap_filter2(filter_str, dlt_name)
+   local expr = parse.parse(filter_str)
+   expr = expand.expand(expr, dlt_name)
+   return codegen.compile(expr)
 end
 
 function filter_count(pred, file)
@@ -28,6 +37,7 @@ function selftest ()
    print("selftest: pf")
    
    local function test_null(str)
+      compile_pcap_filter2(str, "EN10MB")
       local f = compile_pcap_filter(str)
       assert(f(str, 0) == 0, "null packet should be rejected")
    end
@@ -35,6 +45,7 @@ function selftest ()
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
 
    local function assert_count(filter, file, expected, dlt)
+      compile_pcap_filter2(filter, dlt)
       local pred = compile_pcap_filter(filter, dlt)
       local actual = filter_count(pred, file)
       assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)
