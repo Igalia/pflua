@@ -49,7 +49,11 @@ local function filter_builder(...)
       return 'goto '..label
    end
    function builder.test(cond, kt, kf, k)
-      if kt == k then
+      if kt == 'ACCEPT' and kf == 'REJECT' then
+         builder.writeln('do return '..cond..' end')
+      elseif kf == 'ACCEPT' and kt == 'REJECT' then
+         builder.writeln('do return not '..cond..' end')
+      elseif kt == k then
          builder.writeln('if not '..cond..' then '..builder.jump(kf)..' end')
       else
          builder.writeln('if '..cond..' then '..builder.jump(kt)..' end')
