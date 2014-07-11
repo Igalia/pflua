@@ -484,6 +484,60 @@ local function cfold(expr, db)
    end
 end
 
+-- Length assertion hoisting.
+local function lhoist(expr, db)
+   -- TODO: Thread continuations to get info from "if" as well as
+   -- "assert" (and possibly remove "assert" entirely)
+   local function annotate(expr)
+      local op = expr[1]
+      if op == 'assert' then
+         local t, rhs = expr[2], expr[3]
+         local t_a, rhs_a = annotate(t), annotate(rhs)
+         local min = t_a[1]
+         if t[1] == '<=' and type(t[2]) == 'number' and t[3] == 'len' then
+            min = math.max(min, t[2])
+         end
+         return { math.max(min, rhs_a[1]), { op, t_a, rhs_a } }
+      elseif op == 'if' then
+         local test, kt, kf = expr[2], expr[3], expr[4]
+         local test_a, kt_a, kf_a = annotate(test), annotate(kt), annotate(kf)
+         local min = test_a[1]
+         if kt[1] == 'fail' then min = math.max(min, kf_a[1])
+         elseif kf[1] == 'fail' then min = math.max(min, kt_a[1])
+         else min = math.max(min, math.min(kt_a[1], kf_a[1])) end
+         return { min, { op, test_a, kt_a, kf_a } }
+      else
+         return { 0, expr }
+      end
+   end
+
+   local function reduce(aexpr, min)
+      if min < aexpr[1] then
+         return { 'assert', { '<=', aexpr[1], 'len' }, reduce(aexpr, aexpr[1]) }
+      end
+      local expr = aexpr[2]
+      local op = expr[1]
+      if op == 'assert' then
+         local t, rhs = reduce(expr[2], min), reduce(expr[3], min)
+         if t[1] == '<=' and type(t[2]) == 'number' and t[3] == 'len' then
+            if t[2] <= min then return rhs end
+         end
+         return { op, t, rhs }
+      elseif op == 'if' then
+         local t, kt, kf =
+            reduce(expr[2], min), reduce(expr[3], min), reduce(expr[4], min)
+         if t[1] == '<=' and type(t[2]) == 'number' and t[3] == 'len' then
+            if t[2] <= min then return kt else return kf end
+         end
+         return { op, t, kt, kf }
+      else
+         return expr
+      end
+   end
+      
+   return reduce(annotate(expr), 0)
+end
+
 function pp(expr, indent, suffix)
    indent = indent or ''
    suffix = suffix or ''
@@ -509,7 +563,9 @@ end
 
 function expand(expr, dlt)
    dlt = dlt or 'RAW'
-   expr = simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
+   expr = simplify(expand_bool(expr, dlt))
+   expr = simplify(cfold(expr, {}))
+   expr = simplify(lhoist(expr))
    if verbose then pp(expr) end
    return expr
 end
@@ -541,6 +597,5 @@ function selftest ()
       expand(parse("1 = len"), 'EN10MB'))
    check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
-   -- pp(expand(parse("port 80"), 'EN10MB'))
    print("OK")
 end
