@@ -486,26 +486,31 @@ end
 
 -- Length assertion hoisting.
 local function lhoist(expr, db)
-   -- TODO: Thread continuations to get info from "if" as well as
-   -- "assert" (and possibly remove "assert" entirely)
-   local function annotate(expr)
+   local function eta(expr, kt, kf)
+      if expr[1] == 'true' then return kt end
+      if expr[1] == 'false' then return kf end
+      if expr[1] == 'fail' then return 'REJECT' end
+      return nil
+   end
+   local function annotate(expr, kt, kf)
       local op = expr[1]
-      if op == 'assert' then
+      if (op == '<=' and kf == 'REJECT'
+          and type(expr[2]) == 'number' and expr[3] == 'len') then
+         return { expr[2], expr }
+      elseif op == 'assert' then
          local t, rhs = expr[2], expr[3]
-         local t_a, rhs_a = annotate(t), annotate(rhs)
-         local min = t_a[1]
-         if t[1] == '<=' and type(t[2]) == 'number' and t[3] == 'len' then
-            min = math.max(min, t[2])
-         end
-         return { math.max(min, rhs_a[1]), { op, t_a, rhs_a } }
+         local t_a, rhs_a =
+            annotate(t, eta(rhs, kt, kf), 'REJECT'), annotate(rhs, kt, kf)
+         return { math.max(t_a[1], rhs_a[1]), { op, t_a, rhs_a } }
       elseif op == 'if' then
-         local test, kt, kf = expr[2], expr[3], expr[4]
-         local test_a, kt_a, kf_a = annotate(test), annotate(kt), annotate(kf)
-         local min = test_a[1]
-         if kt[1] == 'fail' then min = math.max(min, kf_a[1])
-         elseif kf[1] == 'fail' then min = math.max(min, kt_a[1])
-         else min = math.max(min, math.min(kt_a[1], kf_a[1])) end
-         return { min, { op, test_a, kt_a, kf_a } }
+         local test, t, f = expr[2], expr[3], expr[4]
+         local test_a = annotate(test, eta(t, kt, kf), eta(f, kt, kf))
+         local t_a, f_a =  annotate(t, kt, kf), annotate(f, kt, kf)
+         local rhs_min
+         if eta(t, kt, kf) == 'REJECT' then rhs_min = f_a[1]
+         elseif eta(f, kt, kf) == 'REJECT' then rhs_min = t_a[1]
+         else rhs_min = math.min(t_a[1], f_a[1]) end
+         return { math.max(test_a[1], rhs_min), { op, test_a, t_a, f_a } }
       else
          return { 0, expr }
       end
@@ -535,7 +540,7 @@ local function lhoist(expr, db)
       end
    end
       
-   return reduce(annotate(expr), 0)
+   return reduce(annotate(expr, 'ACCEPT', 'REJECT'), 0)
 end
 
 function pp(expr, indent, suffix)
@@ -597,5 +602,6 @@ function selftest ()
       expand(parse("1 = len"), 'EN10MB'))
    check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
+   pp(expand(parse("tcp and port 80"), 'EN10MB'))
    print("OK")
 end
