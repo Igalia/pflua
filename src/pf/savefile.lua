@@ -84,7 +84,7 @@ function write_record (file, ffi_buffer, length)
 end
 
 function write_record_header (file, length)
-   local pcap_record = ffi.new("struct pcap_record")
+   local pcap_record = types.pcap_record(0, 0, length, length)
    pcap_record.incl_len = length
    pcap_record.orig_len = length
    file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))

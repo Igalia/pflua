@@ -87,7 +87,8 @@ end
 local elapsed_time
 
 local function assert_count(filter, file, expected, dlt)
-   local pred = pf.compile_pcap_filter(filter, dlt)
+   -- TODO: When new compiler handles test cases, bpf=false.
+   local pred = pf.compile_filter(filter, {dlt=dlt, bpf=true})
    local start = os.clock()
    local actual, seen = pf.filter_count(pred, file)
    elapsed_time = os.clock() - start

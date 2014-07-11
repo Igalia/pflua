@@ -64,9 +64,8 @@ function selftest(filter)
    if (filter == nil or filter == '') then
       filter = "tcp port 80"
    end
-   local dlt = "EN10MB"
 
-   local pred = compile_pcap_filter(filter, dlt)
+   local pred = compile_filter(filter, {dlt="EN10MB"})
    call_during_seconds(1, filter_count, pred, file)
 
    print("OK")

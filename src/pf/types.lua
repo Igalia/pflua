@@ -49,6 +49,7 @@ local bpf_program_mt = {
 
 bpf_insn = ffi.typeof("struct bpf_insn")
 bpf_program = ffi.metatype("struct bpf_program", bpf_program_mt)
+pcap_record = ffi.typeof("struct pcap_record")
 
 function selftest ()
    print("selftest: ffi_types")
