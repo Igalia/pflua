@@ -8,7 +8,8 @@ local expand = require('pf.expand')
 local codegen = require('pf.codegen')
 
 function compile_pcap_filter(filter_str, dlt_name)
-   return bpf.compile(libpcap.compile(filter_str, dlt_name))
+   local bpf_prog = bpf.compile(libpcap.compile(filter_str, dlt_name))
+   return function(P, len) return bpf_prog(P, len) ~= 0 end
 end
 
 function compile_pcap_filter2(filter_str, dlt_name)
@@ -39,7 +40,7 @@ function selftest ()
    local function test_null(str)
       local f = compile_pcap_filter(str)
       local f2 = compile_pcap_filter2(str, "EN10MB")
-      assert(f(str, 0) == 0, "null packet should be rejected")
+      assert(f(str, 0) == false, "null packet should be rejected")
       assert(f2(str, 0) == false, "null packet should be rejected2")
    end
    test_null("icmp")
@@ -48,7 +49,7 @@ function selftest ()
    local function assert_count(filter, file, expected, dlt)
       local pred2 = compile_pcap_filter2(filter, dlt)
       local pred = compile_pcap_filter(filter, dlt)
-      local actual = filter_count(function(P,len) return pred(P,len) ~= 0 end, file)
+      local actual = filter_count(pred, file)
       assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)
       actual = filter_count(pred2, file)
       assert(actual == expected, 'got ' .. actual .. ', expected ' .. expected)

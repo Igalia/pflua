@@ -19,7 +19,7 @@ int pcap_offline_filter(const struct bpf_program *fp,
                         const struct pcap_record *h, const uint8_t *pkt);
 ]]
 
-function pcap_offline_filter(bpf, hdr, pkt)
+function offline_filter(bpf, hdr, pkt)
    return pcap.pcap_offline_filter(bpf, hdr, pkt)
 end
 
