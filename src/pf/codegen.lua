@@ -79,15 +79,15 @@ local function compile_value(builder, expr)
    if type(expr) == 'number' then return expr end
    assert(type(expr) == 'table', 'unexpected type '..type(expr))
    local op = expr[1]
-   local lhs = expr[2]
-   local rhs = expr[3]
+   local lhs = compile_value(builder, expr[2])
+   local rhs = compile_value(builder, expr[3])
    if op == '[]' then
       local accessor
       if rhs == 1 then accessor = 'u8'
       elseif rhs == 2 then accessor = 'u16'
       elseif rhs == 4 then accessor = 's32'
       else error('unexpected [] size', rhs) end
-      return builder.v('P:'..accessor..'('..lhs..', '..rhs..')')
+      return builder.v('P:'..accessor..'('..lhs..')')
    elseif op == '+' then return builder.v(lhs..'+'..rhs)
    elseif op == '-' then return builder.v(lhs..'-'..rhs)
    elseif op == '*' then return builder.v(lhs..'*'..rhs)
@@ -178,5 +178,6 @@ function selftest ()
    local expand = require('pf.expand').expand
    compile_lua(expand(parse("ip"), 'EN10MB'))
    compile_lua(expand(parse("tcp"), 'EN10MB'))
+   compile_lua(expand(parse("port 80"), 'EN10MB'))
    print("OK")
 end
