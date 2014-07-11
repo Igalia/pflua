@@ -111,17 +111,35 @@ local function compile_bool(builder, expr, kt, kf, k)
    if op == 'not' then
       return compile_bool(builder, expr[2], kf, kt, k)
    elseif op == 'if' then
-      local test_kt = builder.label()
-      local test_kf = builder.label()
-      compile_bool(builder, expr[2], test_kt, test_kf, test_kt)
-      builder.writelabel(test_kt)
-      builder.push_db()
-      compile_bool(builder, expr[3], kt, kf, nil)
-      builder.pop_db()
-      builder.writelabel(test_kf)
-      builder.push_db()
-      compile_bool(builder, expr[4], kt, kf, k)
-      builder.pop_db()
+      local function eta_reduce(expr)
+         if expr[1] == 'false' then return kf, false
+         elseif expr[1] == 'true' then return kt, false
+         elseif expr[1] == 'fail' then return 'REJECT', false
+         else return builder.label(), true end
+      end
+      local test_kt, fresh_kt = eta_reduce(expr[3])
+      local test_kf, fresh_kf = eta_reduce(expr[4])
+      if fresh_kt then
+         compile_bool(builder, expr[2], test_kt, test_kf, test_kt)
+         builder.writelabel(test_kt)
+         builder.push_db()
+         compile_bool(builder, expr[3], kt, kf, nil)
+         builder.pop_db()
+         if fresh_kf then
+            builder.writelabel(test_kf)
+            builder.push_db()
+            compile_bool(builder, expr[4], kt, kf, k)
+            builder.pop_db()
+         end
+      elseif fresh_kf then
+         compile_bool(builder, expr[2], test_kt, test_kf, test_kf)
+         builder.writelabel(test_kf)
+         builder.push_db()
+         compile_bool(builder, expr[4], kt, kf, k)
+         builder.pop_db()
+      else
+         compile_bool(builder, expr[2], test_kt, test_kf, k)
+      end
    elseif op == 'assert' then
       compile_bool(builder, expr[2], nil, 'REJECT', nil)
       compile_bool(builder, expr[3], kt, kf, k)
