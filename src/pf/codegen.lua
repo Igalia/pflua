@@ -133,7 +133,9 @@ local function compile_bool(builder, expr, kt, kf, k)
          compile_bool(builder, expr[2], test_kt, test_kf, test_kt)
          builder.writelabel(test_kt)
          builder.push_db()
-         compile_bool(builder, expr[3], kt, kf, nil)
+         local t_next = nil
+         if not fresh_kf then t_next = k end
+         compile_bool(builder, expr[3], kt, kf, t_next)
          builder.pop_db()
          if fresh_kf then
             builder.writelabel(test_kf)
