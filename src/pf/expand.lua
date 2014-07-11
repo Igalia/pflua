@@ -311,9 +311,13 @@ function expand_bool(expr, dlt)
    if expr[1] == 'not' or expr[1] == '!' then
       return { 'not', expand_bool(expr[2], dlt) }
    elseif expr[1] == 'and' or expr[1] == '&&' then
-      return { 'and', expand_bool(expr[2], dlt), expand_bool(expr[3], dlt) }
+      return { 'if', expand_bool(expr[2], dlt),
+               expand_bool(expr[3], dlt),
+               { 'false' } }
    elseif expr[1] == 'or' or expr[1] == '||' then
-      return { 'or', expand_bool(expr[2], dlt), expand_bool(expr[3], dlt) }
+      return { 'if', expand_bool(expr[2], dlt),
+               { 'true' },
+               expand_bool(expr[3], dlt) }
    elseif relops[expr[1]] then
       -- An arithmetic relop.
       local res, assertions = expand_relop(expr, dlt)
@@ -380,54 +384,33 @@ function simplify(expr)
       local lhs = simplify(expr[2])
       local rhs = simplify(expr[3])
       if type(lhs) == 'number' and type(rhs) == 'number' then
-         return { 'constant', assert(folders[op])(lhs, rhs) }
+         return { assert(folders[op])(lhs, rhs) and 'true' or 'false' }
       else
          return { op, lhs, rhs }
       end
    elseif op == 'not' then
       local rhs = simplify(expr[2])
-      if rhs[1] == 'constant' then
-         return { 'constant', not rhs[2] }
-      else
-         return { op, rhs }
-      end
-   elseif op == 'and' then
-      local lhs = simplify(expr[2])
-      local rhs = simplify(expr[3])
-      if lhs[1] == 'constant' then
-         if lhs[2] then return rhs else return { 'constant', false } end
-      elseif rhs[1] == 'constant' and rhs[2] then
-         return lhs
-      else
-         return { 'and', lhs, rhs }
-      end
-   elseif op == 'or' then
-      local lhs = simplify(expr[2])
-      local rhs = simplify(expr[3])
-      if lhs[1] == 'constant' then
-         if lhs[2] then return lhs else return rhs end
-      elseif rhs[1] == 'constant' and not rhs[2] then
-         return lhs
-      else
-         return { 'or', lhs, rhs }
-      end
+      if rhs[1] == 'true' then return { 'false' }
+      elseif rhs[1] == 'false' then return { 'true' }
+      else return { op, rhs } end
    elseif op == 'if' then
       local test = simplify(expr[2])
       local kt = simplify(expr[3])
       local kf = simplify(expr[4])
-      if test[1] == 'constant' then
-         if test[2] then return kt else return kf end
-      else
-         return { 'if', test, kt, kf } 
-      end
+      if test[1] == 'assert' then
+         return simplify({ 'assert', test[2], { op, test[3], kt, kf } })
+      elseif test[1] == 'true' then return kt
+      elseif test[1] == 'false' then return kf
+      elseif test[1] == 'not' then return simplify({op, test[2], kf, kt })
+      elseif kt[1] == 'true' and kf[1] == 'false' then return test
+      elseif kt[1] == 'false' and kf[1] == 'true' then return { 'not', test }
+      else return { op, test, kt, kf } end
    elseif op == 'assert' then
       local lhs = simplify(expr[2])
       local rhs = simplify(expr[3])
-      if lhs[1] == 'constant' then
-         if lhs[2] then return rhs else return { 'fail' } end
-      else
-         return { 'assert', lhs, rhs } 
-      end
+      if lhs[1] == 'true' then return rhs
+      elseif lhs[1] == 'false' then return { 'fail' }
+      else return { 'assert', lhs, rhs } end
    else
       local res = { op }
       for i=2,#expr do table.insert(res, simplify(expr[i])) end
@@ -459,7 +442,7 @@ local function cfold(expr, db)
    elseif relops[op] then
       local key = cfkey(expr)
       if db[key] ~= nil then
-         return { 'constant', db[key] }
+         return { db[key] and 'true' or 'false' }
       else
          return expr
       end
@@ -480,32 +463,10 @@ local function cfold(expr, db)
    elseif op == 'not' then
       local rhs = cfold(expr[2], db)
       local key = cfkey(rhs)
-      if db[key] ~= nil then
-         return { 'constant', not db[key] }
-      else
-         return { op, rhs }
-      end
-   elseif op == 'and' then
-      local lhs = cfold(expr[2], db)
-      local key = cfkey(lhs)
-      if db[key] ~= nil then
-         if db[key] then return cfold(expr[3], db) end
-         return { 'constant', false }
-      else
-         db[key] = true
-         return { op, lhs, cfold(expr[3], db) }
-      end
-   elseif op == 'or' then
-      local lhs = cfold(expr[2], db)
-      local key = cfkey(lhs)
-      if db[key] ~= nil then
-         if db[key] then return { 'constant', true } end
-         return cfold(expr[3], db)
-      else
-         local db = dup(db)
-         db[key] = false
-         return { op, lhs, cfold(expr[3], db) }
-      end
+      if db[key] ~= nil then return { db[key] and 'false' or 'true' }
+      elseif rhs[1] == 'true' then return { 'false' }
+      elseif rhs[1] == 'false' then return { 'true' }
+      else return { op, rhs } end
    elseif op == 'if' then
       local test = cfold(expr[2], db)
       local key = cfkey(test)
@@ -573,12 +534,12 @@ function selftest ()
          error('not equal')
       end
    end
-   check({ 'constant', false },
+   check({ 'false' },
       expand(parse("1 = 2"), 'EN10MB'))
    check({ '=', 1, len },
       expand(parse("1 = len"), 'EN10MB'))
    check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
-   pp(expand(parse("port 80"), 'EN10MB'))
+   -- pp(expand(parse("port 80"), 'EN10MB'))
    print("OK")
 end

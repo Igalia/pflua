@@ -110,18 +110,6 @@ local function compile_bool(builder, expr, kt, kf, k)
    local op = expr[1]
    if op == 'not' then
       return compile_bool(builder, expr[2], kf, kt, k)
-   elseif op == 'and' then
-      local knext = builder.label()
-      compile_bool(builder, expr[2], knext, kf, knext)
-      builder.writelabel(knext)
-      compile_bool(builder, expr[3], kt, kf, k)
-   elseif op == 'or' then
-      local knext = builder.label()
-      compile_bool(builder, expr[2], kt, knext, knext)
-      builder.writelabel(knext)
-      builder.push_db()
-      compile_bool(builder, expr[3], kt, kf, k)
-      builder.pop_db()
    elseif op == 'if' then
       local test_kt = builder.label()
       local test_kf = builder.label()
@@ -137,12 +125,10 @@ local function compile_bool(builder, expr, kt, kf, k)
    elseif op == 'assert' then
       compile_bool(builder, expr[2], nil, 'REJECT', nil)
       compile_bool(builder, expr[3], kt, kf, k)
-   elseif op == 'constant' then
-      if expr[2] then
-         if kt ~= k then builder.write(builder.jump(kt)) end
-      else
-         if kf ~= k then builder.write(builder.jump(kf)) end
-      end
+   elseif op == 'true' then
+      if kt ~= k then builder.write(builder.jump(kt)) end
+   elseif op == 'false' then
+      if kf ~= k then builder.write(builder.jump(kf)) end
    elseif op == 'fail' then
       builder.write('do return false end')
    elseif relop_map[op] then
