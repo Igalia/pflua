@@ -101,7 +101,7 @@ local function compile_value(builder, expr)
       elseif rhs == 2 then accessor = 'u16'
       elseif rhs == 4 then accessor = 's32'
       else error('unexpected [] size', rhs) end
-      return read_buffer_word_by_type(accessor, 'P', lhs) 
+      return builder.v(read_buffer_word_by_type(accessor, 'P', lhs))
    elseif op == '+' then return builder.v(lhs..'+'..rhs)
    elseif op == '-' then return builder.v(lhs..'-'..rhs)
    elseif op == '*' then return builder.v(lhs..'*'..rhs)
