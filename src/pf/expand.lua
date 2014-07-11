@@ -103,7 +103,22 @@ local primitive_expanders = {
    ether_proto = unimplemented,
    gateway = unimplemented,
    net = unimplemented,
-   port = unimplemented,
+   port = function(expr)
+      local port = expr[2]
+      return { 'if', { 'ip' },
+               { 'and',
+                 { 'or', has_ipv4_protocol(6),
+                   { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
+                 { 'or',
+                   { '=', { '[ip*]', 0, 2 }, port },
+                   { '=', { '[ip*]', 2, 2 }, port } } },
+               { 'and',
+                 { 'or', has_ipv6_protocol(6),
+                   { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
+                 { 'or',
+                   { '=', { '[ip6*]', 0, 2 }, port },
+                   { '=', { '[ip6*]', 2, 2 }, port } } } }
+   end,
    portrange = unimplemented,
    less = unimplemented,
    greater = unimplemented,
@@ -212,17 +227,29 @@ local function expand_offset(level, dlt)
    function assert_ipv4_protocol(proto)
       return assert_expr(has_ipv4_protocol(proto))
    end
+   function assert_ipv6_protocol(proto)
+      return assert_expr(has_ipv6_protocol(proto))
+   end
    function assert_first_ipv4_fragment()
       return assert_expr(is_first_ipv4_fragment())
    end
    function ipv4_payload_offset(proto)
-      local ip_offset, ip_asserts = expand_offset('ip', dlt)
-      local asserts = concat(concat(ip_asserts, assert_ipv4_protocol(proto)),
-                             assert_first_ipv4_fragment())
+      local ip_offset, asserts = expand_offset('ip', dlt)
+      if proto then
+         asserts = concat(asserts, assert_ipv4_protocol(proto))
+      end
+      asserts = concat(asserts, assert_first_ipv4_fragment())
       local res = { '+',
                     { '<<', { '&', { '[]', ip_offset, 1 }, 0xf }, 2 },
                     ip_offset }
       return res, asserts
+   end
+   function ipv6_payload_offset(proto)
+      local ip_offset, asserts = expand_offset('ip6', dlt)
+      if proto then
+         asserts = concat(asserts, assert_ipv6_protocol(proto))
+      end
+      return { '+', ip_offset, 40 }, asserts
    end
 
    -- Note that unlike their corresponding predicates which detect
@@ -238,6 +265,10 @@ local function expand_offset(level, dlt)
       return 14, assert_ether_protocol(2048)
    elseif level == 'ip6' then
       return 14, assert_ether_protocol(34525)
+   elseif level == 'ip*' then
+      return ipv4_payload_offset()
+   elseif level == 'ip6*' then
+      return ipv6_payload_offset()
    elseif level == 'icmp' then
       return ipv4_payload_offset(1)
    elseif level == 'udp' then
@@ -249,6 +280,7 @@ local function expand_offset(level, dlt)
 end
 
 function expand_arith(expr, dlt)
+   assert(expr)
    if type(expr) == 'number' or expr == 'len' then return expr, {} end
 
    local op = expr[1]
@@ -259,7 +291,7 @@ function expand_arith(expr, dlt)
    end
 
    assert(op ~= '[]', "expr has already been expanded?")
-   local addressable = assert(op:match("^%[(%w+)%]$"), "bad op "..op)
+   local addressable = assert(op:match("^%[(.+)%]$"), "bad addressable")
    local offset, offset_asserts = expand_offset(addressable, dlt)
    local lhs, lhs_asserts = expand_arith(expr[2], dlt)
    local rhs = expr[3]
@@ -299,6 +331,7 @@ function expand_bool(expr, dlt)
       local expander = primitive_expanders[expr[1]]
       assert(expander, "unimplemented primitive: "..expr[1])
       local expanded = expander(expr, dlt)
+      pp(expanded)
       return expand_bool(expander(expr, dlt), dlt)
    end
 end
@@ -546,5 +579,6 @@ function selftest ()
       expand(parse("1 = len"), 'EN10MB'))
    check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
+   pp(expand(parse("port 80"), 'EN10MB'))
    print("OK")
 end
