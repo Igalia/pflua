@@ -358,6 +358,18 @@ local folders = {
    ['>'] = function(a, b) return a > b end
 }
 
+local function cfkey(expr)
+   if type(expr) == 'table' then
+      local ret = 'table('..cfkey(expr[1])
+      for i=2,#expr do ret = ret..' '..cfkey(expr[i]) end
+      return ret..')'
+   else
+      return type(expr)..'('..tostring(expr)..')'
+   end
+end
+
+local simple = set('true', 'false', 'fail')
+
 function simplify(expr)
    if type(expr) ~= 'table' then return expr end
    local op = expr[1]
@@ -403,6 +415,31 @@ function simplify(expr)
       elseif test[1] == 'not' then return simplify({op, test[2], kf, kt })
       elseif kt[1] == 'true' and kf[1] == 'false' then return test
       elseif kt[1] == 'false' and kf[1] == 'true' then return { 'not', test }
+      -- FIXME: Memoize cfkey to avoid O(n^2) badness.
+      elseif (test[1] == 'if' and kt[1] == 'if'
+              and cfkey(test[2]) == cfkey(kt[2])) then
+         if kf[1] == 'if' and cfkey(test[2]) == cfkey(kf[2]) then
+            -- if (if A B C) (if A D E) (if A F G)
+            -- -> (if A (if B D F) (if C E G)
+            return { 'if', test[2],
+                     { 'if', test[3], kt[3], kf[3] },
+                     { 'if', test[4], kt[4], kf[4] } }
+         elseif simple[kf[1]] then
+            -- if (if A B C) (if A D E) F
+            -- -> (if A (if B D F) (if C E F)
+            return { 'if', test[2],
+                     { 'if', test[3], kt[3], kf },
+                     { 'if', test[4], kt[4], kf } }
+         else
+            return { 'if', test, kt, kf }
+         end
+      elseif (test[1] == 'if' and kf[1] == 'if'
+              and cfkey(test[2]) == cfkey(kf[2]) and simple(kt[1])) then
+         -- if (if A B C) D (if A E F)
+         -- -> (if A (if B D E) (if C D F)
+         return { 'if', test[2],
+                  { 'if', test[3], kt, kf[3] },
+                  { 'if', test[4], kt, kf[4] } }
       else return { op, test, kt, kf } end
    elseif op == 'assert' then
       local lhs = simplify(expr[2])
@@ -421,16 +458,6 @@ local function dup(db)
    local ret = {}
    for k, v in pairs(db) do ret[k] = v end
    return ret
-end
-
-local function cfkey(expr)
-   if type(expr) == 'table' then
-      local ret = 'table('..cfkey(expr[1])
-      for i=2,#expr do ret = ret..' '..cfkey(expr[i]) end
-      return ret..')'
-   else
-      return type(expr)..'('..tostring(expr)..')'
-   end
 end
 
 -- Conditional folding.
