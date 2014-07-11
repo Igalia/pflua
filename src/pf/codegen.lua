@@ -31,11 +31,15 @@ local function filter_builder(...)
       builder.writeln('local '..var..' = '..str)
       return var
    end
-   function builder.push_db()
+   function builder.push()
       table.insert(db_stack, db)
+      builder.writeln('do')
+      indent = indent .. '   '
       db = dup(db)
    end
-   function builder.pop_db()
+   function builder.pop()
+      indent = indent:sub(4)
+      builder.writeln('end')
       db = table.remove(db_stack)
    end
    function builder.label()
@@ -144,23 +148,23 @@ local function compile_bool(builder, expr, kt, kf, k)
       if fresh_kt then
          compile_bool(builder, expr[2], test_kt, test_kf, test_kt)
          builder.writelabel(test_kt)
-         builder.push_db()
+         builder.push()
          local t_next = nil
          if not fresh_kf then t_next = k end
          compile_bool(builder, expr[3], kt, kf, t_next)
-         builder.pop_db()
+         builder.pop()
          if fresh_kf then
             builder.writelabel(test_kf)
-            builder.push_db()
+            builder.push()
             compile_bool(builder, expr[4], kt, kf, k)
-            builder.pop_db()
+            builder.pop()
          end
       elseif fresh_kf then
          compile_bool(builder, expr[2], test_kt, test_kf, test_kf)
          builder.writelabel(test_kf)
-         builder.push_db()
+         builder.push()
          compile_bool(builder, expr[4], kt, kf, k)
-         builder.pop_db()
+         builder.pop()
       else
          compile_bool(builder, expr[2], test_kt, test_kf, k)
       end
@@ -200,9 +204,9 @@ function selftest ()
    print("selftest: pf.codegen")
    local parse = require('pf.parse').parse
    local expand = require('pf.expand').expand
-   compile_lua(expand(parse("ip"), 'EN10MB'))
-   compile_lua(expand(parse("tcp"), 'EN10MB'))
-   compile_lua(expand(parse("port 80"), 'EN10MB'))
-   compile_lua(expand(parse("tcp port 80"), 'EN10MB'))
+   compile(expand(parse("ip"), 'EN10MB'))
+   compile(expand(parse("tcp"), 'EN10MB'))
+   compile(expand(parse("port 80"), 'EN10MB'))
+   compile(expand(parse("tcp port 80"), 'EN10MB'))
    print("OK")
 end
