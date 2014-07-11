@@ -335,7 +335,6 @@ function expand_bool(expr, dlt)
       local expander = primitive_expanders[expr[1]]
       assert(expander, "unimplemented primitive: "..expr[1])
       local expanded = expander(expr, dlt)
-      pp(expanded)
       return expand_bool(expander(expr, dlt), dlt)
    end
 end
@@ -485,11 +484,6 @@ local function cfold(expr, db)
    end
 end
 
-function expand(expr, dlt)
-   dlt = dlt or 'RAW'
-   return simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
-end
-
 function pp(expr, indent, suffix)
    indent = indent or ''
    suffix = suffix or ''
@@ -511,6 +505,13 @@ function pp(expr, indent, suffix)
    else
       error("unsupported type "..type(expr))
    end
+end
+
+function expand(expr, dlt)
+   dlt = dlt or 'RAW'
+   expr = simplify(cfold(simplify(expand_bool(expr, dlt)), {}))
+   if verbose then pp(expr) end
+   return expr
 end
 
 function selftest ()

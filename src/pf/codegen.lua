@@ -126,11 +126,11 @@ local function compile_bool(builder, expr, kt, kf, k)
       compile_bool(builder, expr[2], nil, 'REJECT', nil)
       compile_bool(builder, expr[3], kt, kf, k)
    elseif op == 'true' then
-      if kt ~= k then builder.write(builder.jump(kt)) end
+      if kt ~= k then builder.writeln(builder.jump(kt)) end
    elseif op == 'false' then
-      if kf ~= k then builder.write(builder.jump(kf)) end
+      if kf ~= k then builder.writeln(builder.jump(kf)) end
    elseif op == 'fail' then
-      builder.write('do return false end')
+      builder.writeln('do return false end')
    elseif relop_map[op] then
       -- An arithmetic relop.
       local op = relop_map[op]
