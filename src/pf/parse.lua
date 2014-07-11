@@ -656,9 +656,18 @@ local function parse_logical(lexer, max_precedence)
       max_precedence = max_precedence or math.huge
       while true do
          local op = lexer.peek()
+         if not op then return exp end
          local prec = logical_precedence[op]
-         if not prec or prec > max_precedence then return exp end
-         lexer.consume(op)
+         if prec then
+            if prec > max_precedence then return exp end
+            lexer.consume(op)
+         else
+            -- The grammar is such that "tcp port 80" should actually
+            -- parse as "tcp and port 80".
+            op = 'and'
+            prec = 1
+            if prec > max_precedence then return exp end
+         end
          local rhs = parse_logical(lexer, prec - 1)
          exp = { op, exp, rhs }
       end
@@ -742,5 +751,7 @@ function selftest ()
               { '=', { '+', { '+', 1, { '*', 2, 3 } }, 4 }, 5 })
    parse_test("1+1=2 and tcp",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
+   parse_test("tcp port 80",
+              { 'and', { 'tcp' }, { 'port', 80 } })
    print("OK")
 end
