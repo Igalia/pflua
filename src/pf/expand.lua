@@ -439,7 +439,7 @@ function simplify(expr)
             return { 'if', test, kt, kf }
          end
       elseif (test[1] == 'if' and kf[1] == 'if'
-              and cfkey(test[2]) == cfkey(kf[2]) and simple(kt[1])) then
+              and cfkey(test[2]) == cfkey(kf[2]) and simple[kt[1]]) then
          -- if (if A B C) D (if A E F)
          -- -> (if A (if B D E) (if C D F)
          return { 'if', test[2],
