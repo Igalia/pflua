@@ -516,6 +516,153 @@ local function cfold(expr, db)
    end
 end
 
+-- Range inference.
+local function infer_ranges(expr)
+   local function cons(car, cdr) return { car, cdr } end
+   local function car(pair) return pair[1] end
+   local function cdr(pair) return pair[2] end
+   local function cadr(pair) return car(cdr(pair)) end
+   local function push(db)
+      return cons({ len={}, [1]={}, [2]={}, [4]={} }, db)
+   end
+   local function lookup(db, pos, size)
+      while db do
+         local pair = car(db)[size][cfkey(pos)]
+         if pair then return pair[1], pair[2] end
+         db = cdr(db)
+      end
+      if size == 1 then return 0, 0xff end
+      if size == 2 then return 0, 0xffff end
+      assert(size == 4)
+      return 0, 0xffffffff
+   end
+   local function intern(db, pos, size, min, max)
+      car(db)[size][cfkey(pos)] = { min, max }
+   end
+   local function merge(db, head)
+      for size, tab in pairs(head) do
+         for key, pair in pairs(tab) do
+            car(db)[size][key] = pair
+         end
+      end
+   end
+   local function union(db, h1, h2)
+      for size, tab in pairs(h1) do
+         for key, pair in pairs(tab) do
+            local min2, max2 = h2[size][key]
+            if min2 then
+               local min1, max1 = pair
+               car(db)[size][key] = { math.min(min1, min2), math.ax(max1, max2) }
+            end
+         end
+      end
+   end
+
+   local function eta(expr, kt, kf)
+      if expr[1] == 'true' then return kt end
+      if expr[1] == 'false' then return kf end
+      if expr[1] == 'fail' then return 'REJECT' end
+      return nil
+   end
+
+   local function restrict_range(min, max, op, val)
+      if op == '<=' then
+         return min, math.min(max, val), math.max(min, val + 1), max
+      elseif op == '=' then
+         return val, val, min, max
+      elseif op == '~=' then
+         return min, max, val, val
+      else
+         print('implement me', op)
+         return min, max, min, max
+      end
+   end
+
+   local function visit(expr, db_t, db_f, kt, kf)
+      if type(expr) ~= 'table' then return expr end
+      local op = expr[1]
+
+      -- Arithmetic ops just use the store for lookup, so we can just
+      -- use db_t and not worry about continuations.
+      if op == '[]' then
+         local pos, size = visit(expr[2], db_t), expr[3]
+         local min, max = lookup(db_t, pos, size)
+         if min == max then return min end
+         return { op, pos, size }
+      elseif binops[op] then
+         local lhs, rhs = visit(expr[2], db_t), visit(expr[3], db_t)
+         if type(lhs) == 'number' and type(rhs) == 'number' then
+            return assert(folders[op])(lhs, rhs)
+         end
+         return { op, lhs, rhs }
+      end
+
+      -- Logical ops add to their db_t and db_f stores.
+      if relops[op] then
+         local lhs, rhs = visit(expr[2], db_t), visit(expr[3], db_t)
+         if type(lhs) == 'number' and type(rhs) == 'number' then
+            return { assert(folders[op])(lhs, rhs) and 'true' or 'false' }
+         end
+         if (type(lhs) == 'table' and lhs[1] == '[]'
+             and type(rhs) == 'number') then
+             local pos, size, val = lhs[2], lhs[3], rhs
+             local min, max = lookup(db_t, pos, size)
+             -- TODO: fold
+             min_t, max_t, min_f, max_f = restrict_range(min, max, op, val)
+             intern(db_t, pos, size, min_t, max_t)
+             intern(db_f, pos, size, min_f, max_f)
+         end
+         return { op, lhs, rhs }
+      elseif op == 'assert' then
+         local test_db_t, test_db_f = push(db_t), push(db_t)
+         local test_kt = eta(expr[3], kt, kf)
+         local test = visit(expr[2], test_db_t, test_db_f, test_kt, 'REJECT')
+         -- test_db_f is garbage, as this is an assertion.
+         merge(db_t, car(test_db_t))
+         merge(db_f, car(test_db_t))
+         return { op, test, visit(expr[3], db_t, db_f, kt, kf) }
+      elseif op == 'not' then
+         return { op, visit(expr[2], db_f, db_t, kf, kt) }
+      elseif op == 'if' then
+         local test, t, f = expr[2], expr[3], expr[4]
+
+         local test_db_t, test_db_f = push(db_t), push(db_t)
+         local test_kt, test_kf = eta(t, kt, kf), eta(f, kt, kf)
+         test = visit(test, test_db_t, test_db_f, test_kt, test_kf)
+
+         local kt_db_t, kt_db_f = push(test_db_t), push(test_db_t)
+         local kf_db_t, kf_db_f = push(test_db_f), push(test_db_f)
+         t = visit(t, kt_db_t, kt_db_f, kt, kf)
+         f = visit(f, kf_db_t, kf_db_f, kt, kf)
+
+         if test_kt == 'fail' then
+            local head_t, head_f = car(kf_db_t), car(kf_db_f)
+            local assertions = cadr(kf_db_t)
+            merge(db_t, assertions)
+            merge(db_t, head_t)
+            merge(db_f, assertions)
+            merge(db_f, head_f)
+         elseif test_kf == 'fail' then
+            local head_t, head_f = car(kt_db_t), car(kt_db_f)
+            local assertions = cadr(kt_db_t)
+            merge(db_t, assertions)
+            merge(db_t, head_t)
+            merge(db_f, assertions)
+            merge(db_f, head_f)
+         else
+            local head_t_t, head_t_f = car(kt_db_t), car(kt_db_f)
+            local head_f_t, head_f_f = car(kf_db_t), car(kf_db_f)
+            union(db_t, head_t_t, head_f_t)
+            union(db_f, head_t_f, head_f_f)
+         end
+         return { op, test, t, f }
+      else
+         return expr
+      end
+   end
+   return visit(expr, push(), push(), 'ACCEPT', 'REJECT')
+end
+
 -- Length assertion hoisting.
 local function lhoist(expr, db)
    local function eta(expr, kt, kf)
@@ -602,6 +749,7 @@ function expand(expr, dlt)
    dlt = dlt or 'RAW'
    expr = simplify(expand_bool(expr, dlt))
    expr = simplify(cfold(expr, {}))
+   expr = simplify(infer_ranges(expr))
    expr = simplify(lhoist(expr))
    if verbose then pp(expr) end
    return expr
