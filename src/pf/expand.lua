@@ -508,7 +508,7 @@ local function cfold(expr, db)
          local db_kt = dup(db)
          local db_kf = dup(db)
          db_kt[key] = true
-         db_kf[key] = true
+         db_kf[key] = false
          return { op, test, cfold(expr[3], db_kt), cfold(expr[4], db_kf) }
       end
    else
