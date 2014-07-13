@@ -212,8 +212,10 @@ local binops = set(
    '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
 )
 local associative_binops = set(
-   '+', '*', '&', '|'
+   '+', '*', '&', '|', '^'
 )
+local bitops = set('&', '|', '^')
+local unops = set('ntohs', 'ntohl')
 local leaf_primitives = set(
    'true', 'false', 'fail'
 )
@@ -297,10 +299,14 @@ function expand_arith(expr, dlt)
    local addressable = assert(op:match("^%[(.+)%]$"), "bad addressable")
    local offset, offset_asserts = expand_offset(addressable, dlt)
    local lhs, lhs_asserts = expand_arith(expr[2], dlt)
-   local rhs = expr[3]
-   local len_assert = { '<=', { '+', { '+', offset, lhs }, rhs }, 'len' }
+   local size = expr[3]
+   local len_assert = { '<=', { '+', { '+', offset, lhs }, size }, 'len' }
    local asserts = concat(concat(offset_asserts, lhs_asserts), { len_assert })
-   return { '[]', { '+', offset, lhs }, rhs }, asserts
+   local ret =  { '[]', { '+', offset, lhs }, size }
+   if size == 1 then return ret, asserts end
+   if size == 2 then return { 'ntohs', ret }, asserts end
+   if size == 4 then return { 'ntohl', ret }, asserts end
+   error('unreachable')
 end
 
 function expand_relop(expr, dlt)
@@ -355,6 +361,8 @@ local folders = {
    ['|'] = function(a, b) return bit.bor(a, b) end,
    ['<<'] = function(a, b) return bit.lshift(a, b) end,
    ['>>'] = function(a, b) return bit.rshift(a, b) end,
+   ['ntohs'] = function(a) return bit.rshift(bit.bswap(a), 16) end,
+   ['ntohl'] = function(a) return bit.bswap(a) end,
    ['='] = function(a, b) return a == b end,
    ['!='] = function(a, b) return a ~= b end,
    ['<'] = function(a, b) return a < b end,
@@ -374,6 +382,22 @@ local function cfkey(expr)
 end
 
 local simple = set('true', 'false', 'fail')
+
+function try_invert(expr)
+   local op = expr[1]
+   if unops[op] then
+      return assert(folders[op]), expr[2]
+   elseif bitops[op] then
+      local lhs, rhs = expr[2], expr[3]
+      if type(lhs) == 'number' and unops[rhs[1]] then
+         local fold =  assert(folders[rhs[1]])
+         return fold, { op, fold(lhs), rhs[2] }
+      elseif type(rhs) == 'number' and unops[lhs[1]] then
+         local fold =  assert(folders[lhs[1]])
+         return fold, { op, lhs[2], fold(rhs) }
+      end
+   end
+end
 
 function simplify(expr)
    if type(expr) ~= 'table' then return expr end
@@ -396,14 +420,24 @@ function simplify(expr)
          end
       end
       return { op, lhs, rhs }
+   elseif unops[op] then
+      local rhs = simplify(expr[2])
+      if type(rhs) == 'number' then return assert(folders[op])(rhs) end
+      return { op, rhs }
    elseif relops[op] then
       local lhs = simplify(expr[2])
       local rhs = simplify(expr[3])
-      if type(lhs) == 'number' and type(rhs) == 'number' then
-         return { assert(folders[op])(lhs, rhs) and 'true' or 'false' }
-      else
-         return { op, lhs, rhs }
+      if type(lhs) == 'number' then
+         if type(rhs) == 'number' then
+            return { assert(folders[op])(lhs, rhs) and 'true' or 'false' }
+         end
+         invert_lhs, inverted_rhs = try_invert(rhs)
+         if invert_lhs then lhs, rhs = invert_lhs(lhs), inverted_rhs end
+      elseif type(rhs) == 'number' then
+         invert_rhs, inverted_lhs = try_invert(lhs)
+         if invert_rhs then lhs, rhs = inverted_lhs, invert_rhs(rhs) end
       end
+      return { op, lhs, rhs }
    elseif op == 'not' then
       local rhs = simplify(expr[2])
       if rhs[1] == 'true' then return { 'false' }
@@ -470,6 +504,7 @@ local function cfold(expr, db)
    if type(expr) ~= 'table' then return expr end
    local op = expr[1]
    if binops[op] then return expr
+   elseif unops[op] then return expr
    elseif relops[op] then
       local key = cfkey(expr)
       if db[key] ~= nil then
@@ -589,6 +624,12 @@ local function infer_ranges(expr)
          local min, max = lookup(db_t, pos, size)
          if min == max then return min end
          return { op, pos, size }
+      elseif unops[op] then
+         local rhs = visit(expr[2], db_t)
+         if type(rhs) == 'number' then
+            return assert(folders[op])(rhs)
+         end
+         return { op, rhs }
       elseif binops[op] then
          local lhs, rhs = visit(expr[2], db_t), visit(expr[3], db_t)
          if type(lhs) == 'number' and type(rhs) == 'number' then

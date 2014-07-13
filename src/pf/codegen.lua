@@ -86,17 +86,9 @@ local function read_buffer_word_by_type(buffer, offset, size)
    if size == 1 then
       return buffer..'['..offset..']'
    elseif size == 2 then
-      local offset1 = type(offset) == 'number' and offset + 1 or offset..'+1'
-      return ('bit.bor(bit.lshift('..buffer..'['..offset..'], 8), '..
-                 buffer..'['..offset1..'])')
+      return ('ffi.cast("uint16_t*", '..buffer..'+'..offset..')[0]')
    elseif size == 4 then
-      local offset1 = type(offset) == 'number' and offset + 1 or offset..'+1'
-      local offset2 = type(offset) == 'number' and offset + 2 or offset..'+2'
-      local offset3 = type(offset) == 'number' and offset + 3 or offset..'+3'
-      return ('bit.bor(bit.lshift('..buffer..'['..offset..'], 24), '..
-                 'bit.lshift('..buffer..'['..offset1..'], 16), '..
-                 'bit.lshift('..buffer..'['..offset2..'], 8), '..
-                 buffer..'['..offset3..'])')
+      return ('ffi.cast("int32_t*", '..buffer..'+'..offset..')[0]')
    else
       error("bad [] size: "..size)
    end
@@ -108,6 +100,11 @@ local function compile_value(builder, expr)
    assert(type(expr) == 'table', 'unexpected type '..type(expr))
    local op = expr[1]
    local lhs = compile_value(builder, expr[2])
+   if op == 'ntohs' then
+      return builder.v('bit.rshift(bit.bswap('..lhs..'), 16)')
+   elseif op == 'ntohl' then
+      return builder.v('bit.bswap('..lhs..')')
+   end
    local rhs = compile_value(builder, expr[3])
    if op == '[]' then
       return builder.v(read_buffer_word_by_type('P', lhs, rhs))
@@ -194,6 +191,7 @@ function compile_lua(parsed)
 end
 
 function compile(parsed, name)
+   if not getfenv(0).ffi then getfenv(0).ffi = require('ffi') end
    return assert(loadstring(compile_lua(parsed), name))()
 end
 
