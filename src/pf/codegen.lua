@@ -82,14 +82,14 @@ local function filter_builder(...)
    return builder
 end
 
-local function read_buffer_word_by_type(accessor, buffer, offset)
-   if (accessor == 'u8') then
+local function read_buffer_word_by_type(buffer, offset, size)
+   if size == 1 then
       return buffer..'['..offset..']'
-   elseif (accessor == 'u16') then
+   elseif size == 2 then
       local offset1 = type(offset) == 'number' and offset + 1 or offset..'+1'
       return ('bit.bor(bit.lshift('..buffer..'['..offset..'], 8), '..
                  buffer..'['..offset1..'])')
-   elseif (accessor == 's32') then
+   elseif size == 4 then
       local offset1 = type(offset) == 'number' and offset + 1 or offset..'+1'
       local offset2 = type(offset) == 'number' and offset + 2 or offset..'+2'
       local offset3 = type(offset) == 'number' and offset + 3 or offset..'+3'
@@ -97,6 +97,8 @@ local function read_buffer_word_by_type(accessor, buffer, offset)
                  'bit.lshift('..buffer..'['..offset1..'], 16), '..
                  'bit.lshift('..buffer..'['..offset2..'], 8), '..
                  buffer..'['..offset3..'])')
+   else
+      error("bad [] size: "..size)
    end
 end
 
@@ -108,12 +110,7 @@ local function compile_value(builder, expr)
    local lhs = compile_value(builder, expr[2])
    local rhs = compile_value(builder, expr[3])
    if op == '[]' then
-      local accessor
-      if rhs == 1 then accessor = 'u8'
-      elseif rhs == 2 then accessor = 'u16'
-      elseif rhs == 4 then accessor = 's32'
-      else error('unexpected [] size', rhs) end
-      return builder.v(read_buffer_word_by_type(accessor, 'P', lhs))
+      return builder.v(read_buffer_word_by_type('P', lhs, rhs))
    elseif op == '+' then return builder.v(lhs..'+'..rhs)
    elseif op == '-' then return builder.v(lhs..'-'..rhs)
    elseif op == '*' then return builder.v(lhs..'*'..rhs)
