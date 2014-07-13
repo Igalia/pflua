@@ -196,8 +196,8 @@ function compile_lua(parsed)
    return builder.finish()
 end
 
-function compile(parsed)
-   return assert(loadstring(compile_lua(parsed), 'generated.lua'))()
+function compile(parsed, name)
+   return assert(loadstring(compile_lua(parsed), name))()
 end
 
 function selftest ()
