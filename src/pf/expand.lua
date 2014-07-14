@@ -127,21 +127,21 @@ local primitive_expanders = {
                    { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
                  { 'or',
                    { 'and',
-                     { '<=', { '[ip*]', 0, 2 }, lo },
-                     { '<=', hi, { '[ip*]', 0, 2 } } },
+                     { '<=', lo, { '[ip*]', 0, 2 } },
+                     { '<=', { '[ip*]', 0, 2 }, hi } },
                    { 'and',
-                     { '<=', { '[ip*]', 0, 2 }, lo },
-                     { '<=', hi, { '[ip*]', 0, 2 } } } } },
+                     { '<=', lo, { '[ip*]', 2, 2 } },
+                     { '<=', { '[ip*]', 2, 2 }, hi } } } },
                { 'and',
                  { 'or', has_ipv6_protocol(6),
                    { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
                  { 'or',
                    { 'and',
-                     { '<=', { '[ip6*]', 0, 2 }, lo },
-                     { '<=', hi, { '[ip6*]', 0, 2 } } },
+                     { '<=', lo, { '[ip6*]', 0, 2 } },
+                     { '<=', { '[ip6*]', 0, 2 }, hi } },
                    { 'and',
-                     { '<=', { '[ip6*]', 0, 2 }, lo },
-                     { '<=', hi, { '[ip6*]', 0, 2 } } } } } }
+                     { '<=', lo, { '[ip6*]', 2, 2 } },
+                     { '<=', { '[ip6*]', 2, 2 }, hi } } } } }
    end,
    less = unimplemented,
    greater = unimplemented,
@@ -406,11 +406,11 @@ end
 
 local simple = set('true', 'false', 'fail')
 
-function try_invert(expr)
+function try_invert(expr, relop)
    local op = expr[1]
-   if unops[op] then
+   if unops[op] and (relop == '=' or relop == '!=') then
       return assert(folders[op]), expr[2]
-   elseif bitops[op] then
+   elseif bitops[op] and (relop == '=' or relop == '!=') then
       local lhs, rhs = expr[2], expr[3]
       if type(lhs) == 'number' and unops[rhs[1]] then
          local fold =  assert(folders[rhs[1]])
@@ -454,10 +454,10 @@ function simplify(expr)
          if type(rhs) == 'number' then
             return { assert(folders[op])(lhs, rhs) and 'true' or 'false' }
          end
-         invert_lhs, inverted_rhs = try_invert(rhs)
+         invert_lhs, inverted_rhs = try_invert(rhs, op)
          if invert_lhs then lhs, rhs = invert_lhs(lhs), inverted_rhs end
       elseif type(rhs) == 'number' then
-         invert_rhs, inverted_lhs = try_invert(lhs)
+         invert_rhs, inverted_lhs = try_invert(lhs, op)
          if invert_rhs then lhs, rhs = inverted_lhs, invert_rhs(rhs) end
       end
       return { op, lhs, rhs }
