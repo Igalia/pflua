@@ -119,7 +119,31 @@ local primitive_expanders = {
                    { '=', { '[ip6*]', 0, 2 }, port },
                    { '=', { '[ip6*]', 2, 2 }, port } } } }
    end,
-   portrange = unimplemented,
+   portrange = function(expr)
+      local lo, hi = expr[2][1], expr[2][2]
+      print('ohai', lo, hi)
+      return { 'if', { 'ip' },
+               { 'and',
+                 { 'or', has_ipv4_protocol(6),
+                   { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
+                 { 'or',
+                   { 'and',
+                     { '<=', { '[ip*]', 0, 2 }, lo },
+                     { '<=', hi, { '[ip*]', 0, 2 } } },
+                   { 'and',
+                     { '<=', { '[ip*]', 0, 2 }, lo },
+                     { '<=', hi, { '[ip*]', 0, 2 } } } } },
+               { 'and',
+                 { 'or', has_ipv6_protocol(6),
+                   { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
+                 { 'or',
+                   { 'and',
+                     { '<=', { '[ip6*]', 0, 2 }, lo },
+                     { '<=', hi, { '[ip6*]', 0, 2 } } },
+                   { 'and',
+                     { '<=', { '[ip6*]', 0, 2 }, lo },
+                     { '<=', hi, { '[ip6*]', 0, 2 } } } } } }
+   end,
    less = unimplemented,
    greater = unimplemented,
    ip = function(expr) return has_ether_protocol(2048) end,

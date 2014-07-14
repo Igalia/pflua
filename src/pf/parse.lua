@@ -250,7 +250,7 @@ function parse_host_arg(lexer)
 end
 
 function parse_int_arg(lexer, max_len)
-   local ret = lexer.next()
+   local ret = lexer.next({maybe_arithmetic=true})
    assert(type(ret) == 'number', 'expected a number', ret)
    if max_len then assert(ret <= max_len, 'out of range '..ret) end
    return ret
@@ -285,7 +285,7 @@ local parse_port_arg = parse_uint16_arg
 local function parse_portrange_arg(lexer)
    local start = parse_port_arg(lexer)
    lexer.consume('-')
-   return { 'portrange', start, parse_port_arg(lexer) }
+   return { start, parse_port_arg(lexer) }
 end
 
 local function parse_ehost_arg(lexer)
