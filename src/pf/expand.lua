@@ -459,13 +459,13 @@ function simplify(expr)
               and cfkey(test[2]) == cfkey(kt[2])) then
          if kf[1] == 'if' and cfkey(test[2]) == cfkey(kf[2]) then
             -- if (if A B C) (if A D E) (if A F G)
-            -- -> (if A (if B D F) (if C E G)
+            -- -> if A (if B D F) (if C E G)
             return { 'if', test[2],
                      { 'if', test[3], kt[3], kf[3] },
                      { 'if', test[4], kt[4], kf[4] } }
          elseif simple[kf[1]] then
             -- if (if A B C) (if A D E) F
-            -- -> (if A (if B D F) (if C E F)
+            -- -> if A (if B D F) (if C E F)
             return { 'if', test[2],
                      { 'if', test[3], kt[3], kf },
                      { 'if', test[4], kt[4], kf } }
@@ -475,7 +475,7 @@ function simplify(expr)
       elseif (test[1] == 'if' and kf[1] == 'if'
               and cfkey(test[2]) == cfkey(kf[2]) and simple[kt[1]]) then
          -- if (if A B C) D (if A E F)
-         -- -> (if A (if B D E) (if C D F)
+         -- -> if A (if B D E) (if C D F)
          return { 'if', test[2],
                   { 'if', test[3], kt, kf[3] },
                   { 'if', test[4], kt, kf[4] } }
