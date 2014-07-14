@@ -121,7 +121,6 @@ local primitive_expanders = {
    end,
    portrange = function(expr)
       local lo, hi = expr[2][1], expr[2][2]
-      print('ohai', lo, hi)
       return { 'if', { 'ip' },
                { 'and',
                  { 'or', has_ipv4_protocol(6),
