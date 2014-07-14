@@ -331,6 +331,14 @@ function compile_lua(bpf)
 end
 
 function compile(bpf)
+   -- Oddly, sometimes pflua-bench:src/bench.lua doesn't pick these up
+   -- sometimes.  Perhaps we should constructively create an
+   -- environment.
+   if not getfenv(0).runtime_u32 then getfenv(0).runtime_u32 = runtime_u32 end
+   if not getfenv(0).runtime_add then getfenv(0).runtime_add = runtime_add end
+   if not getfenv(0).runtime_sub then getfenv(0).runtime_sub = runtime_sub end
+   if not getfenv(0).runtime_mul then getfenv(0).runtime_mul = runtime_mul end
+   if not getfenv(0).runtime_div then getfenv(0).runtime_div = runtime_div end
    return assert(loadstring(compile_lua(bpf)))()
 end
 
