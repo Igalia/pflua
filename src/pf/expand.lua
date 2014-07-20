@@ -84,6 +84,18 @@ local function has_ip_protocol(proto)
             has_ipv4_protocol(proto),
             { 'and', { 'ip6' }, has_ipv6_protocol(proto) } }
 end
+local function is_iso_protocol()
+   return { 'and',
+             { '>', { '[ether]', 12, 2 }, 1500 },
+             { '=', { '[ip]', 0, 2 }, 65528 },
+          }
+end
+local function has_iso_protocol(proto)
+   return { 'and',
+            is_iso_protocol(),
+            { '=', { '[ip]', 3, 1 }, proto }
+          }
+end
 
 local primitive_expanders = {
    dst_host = unimplemented,
@@ -166,7 +178,7 @@ local primitive_expanders = {
    decnet_src = unimplemented,
    decnet_dst = unimplemented,
    decnet_host = unimplemented,
-   iso = unimplemented,
+   iso = unimplemented, -- FIXME(wingo): parse error
    stp = unimplemented,
    ipx = unimplemented,
    netbeui = unimplemented,
@@ -199,9 +211,9 @@ local primitive_expanders = {
    pppoed = unimplemented,
    pppoes = unimplemented,
    iso_proto = unimplemented,
-   clnp = unimplemented,
-   esis = unimplemented,
-   isis = unimplemented,
+   clnp = function(expr) return has_iso_protocol(129) end,
+   esis = function(expr) return has_iso_protocol(130) end,
+   isis = function(expr) return has_iso_protocol(131) end,
    l1 = unimplemented,
    l2 = unimplemented,
    iih = unimplemented,
