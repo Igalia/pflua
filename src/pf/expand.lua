@@ -84,6 +84,12 @@ local function has_ip_protocol(proto)
             has_ipv4_protocol(proto),
             { 'and', { 'ip6' }, has_ipv6_protocol(proto) } }
 end
+local function is_stp_protocol()
+   return { 'and',
+             { '>', { '[ether]', 12, 2 }, 1500 },
+             { '=', { '[ip]', 0, 1 }, 66 },
+          }
+end
 
 local primitive_expanders = {
    dst_host = unimplemented,
@@ -167,7 +173,7 @@ local primitive_expanders = {
    decnet_dst = unimplemented,
    decnet_host = unimplemented,
    iso = unimplemented,
-   stp = unimplemented,
+   stp = is_stp_protocol,
    ipx = unimplemented,
    netbeui = unimplemented,
    lat = unimplemented,
