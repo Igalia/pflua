@@ -54,7 +54,10 @@ function records_mm(filename)
    local function pcap_records_it()
       local record = ffi.cast("struct pcap_record *", ptr)
       if ptr >= ptr_end then
-         ffi.C.munmap(start, size)
+         local ret = ffi.C.munmap(start, size)
+         if ret == -1 then
+            error("Error unmapping")
+         end
          return nil
       end
       local packet = ffi.cast("unsigned char *", record + 1)
