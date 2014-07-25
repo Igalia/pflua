@@ -161,8 +161,30 @@ local primitive_expanders = {
    protochain = unimplemented,
    arp = function(expr) return has_ether_protocol(2054) end,
    rarp = function(expr) return has_ether_protocol(32821) end,
-   atalk = unimplemented,
-   aarp = unimplemented,
+   atalk = function(expr)
+       return { 'and',
+                { 'or',
+                   { '=', { '[ether]', 12, 2 }, 32923 },
+                   { '>', { '[ether]', 12, 2 }, 1500 },
+                },
+                { 'and',
+                   { '=', { '[ip]', 4, 2 }, 30729 },
+                   { '=', { '[ip]', 0, 4 }, 2863268616 }
+                }
+              }
+   end,
+   aarp = function(expr)
+       return { 'and',
+                { 'or',
+                   { '=', { '[ether]', 12, 2 }, 33011 },
+                   { '>', { '[ether]', 12, 2 }, 1500 },
+                },
+                { 'and',
+                   { '=', { '[ip]', 4, 2 }, 32883 },
+                   { '=', { '[ip]', 0, 4 }, 2863268608 }
+                }
+              }
+   end,
    decnet_src = unimplemented,
    decnet_dst = unimplemented,
    decnet_host = unimplemented,
