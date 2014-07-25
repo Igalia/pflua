@@ -19,7 +19,11 @@ end
 function mmap(fd, size)
    local PROT_READ = 1
    local MAP_PRIVATE = 2
-   return ffi.C.mmap(ffi.cast("void *", 0), size, PROT_READ, MAP_PRIVATE, fd, 0)
+   local ptr = ffi.C.mmap(ffi.cast("void *", 0), size, PROT_READ, MAP_PRIVATE, fd, 0)
+   if ptr == ffi.cast("void *", -1) then
+      error("Error mmapping")
+   end
+   return ptr
 end
 
 function size(fd)
@@ -37,9 +41,11 @@ function records_mm(filename)
    end
    local size = size(fd)
    local ptr = mmap(fd, size)
-   ffi.C.close(fd)
    if ptr == ffi.cast("void *", -1) then
       error("Error mmapping " .. filename)
+   end
+   if (-1 == ffi.C.close(fd)) then
+      error("Error closing fd")
    end
    local start = ptr
    ptr = ffi.cast("unsigned char *", ptr)
@@ -54,9 +60,8 @@ function records_mm(filename)
    local function pcap_records_it()
       local record = ffi.cast("struct pcap_record *", ptr)
       if ptr >= ptr_end then
-         local ret = ffi.C.munmap(start, size)
-         if ret == -1 then
-            error("Error unmapping")
+         if (-1 == ffi.C.munmap(start, size)) then
+            error("Error munmapping")
          end
          return nil
       end
