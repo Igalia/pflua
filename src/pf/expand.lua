@@ -1,22 +1,13 @@
 module(...,package.seeall)
 
 local bit = require('bit')
+local utils = require('pf.utils')
 
 verbose = os.getenv("PF_VERBOSE");
 
 local expand_arith, expand_relop, expand_bool
 
-local function set(...)
-   local ret = {}
-   for k, v in pairs({...}) do ret[v] = true end
-   return ret
-end
-local function concat(a, b)
-   local ret = {}
-   for _, v in ipairs(a) do table.insert(ret, v) end
-   for _, v in ipairs(b) do table.insert(ret, v) end
-   return ret
-end
+local set, concat, dup, pp = utils.set, utils.concat, utils.dup, utils.pp
 
 local ether_protos = set(
    'ip', 'ip6', 'arp', 'rarp', 'atalk', 'aarp', 'decnet', 'sca', 'lat',
@@ -516,12 +507,6 @@ function simplify(expr)
    end
 end
 
-local function dup(db)
-   local ret = {}
-   for k, v in pairs(db) do ret[k] = v end
-   return ret
-end
-
 -- Conditional folding.
 local function cfold(expr, db)
    if type(expr) ~= 'table' then return expr end
@@ -786,29 +771,6 @@ local function lhoist(expr, db)
    return reduce(annotate(expr, 'ACCEPT', 'REJECT'), 0)
 end
 
-function pp(expr, indent, suffix)
-   indent = indent or ''
-   suffix = suffix or ''
-   if type(expr) == 'number' then
-      print(indent..expr..suffix)
-   elseif type(expr) == 'string' then
-      print(indent..'"'..expr..'"'..suffix)
-   elseif type(expr) == 'boolean' then
-      print(indent..(expr and 'true' or 'false')..suffix)
-   elseif type(expr) == 'table' then
-      if #expr == 1 then
-         print(indent..'{ "'..expr[1]..'" }'..suffix)
-      else
-         print(indent..'{ "'..expr[1]..'",')
-         indent = indent..'  '
-         for i=2,#expr-1 do pp(expr[i], indent, ',') end
-         pp(expr[#expr], indent, ' }'..suffix)
-      end
-   else
-      error("unsupported type "..type(expr))
-   end
-end
-
 function expand(expr, dlt)
    dlt = dlt or 'RAW'
    expr = simplify(expand_bool(expr, dlt))
@@ -822,29 +784,12 @@ end
 function selftest ()
    print("selftest: pf.expand")
    local parse = require('pf.parse').parse
-   local function equals(expected, actual)
-      if type(expected) ~= type(actual) then return false end
-      if type(expected) == 'table' then
-         for k, v in pairs(expected) do
-            if not equals(v, actual[k]) then return false end
-         end
-         return true
-      else
-         return expected == actual
-      end
-   end
-   local function check(expected, actual)
-      if not equals(expected, actual) then
-         pp(expected)
-         pp(actual)
-         error('not equal')
-      end
-   end
-   check({ 'false' },
+   local equals, assert_equals = utils.equals, utils.assert_equals
+   assert_equals({ 'false' },
       expand(parse("1 = 2"), 'EN10MB'))
-   check({ '=', 1, len },
+   assert_equals({ '=', 1, "len" },
       expand(parse("1 = len"), 'EN10MB'))
-   check({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
+   assert_equals({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
    -- Could check this, but it's very large
    expand(parse("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)"),
