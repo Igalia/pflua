@@ -188,8 +188,8 @@ local function cfold(expr, db)
          if db[key] then return cfold(expr[3], db) end
          return cfold(expr[4], db)
       else
-         local db_kt = dup(db)
-         local db_kf = dup(db)
+         local db_kt = expr[4][1] == 'fail' and db or dup(db)
+         local db_kf = expr[3][1] == 'fail' and db or dup(db)
          db_kt[key] = true
          db_kf[key] = false
          return { op, test, cfold(expr[3], db_kt), cfold(expr[4], db_kf) }
@@ -419,5 +419,6 @@ function selftest ()
       opt("ether[0] = 2"))
    -- Could check this, but it's very large
    opt("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
+   opt("tcp port 5555")
    print("OK")
 end
