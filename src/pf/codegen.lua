@@ -142,16 +142,16 @@ local function compile_bool(builder, expr, kt, kf, k)
       if fresh_kt then
          compile_bool(builder, expr[2], test_kt, test_kf, test_kt)
          builder.writelabel(test_kt)
-         builder.push()
-         local t_next = nil
-         if not fresh_kf then t_next = k end
-         compile_bool(builder, expr[3], kt, kf, t_next)
-         builder.pop()
          if fresh_kf then
+            builder.push()
+            compile_bool(builder, expr[3], kt, kf, test_kf)
+            builder.pop()
             builder.writelabel(test_kf)
             builder.push()
             compile_bool(builder, expr[4], kt, kf, k)
             builder.pop()
+         else
+            compile_bool(builder, expr[3], kt, kf, k)
          end
       elseif fresh_kf then
          compile_bool(builder, expr[2], test_kt, test_kf, test_kf)
@@ -196,9 +196,10 @@ function selftest ()
    print("selftest: pf.codegen")
    local parse = require('pf.parse').parse
    local expand = require('pf.expand').expand
-   compile(expand(parse("ip"), 'EN10MB'))
-   compile(expand(parse("tcp"), 'EN10MB'))
-   compile(expand(parse("port 80"), 'EN10MB'))
-   compile(expand(parse("tcp port 80"), 'EN10MB'))
+   local optimize = require('pf.optimize').optimize
+   compile(optimize(expand(parse("ip"), 'EN10MB')))
+   compile(optimize(expand(parse("tcp"), 'EN10MB')))
+   compile(optimize(expand(parse("port 80"), 'EN10MB')))
+   compile(optimize(expand(parse("tcp port 80"), 'EN10MB')))
    print("OK")
 end
