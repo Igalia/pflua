@@ -119,9 +119,9 @@ local function simplify(expr)
       local kf = simplify(expr[4])
       if test[1] == 'true' then return kt
       elseif test[1] == 'false' then return kf
+      elseif test[1] == 'fail' then return test
       elseif test[1] == 'not' then return simplify({op, test[2], kf, kt })
       elseif kt[1] == 'true' and kf[1] == 'false' then return test
-      elseif kt[1] == 'false' and kf[1] == 'true' then return { 'not', test }
       -- FIXME: Memoize cfkey to avoid O(n^2) badness.
       elseif test[1] == 'if' then
          if test[3][1] == 'fail' then
@@ -134,23 +134,23 @@ local function simplify(expr)
             if kf[1] == 'if' and cfkey(test[2]) == cfkey(kf[2]) then
                -- if (if A B C) (if A D E) (if A F G)
                -- -> if A (if B D F) (if C E G)
-               return { 'if', test[2],
-                        { 'if', test[3], kt[3], kf[3] },
-                        { 'if', test[4], kt[4], kf[4] } }
+               return simplify({ 'if', test[2],
+                                 { 'if', test[3], kt[3], kf[3] },
+                                 { 'if', test[4], kt[4], kf[4] } })
             elseif simple[kf[1]] then
                -- if (if A B C) (if A D E) F
                -- -> if A (if B D F) (if C E F)
-               return { 'if', test[2],
-                        { 'if', test[3], kt[3], kf },
-                        { 'if', test[4], kt[4], kf } }
+               return simplify({ 'if', test[2],
+                                 simplify({ 'if', test[3], kt[3], kf }),
+                                 simplify({ 'if', test[4], kt[4], kf }) })
             end
          elseif (kf[1] == 'if' and cfkey(test[2]) == cfkey(kf[2])
                  and simple[kt[1]]) then
             -- if (if A B C) D (if A E F)
             -- -> if A (if B D E) (if C D F)
-            return { 'if', test[2],
-                     { 'if', test[3], kt, kf[3] },
-                     { 'if', test[4], kt, kf[4] } }
+            return simplify({ 'if', test[2],
+                              { 'if', test[3], kt, kf[3] },
+                              { 'if', test[4], kt, kf[4] } })
          end
       end
       return { op, test, kt, kf }
