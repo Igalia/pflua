@@ -125,31 +125,37 @@ local function simplify(expr)
       elseif kt[1] == 'true' and kf[1] == 'false' then return test
       elseif kt[1] == 'false' and kf[1] == 'true' then return { 'not', test }
       -- FIXME: Memoize cfkey to avoid O(n^2) badness.
-      elseif (test[1] == 'if' and kt[1] == 'if'
-              and cfkey(test[2]) == cfkey(kt[2])) then
-         if kf[1] == 'if' and cfkey(test[2]) == cfkey(kf[2]) then
-            -- if (if A B C) (if A D E) (if A F G)
-            -- -> if A (if B D F) (if C E G)
+      elseif test[1] == 'if' then
+         if test[3][1] == 'fail' then
+            -- if (if A fail B) C D -> if A fail (if B C D)
+            return simplify({op, test[2], {'fail'}, {op, test[4], kt, kf}})
+         elseif test[4][1] == 'fail' then
+            -- if (if A B fail) C D -> if A (if B C D) fail
+            return simplify({op, test[2], {op, test[3], kt, kf}, {'fail'}})
+         elseif kt[1] == 'if' and cfkey(test[2]) == cfkey(kt[2]) then
+            if kf[1] == 'if' and cfkey(test[2]) == cfkey(kf[2]) then
+               -- if (if A B C) (if A D E) (if A F G)
+               -- -> if A (if B D F) (if C E G)
+               return { 'if', test[2],
+                        { 'if', test[3], kt[3], kf[3] },
+                        { 'if', test[4], kt[4], kf[4] } }
+            elseif simple[kf[1]] then
+               -- if (if A B C) (if A D E) F
+               -- -> if A (if B D F) (if C E F)
+               return { 'if', test[2],
+                        { 'if', test[3], kt[3], kf },
+                        { 'if', test[4], kt[4], kf } }
+            end
+         elseif (kf[1] == 'if' and cfkey(test[2]) == cfkey(kf[2])
+                 and simple[kt[1]]) then
+            -- if (if A B C) D (if A E F)
+            -- -> if A (if B D E) (if C D F)
             return { 'if', test[2],
-                     { 'if', test[3], kt[3], kf[3] },
-                     { 'if', test[4], kt[4], kf[4] } }
-         elseif simple[kf[1]] then
-            -- if (if A B C) (if A D E) F
-            -- -> if A (if B D F) (if C E F)
-            return { 'if', test[2],
-                     { 'if', test[3], kt[3], kf },
-                     { 'if', test[4], kt[4], kf } }
-         else
-            return { 'if', test, kt, kf }
+                     { 'if', test[3], kt, kf[3] },
+                     { 'if', test[4], kt, kf[4] } }
          end
-      elseif (test[1] == 'if' and kf[1] == 'if'
-              and cfkey(test[2]) == cfkey(kf[2]) and simple[kt[1]]) then
-         -- if (if A B C) D (if A E F)
-         -- -> if A (if B D E) (if C D F)
-         return { 'if', test[2],
-                  { 'if', test[3], kt, kf[3] },
-                  { 'if', test[4], kt, kf[4] } }
-      else return { op, test, kt, kf } end
+      end
+      return { op, test, kt, kf }
    elseif op == 'assert' then
       local lhs = simplify(expr[2])
       local rhs = simplify(expr[3])
