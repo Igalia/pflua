@@ -55,6 +55,7 @@ function pp(expr, indent, suffix)
    else
       error("unsupported type "..type(expr))
    end
+   return expr
 end
 
 function assert_equals(expected, actual)
