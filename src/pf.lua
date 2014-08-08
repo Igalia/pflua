@@ -6,6 +6,7 @@ local libpcap = require("pf.libpcap")
 local bpf = require("pf.bpf")
 local parse = require('pf.parse')
 local expand = require('pf.expand')
+local optimize = require('pf.optimize')
 local codegen = require('pf.codegen')
 
 function compile_filter(filter_str, opts)
@@ -24,6 +25,7 @@ function compile_filter(filter_str, opts)
    else
       local expr = parse.parse(filter_str)
       expr = expand.expand(expr, dlt)
+      expr = optimize.optimize(expr)
       return codegen.compile(expr)
    end
 end
