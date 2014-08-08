@@ -117,9 +117,7 @@ local function simplify(expr)
       local test = simplify(expr[2])
       local kt = simplify(expr[3])
       local kf = simplify(expr[4])
-      if test[1] == 'assert' then
-         return simplify({ 'assert', test[2], { op, test[3], kt, kf } })
-      elseif test[1] == 'true' then return kt
+      if test[1] == 'true' then return kt
       elseif test[1] == 'false' then return kf
       elseif test[1] == 'not' then return simplify({op, test[2], kf, kt })
       elseif kt[1] == 'true' and kf[1] == 'false' then return test
@@ -156,12 +154,6 @@ local function simplify(expr)
          end
       end
       return { op, test, kt, kf }
-   elseif op == 'assert' then
-      local lhs = simplify(expr[2])
-      local rhs = simplify(expr[3])
-      if lhs[1] == 'true' then return rhs
-      elseif lhs[1] == 'false' then return { 'fail' }
-      else return { 'assert', lhs, rhs } end
    else
       local res = { op }
       for i=2,#expr do table.insert(res, simplify(expr[i])) end
@@ -182,20 +174,6 @@ local function cfold(expr, db)
       else
          return expr
       end
-   elseif op == 'assert' then
-      local test = cfold(expr[2], db)
-      local key = cfkey(test)
-      if db[key] ~= nil then
-         if db[key] then return cfold(expr[3], db) end
-         return { 'fail' }
-      else
-         db[key] = true
-         return { op, test, cfold(expr[3], db) }
-      end
-   elseif expr[2] and type(expr[2]) == 'table' and expr[2][1] == 'assert' then
-      local ret = { 'assert', expr[2][2], { op, expr[2][3] } }
-      for i = 3, #expr do table.insert(ret[3], expr[i]) end
-      return cfold(ret, db)
    elseif op == 'not' then
       local rhs = cfold(expr[2], db)
       local key = cfkey(rhs)
@@ -324,14 +302,6 @@ local function infer_ranges(expr)
              intern(db_f, pos, size, min_f, max_f)
          end
          return { op, lhs, rhs }
-      elseif op == 'assert' then
-         local test_db_t, test_db_f = push(db_t), push(db_t)
-         local test_kt = eta(expr[3], kt, kf)
-         local test = visit(expr[2], test_db_t, test_db_f, test_kt, 'REJECT')
-         -- test_db_f is garbage, as this is an assertion.
-         merge(db_t, car(test_db_t))
-         merge(db_f, car(test_db_t))
-         return { op, test, visit(expr[3], db_t, db_f, kt, kf) }
       elseif op == 'not' then
          return { op, visit(expr[2], db_f, db_t, kf, kt) }
       elseif op == 'if' then
@@ -387,11 +357,6 @@ local function lhoist(expr, db)
       if (op == '<=' and kf == 'REJECT'
           and type(expr[2]) == 'number' and expr[3] == 'len') then
          return { expr[2], expr }
-      elseif op == 'assert' then
-         local t, rhs = expr[2], expr[3]
-         local t_a, rhs_a =
-            annotate(t, eta(rhs, kt, kf), 'REJECT'), annotate(rhs, kt, kf)
-         return { math.max(t_a[1], rhs_a[1]), { op, t_a, rhs_a } }
       elseif op == 'if' then
          local test, t, f = expr[2], expr[3], expr[4]
          local test_a = annotate(test, eta(t, kt, kf), eta(f, kt, kf))
@@ -408,17 +373,13 @@ local function lhoist(expr, db)
 
    local function reduce(aexpr, min)
       if min < aexpr[1] then
-         return { 'assert', { '<=', aexpr[1], 'len' }, reduce(aexpr, aexpr[1]) }
+         return { 'if', { '<=', aexpr[1], 'len' },
+                  reduce(aexpr, aexpr[1]),
+                  { 'fail' } }
       end
       local expr = aexpr[2]
       local op = expr[1]
-      if op == 'assert' then
-         local t, rhs = reduce(expr[2], min), reduce(expr[3], min)
-         if t[1] == '<=' and type(t[2]) == 'number' and t[3] == 'len' then
-            if t[2] <= min then return rhs end
-         end
-         return { op, t, rhs }
-      elseif op == 'if' then
+      if op == 'if' then
          local t, kt, kf =
             reduce(expr[2], min), reduce(expr[3], min), reduce(expr[4], min)
          if t[1] == '<=' and type(t[2]) == 'number' and t[3] == 'len' then
@@ -452,7 +413,9 @@ function selftest ()
       opt("1 = 2"))
    assert_equals({ '=', 1, "len" },
       opt("1 = len"))
-   assert_equals({ 'assert', { '<=', 1, 'len'}, { '=', { '[]', 0, 1 }, 2 } },
+   assert_equals({ 'if', { '<=', 1, 'len'},
+                   { '=', { '[]', 0, 1 }, 2 },
+                   { 'fail' }},
       opt("ether[0] = 2"))
    -- Could check this, but it's very large
    opt("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")

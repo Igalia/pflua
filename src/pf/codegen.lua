@@ -162,9 +162,6 @@ local function compile_bool(builder, expr, kt, kf, k)
       else
          compile_bool(builder, expr[2], test_kt, test_kf, k)
       end
-   elseif op == 'assert' then
-      compile_bool(builder, expr[2], nil, 'REJECT', nil)
-      compile_bool(builder, expr[3], kt, kf, k)
    elseif op == 'true' then
       if kt ~= k then builder.writeln(builder.jump(kt)) end
    elseif op == 'false' then

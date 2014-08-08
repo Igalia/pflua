@@ -344,7 +344,7 @@ function expand_bool(expr, dlt)
       -- An arithmetic relop.
       local res, assertions = expand_relop(expr, dlt)
       while #assertions ~= 0 do
-         res = { 'assert', table.remove(assertions), res }
+         res = { 'if', table.remove(assertions), res, { 'fail' } }
       end
       return res
    elseif expr[1] == 'if' then
@@ -378,9 +378,10 @@ function selftest ()
       expand(parse("1 = 2"), 'EN10MB'))
    assert_equals({ '=', 1, "len" },
       expand(parse("1 = len"), 'EN10MB'))
-   assert_equals({ 'assert',
+   assert_equals({ 'if',
                    { '<=', { '+', { '+', 0, 0 }, 1 }, 'len'},
-                   { '=', { '[]', { '+', 0, 0 }, 1 }, 2 } },
+                   { '=', { '[]', { '+', 0, 0 }, 1 }, 2 },
+                   { 'fail' } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
    -- Could check this, but it's very large
    expand(parse("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)"),
