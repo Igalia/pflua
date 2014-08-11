@@ -489,6 +489,13 @@ local iso_types = {
    addr4 = unary(parse_ehost_arg),
 }
 
+local tcp_or_udp_types = {
+   port = unary(parse_port_arg),
+   portrange = unary(parse_portrange_arg),
+   dst = table_parser(src_or_dst_types),
+   src = table_parser(src_or_dst_types),
+}
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
@@ -503,8 +510,8 @@ local primitives = {
    ip = table_parser(ip_types, nullary()),
    ip6 = table_parser(ip6_types, nullary()),
    proto = unary(parse_proto_arg),
-   tcp = nullary(),
-   udp = nullary(),
+   tcp = table_parser(tcp_or_udp_types, nullary()),
+   udp = table_parser(tcp_or_udp_types, nullary()),
    icmp = nullary(),
    protochain = unary(parse_proto_arg),
    arp = nullary(),
@@ -770,15 +777,16 @@ function selftest ()
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
-   parse_test("tcp port 80",
-              { 'and', { 'tcp' }, { 'port', 80 } })
+   parse_test("tcp src portrange 80-90", 
+              { 'tcp_src_portrange', { 80, 90 } })
+   parse_test("tcp port 80", 
+              { 'tcp_port', 80 })
    parse_test("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)",
-              { "and", { "tcp" },
-                { "and", { "port", 80 },
-                  { "!=",
+              { "and", 
+                 { "tcp_port", 80 },
+                 { "!=",
                     { "-", { "-", { "[ip]", 2, 1 },
-                             { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
-                      { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } } })
-
+                       { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
+                    { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } })
    print("OK")
 end

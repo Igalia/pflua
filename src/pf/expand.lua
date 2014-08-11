@@ -75,6 +75,182 @@ local function has_ip_protocol(proto)
             { 'and', { 'ip6' }, has_ipv6_protocol(proto) } }
 end
 
+-- Port operations
+--
+local function has_ipv4_src_port(port)
+   return { '=', { '[ip*]', 0, 2 }, port }
+end
+local function has_ipv4_dst_port(port)
+   return { '=', { '[ip*]', 2, 2 }, port }
+end
+local function has_ipv4_port(port)
+   return { 'or', has_ipv4_src_port(port), has_ipv4_dst_port(port) }
+end
+local function has_ipv6_src_port(port)
+   return { '=', { '[ip6*]', 0, 2 }, port }
+end
+local function has_ipv6_dst_port(port)
+   return { '=', { '[ip6*]', 2, 2 }, port }
+end
+local function has_ipv6_port(port)
+   return { 'or', has_ipv6_src_port(port), has_ipv6_dst_port(port) }
+end
+local function expand_port(expr)
+   local port = expr[2]
+   return { 'if', { 'ip' },
+            { 'and',
+              { 'or', has_ipv4_protocol(6),
+                { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
+              has_ipv4_port(port) },
+            { 'and',
+              { 'or', has_ipv6_protocol(6),
+                { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
+              has_ipv6_port(port) } }
+end
+
+local function expand_proto_port(expr, proto)
+   local port = expr[2]
+   return { 'if', { 'ip' },
+            { 'and',
+              has_ipv4_protocol(proto),
+              has_ipv4_port(port) },
+            { 'and',
+              has_ipv6_protocol(proto),
+              has_ipv6_port(port) } }
+end
+local function expand_tcp_port(expr)
+   return expand_proto_port(expr, 6)
+end
+local function expand_udp_port(expr)
+   return expand_proto_port(expr, 17)
+end
+
+local function expand_proto_src_port(expr, proto)
+   local port = expr[2]
+   return { 'if', { 'ip' },
+            { 'and',
+              has_ipv4_protocol(proto),
+              has_ipv4_src_port(port) },
+            { 'and',
+              has_ipv6_protocol(proto),
+              has_ipv6_src_port(port) } }
+end
+local function expand_tcp_src_port(expr)
+   return expand_proto_src_port(expr, 6)
+end
+local function expand_udp_src_port(expr)
+   return expand_proto_src_port(expr, 17)
+end
+
+local function expand_proto_dst_port(expr, proto)
+   local port = expr[2]
+   return { 'if', { 'ip' },
+            { 'and',
+              has_ipv4_protocol(proto),
+              has_ipv4_dst_port(port) },
+            { 'and',
+              has_ipv6_protocol(proto),
+              has_ipv6_dst_port(port) } }
+end
+local function expand_tcp_dst_port(expr)
+   return expand_proto_dst_port(expr, 6)
+end
+local function expand_udp_dst_port(expr)
+   return expand_proto_dst_port(expr, 17)
+end
+
+-- Portrange operations
+--
+local function has_ipv4_src_portrange(lo, hi)
+   return { 'and',
+            { '<=', lo, { '[ip*]', 0, 2 } },
+            { '<=', { '[ip*]', 0, 2 }, hi } }
+end
+local function has_ipv4_dst_portrange(lo, hi)
+   return { 'and',
+            { '<=', lo, { '[ip*]', 2, 2 } },
+            { '<=', { '[ip*]', 2, 2 }, hi } }
+end
+local function has_ipv4_portrange(lo, hi)
+   return { 'or', has_ipv4_src_portrange(lo, hi), has_ipv4_dst_portrange(lo, hi) }
+end
+local function has_ipv6_src_portrange(lo, hi)
+   return { 'and',
+            { '<=', lo, { '[ip*]', 0, 2 } },
+            { '<=', { '[ip*]', 0, 2 }, hi } }
+end
+local function has_ipv6_dst_portrange(lo, hi)
+   return { 'and',
+            { '<=', lo, { '[ip*]', 2, 2 } },
+            { '<=', { '[ip*]', 2, 2 }, hi } }
+end
+local function has_ipv6_portrange(lo, hi)
+   return { 'or', has_ipv6_src_portrange(lo, hi), has_ipv6_dst_portrange(lo, hi) }
+end
+local function expand_portrange(expr)
+   local lo, hi = expr[2][1], expr[2][2]
+   return { 'if', { 'ip' },
+            { 'and',
+              { 'or', has_ipv4_protocol(6), 
+                { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
+              has_ipv4_portrange(lo, hi) },
+            { 'and',
+              { 'or', has_ipv6_protocol(6),
+                { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
+              has_ipv6_portrange(lo, hi) } }
+end
+
+local function expand_proto_portrange(expr, proto)
+   local lo, hi = expr[2][1], expr[2][2]
+   return { 'if', { 'ip' },
+            { 'and',
+              has_ipv4_protocol(proto),
+              has_ipv4_portrange(lo, hi) },
+            { 'and',
+              has_ipv6_protocol(proto),
+              has_ipv6_portrange(lo, hi) } }
+end
+local function expand_tcp_portrange(expr)
+   return expand_proto_portrange(expr, 6)
+end
+local function expand_udp_portrange(expr)
+   return expand_proto_portrange(expr, 17)
+end
+
+local function expand_proto_src_portrange(expr, proto)
+   local lo, hi = expr[2][1], expr[2][2]
+   return { 'if', { 'ip' },
+            { 'and',
+              has_ipv4_protocol(proto),
+              has_ipv4_src_portrange(lo, hi) },
+            { 'and',
+              has_ipv6_protocol(proto),
+              has_ipv6_src_portrange(lo, hi) } }
+end
+local function expand_tcp_src_portrange(expr)
+   return expand_proto_src_portrange(expr, 6)
+end
+local function expand_udp_src_portrange(expr)
+   return expand_proto_src_portrange(expr, 17)
+end
+
+local function expand_proto_dst_portrange(expr, proto)
+   local lo, hi = expr[2][1], expr[2][2]
+   return { 'if', { 'ip' },
+            { 'and',
+              has_ipv4_protocol(proto),
+              has_ipv4_dst_portrange(lo, hi) },
+            { 'and', 
+              has_ipv6_protocol(proto),
+              has_ipv6_dst_portrange(lo, hi) } }
+end
+local function expand_tcp_dst_portrange(expr)
+   return expand_proto_dst_portrange(expr, 6)
+end
+local function expand_udp_dst_portrange(expr)
+   return expand_proto_dst_portrange(expr, 17)
+end
+
 local primitive_expanders = {
    dst_host = unimplemented,
    dst_net = unimplemented,
@@ -93,46 +269,8 @@ local primitive_expanders = {
    ether_proto = unimplemented,
    gateway = unimplemented,
    net = unimplemented,
-   port = function(expr)
-      local port = expr[2]
-      return { 'if', { 'ip' },
-               { 'and',
-                 { 'or', has_ipv4_protocol(6),
-                   { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
-                 { 'or',
-                   { '=', { '[ip*]', 0, 2 }, port },
-                   { '=', { '[ip*]', 2, 2 }, port } } },
-               { 'and',
-                 { 'or', has_ipv6_protocol(6),
-                   { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
-                 { 'or',
-                   { '=', { '[ip6*]', 0, 2 }, port },
-                   { '=', { '[ip6*]', 2, 2 }, port } } } }
-   end,
-   portrange = function(expr)
-      local lo, hi = expr[2][1], expr[2][2]
-      return { 'if', { 'ip' },
-               { 'and',
-                 { 'or', has_ipv4_protocol(6),
-                   { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
-                 { 'or',
-                   { 'and',
-                     { '<=', lo, { '[ip*]', 0, 2 } },
-                     { '<=', { '[ip*]', 0, 2 }, hi } },
-                   { 'and',
-                     { '<=', lo, { '[ip*]', 2, 2 } },
-                     { '<=', { '[ip*]', 2, 2 }, hi } } } },
-               { 'and',
-                 { 'or', has_ipv6_protocol(6),
-                   { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
-                 { 'or',
-                   { 'and',
-                     { '<=', lo, { '[ip6*]', 0, 2 } },
-                     { '<=', { '[ip6*]', 0, 2 }, hi } },
-                   { 'and',
-                     { '<=', lo, { '[ip6*]', 2, 2 } },
-                     { '<=', { '[ip6*]', 2, 2 }, hi } } } } }
-   end,
+   port = expand_port,
+   portrange = expand_portrange,
    less = unimplemented,
    greater = unimplemented,
    ip = function(expr) return has_ether_protocol(2048) end,
@@ -146,7 +284,19 @@ local primitive_expanders = {
    ip6_multicast = unimplemented,
    proto = unimplemented,
    tcp = function(expr) return has_ip_protocol(6) end,
+   tcp_port = expand_tcp_port,
+   tcp_src_port = expand_tcp_src_port,
+   tcp_dst_port = expand_tcp_dst_port,
+   tcp_portrange = expand_tcp_portrange,
+   tcp_src_portrange = expand_tcp_src_portrange,
+   tcp_dst_portrange = expand_tcp_dst_portrange,
    udp = function(expr) return has_ip_protocol(17) end,
+   udp_port = expand_udp_port,
+   udp_src_port = expand_udp_src_port,
+   udp_dst_port = expand_udp_dst_port,
+   udp_portrange = expand_udp_portrange,
+   udp_src_portrange = expand_udp_src_portrange,
+   udp_dst_portrange = expand_udp_dst_portrange,
    icmp = function(expr) return has_ip_protocol(1) end,
    protochain = unimplemented,
    arp = function(expr) return has_ether_protocol(2054) end,
