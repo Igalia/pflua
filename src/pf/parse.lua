@@ -436,6 +436,33 @@ local function parse_optional_int(lexer, tok)
    return parser(tok)
 end
 
+local function parse_tcp_or_udp_arg(lexer, tok)
+   local function parse_port_or_portrange(lexer, tok)
+      if (tok == 'port') then
+         return parse_port_arg(lexer)
+      end
+      if (tok == 'portrange') then
+         return parse_portrange_arg(lexer)
+      end
+      error("Invalid token: "..tok)
+   end
+
+   -- Check is nullary
+   local arg = lexer.peek()
+   if not (arg == "src" or arg == "dst" or arg == "port" or arg == "portrange") then
+      return { tok }
+   end
+
+   -- Parse arguments
+   local arg = lexer.next()
+   if (arg == 'src' or arg == 'dst') then
+      local subarg = lexer.next()
+      return {tok, { arg.."_"..subarg, parse_port_or_portrange(lexer, subarg) }}
+   else
+      return {tok, { arg, parse_port_or_portrange(lexer, arg) }}
+   end
+end
+
 local src_or_dst_types = {
    host = unary(parse_host_arg),
    net = unary(parse_net_arg),
@@ -503,8 +530,8 @@ local primitives = {
    ip = table_parser(ip_types, nullary()),
    ip6 = table_parser(ip6_types, nullary()),
    proto = unary(parse_proto_arg),
-   tcp = nullary(),
-   udp = nullary(),
+   tcp = parse_tcp_or_udp_arg,
+   udp = parse_tcp_or_udp_arg,
    icmp = nullary(),
    protochain = unary(parse_proto_arg),
    arp = nullary(),
@@ -770,15 +797,16 @@ function selftest ()
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
-   parse_test("tcp port 80",
-              { 'and', { 'tcp' }, { 'port', 80 } })
+   parse_test("tcp src portrange 80-90", 
+              { 'tcp', { 'src_portrange', { 80, 90 } } })
+   parse_test("tcp port 80", 
+              { 'tcp', { 'port', 80 } })
    parse_test("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)",
-              { "and", { "tcp" },
-                { "and", { "port", 80 },
-                  { "!=",
+              { "and", 
+                 { "tcp", { 'port', 80 } },
+                 { "!=",
                     { "-", { "-", { "[ip]", 2, 1 },
-                             { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
-                      { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } } })
-
+                       { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
+                    { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } })
    print("OK")
 end
