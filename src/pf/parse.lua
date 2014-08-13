@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local utils = require('pf.utils')
+local constants = require('pf.constants')
 
 local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
 local uint32 = utils.uint32
@@ -378,12 +379,49 @@ function parse_net_arg(lexer)
    end
 end
 
-local parse_port_arg = parse_uint16_arg
+local function tointeger(str, min, max)
+   local number = tonumber(str)
+   assert(number and math.floor(number) == number, "Not an integer number: "..number)
+   assert(number >= min and number <= max, "Not within the range: "..number)
+   return number
+end
+
+local function to_port_number(tok)
+   local port
+   if (tonumber(tok)) then
+      port = tointeger(tok, 0, 65535)
+      assert(port, 'out of range '..port)
+   else
+      port = constants.services[tok]
+   end
+   return port
+end
+
+local function parse_port_arg(lexer)
+   local tok = lexer.next()
+   local result = to_port_number(tok)
+   if (not result) then
+      lexer.error(string.format('unsupported port %s', tok))
+   end
+   return result
+end
 
 local function parse_portrange_arg(lexer)
-   local start = parse_port_arg(lexer)
-   lexer.consume('-')
-   return { start, parse_port_arg(lexer) }
+   local tok = lexer.next()
+
+   -- Try to split portrange from start to first hyphen, or from start to
+   -- second hyphen
+   local _, pos = 0
+   while (true) do
+      _, pos = tok:match("^([%w]+)-()", pos)
+      if (not pos) then
+         lexer.error(string.format("Error parsing portrange :%s", portrange))
+      end
+      local from, to = to_port_number(tok:sub(1, pos - 2)), to_port_number(tok:sub(pos))
+      if from and to then
+         return { from, to }
+      end
+   end
 end
 
 local function parse_ehost_arg(lexer)
@@ -657,6 +695,11 @@ local function parse_primary_arithmetic(lexer, tok)
       lexer.consume(']')
       return { '['..tok..']', pos, size}
    else
+      -- 'tok' may be a constant
+      local val = constants.protocol_header_field_offsets[tok] or
+                  constants.icmp_type_fields[tok] or
+                  constants.tcp_flag_fields[tok]
+      if val ~= nil then return val end
       lexer.error('bad token while parsing arithmetic expression %s', tok)
    end
 end
@@ -943,12 +986,20 @@ function selftest ()
               { 'and', { 'or', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
-   parse_test("tcp src portrange 80-90", 
+   parse_test("tcp src portrange 80-90",
               { 'tcp_src_portrange', { 80, 90 } })
-   parse_test("tcp port 80", 
+   parse_test("tcp src portrange ftp-data-90",
+              { 'tcp_src_portrange', { 20, 90 } })
+   parse_test("tcp src portrange 80-ftp-data",
+              { 'tcp_src_portrange', { 80, 20 } })
+   parse_test("tcp src portrange ftp-data-iso-tsap",
+              { 'tcp_src_portrange', { 20, 102 } })
+   parse_test("tcp src portrange echo-ftp-data",
+              { 'tcp_src_portrange', { 7, 20 } })
+   parse_test("tcp port 80",
               { 'tcp_port', 80 })
    parse_test("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)",
-              { "and", 
+              { "and",
                  { "tcp_port", 80 },
                  { "!=",
                     { "-", { "-", { "[ip]", 2, 1 },
@@ -984,5 +1035,9 @@ function selftest ()
              { 'src_net', { 'ipv4/mask', { 'ipv4', 192, 168, 1, 0 }, { 'ipv4', 255, 255, 255, 0 } } })
    parse_test("less 100", {"less", 100})
    parse_test("greater 50 + 50", {"greater", {"+", 50, 50}})
+   parse_test("icmp[icmptype] != icmp-echo and icmp[icmptype] != icmp-echoreply",
+              { "and",
+                { "!=", { "[icmp]", 0, 1 }, 8 },
+                { "!=", { "[icmp]", 0, 1 }, 0 } })
    print("OK")
 end
