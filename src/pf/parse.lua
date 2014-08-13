@@ -197,6 +197,8 @@ local function tokens(str)
    local pos, next_pos = 1, nil
    local peeked = nil
    local brackets = 0
+   local last_pos = 0
+   local primitive_error = error
    local function peek(opts)
       if not next_pos then
          pos = skip_whitespace(str, pos)
@@ -210,6 +212,7 @@ local function tokens(str)
    local function next(opts)
       local tok = assert(peek(opts), "unexpected end of filter string")
       pos, next_pos = next_pos, nil
+      last_pos = pos
       return tok
    end
    local function consume(expected, opts)
@@ -221,7 +224,21 @@ local function tokens(str)
       next()
       return true
    end
-   return { peek = peek, next = next, consume = consume, check = check }
+   local function error_str(message, ...)
+      local location_error_message = "Error: In expression \"%s\""
+      local start = #location_error_message - 4
+      local cursor_pos = start + last_pos
+
+      local result = "\n"
+      result = result..location_error_message:format(str).."\n"
+      result = result..string.rep(" ", cursor_pos).."^".."\n"
+      result = result..message:format(...).."\n"
+      return result
+   end
+   local function error(message, ...)
+       primitive_error(error_str(message, ...))
+   end
+   return { peek = peek, next = next, consume = consume, check = check, error = error }
 end
 
 local addressables = set(
@@ -246,7 +263,7 @@ function parse_host_arg(lexer)
    if type(arg) == 'string' or arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       return arg
    end
-   error('invalid host', arg)
+   lexer.error('invalid host %s', arg)
 end
 
 function parse_int_arg(lexer, max_len)
@@ -273,10 +290,10 @@ function parse_net_arg(lexer)
          return arg
       end
    elseif type(arg) == 'string' then
-      error('named nets currently unsupported ' .. arg)
+      lexer.error('named nets currently unsupported %s', arg)
    else
       assert(type(arg) == 'number')  -- `net 10'
-      error('bare numbered nets currently unsupported', arg)
+      lexer.error('bare numbered nets currently unsupported %s', arg)
    end
 end
 
@@ -293,7 +310,7 @@ local function parse_ehost_arg(lexer)
    if type(arg) == 'string' or arg[1] == 'ehost' then
       return arg
    end
-   error('invalid ethernet host', arg)
+   lexer.error('invalid ethernet host %s', arg)
 end
 
 local function table_parser(table, default)
@@ -304,7 +321,7 @@ local function table_parser(table, default)
          return table[subtok](lexer, tok..'_'..subtok)
       end
       if default then return default(lexer, tok) end
-      error("unknown "..tok.." type "..subtok)
+      lexer.error('unknown %s type %s ', tok, subtok)
    end
 end
 
@@ -318,7 +335,7 @@ local function parse_ether_proto_arg(lexer)
    if type(arg) == 'number' or ether_protos[arg] then
       return arg
    end
-   error('invalid ethernet proto', arg)
+   lexer.error('invalid ethernet proto %s', arg)
 end
 
 local ip_protos = set(
@@ -330,14 +347,14 @@ local function parse_ip_proto_arg(lexer)
    if type(arg) == 'number' or ip_protos[arg] then
       return arg
    end
-   error('invalid ip proto', arg)
+   lexer.error('invalid ip proto %s', arg)
 end
 
 local function simple_typed_arg_parser(expected)
    return function(lexer)
       local arg = lexer.next()
       if type(arg) == expected then return arg end
-      error('expected a '..expected..' string, got '..type(arg))
+      lexer.error('expected a %s string, got %s', expected, type(arg))
    end
 end
 
@@ -351,7 +368,7 @@ local function parse_decnet_host_arg(lexer)
       assert(#arg == 3, "bad decnet address", arg)
       return arg
    end
-   error('invalid decnet host', arg)
+   lexer.error('invalid decnet host %s', arg)
 end
 
 local llc_types = set(
@@ -593,7 +610,7 @@ local function parse_primary_arithmetic(lexer, tok)
       lexer.consume(']')
       return { '['..tok..']', pos, size}
    else
-      error('bad token while parsing arithmetic expression', tok)
+      lexer.error('bad token while parsing arithmetic expression %s', tok)
    end
 end
 
@@ -635,7 +652,7 @@ local function parse_primitive_or_arithmetic(lexer)
    -- short for `not host vs and host ace` and which should not be
    -- confused with `not (host vs or ace)`."  For now we punt on this
    -- part of the grammar.
-   error("keyword elision not implemented "..tok)
+   lexer.error('keyword elision not implemented %s', tok)
 end
 
 local logical_precedence = {
