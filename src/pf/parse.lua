@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+local constants = require('pf.constants')
+
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
       pos = pos + 1
@@ -297,12 +299,60 @@ function parse_net_arg(lexer)
    end
 end
 
-local parse_port_arg = parse_uint16_arg
+local function tointeger(str, min, max)
+   number = tonumber(str)
+   if (number >= min and number <= max) then return number end
+end
+
+local function to_port_number(tok)
+   local port
+   if (tonumber(tok) ~= nil) then
+      port = tointeger(tok, 0, 65535)
+      assert(port, 'out of range '..port)
+   else
+      port = constants.services[tok]
+      if (not port) then
+         error(string.format('unsupported port %s', tok))
+      end
+   end
+   return port
+end
+
+local function parse_port_arg(lexer)
+   return to_port_number(lexer.next())
+end
+
+local function split_range(lexer)
+
+   -- Check if 'name' is a valid port
+   local function is_valid_port(name)
+      return (tonumber(name) or constants.services[name])
+   end
+
+   local arg = lexer.peek()
+
+   -- If 'arg' is a valid port, it is not a port range
+   if is_valid_port(arg) then return nil end
+
+   -- Try to split portrange from start to first hyphen, or from start to
+   -- second hyphen
+   local _, pos = 0
+   while (true) do
+      _, pos = arg:match("^([%w]+)-()", pos)
+      if (not pos) then
+         lexer.error(string.format("Error parsing portrange :%s", portrange))
+      end
+      local from, to = arg:sub(1, pos - 2), arg:sub(pos)
+      if is_valid_port(from) and is_valid_port(to) then
+         return from, to
+      end
+   end
+end
 
 local function parse_portrange_arg(lexer)
-   local start = parse_port_arg(lexer)
-   lexer.consume('-')
-   return { start, parse_port_arg(lexer) }
+   local from, to = split_range(lexer)
+   lexer.next()
+   return { to_port_number(from), to_port_number(to) }
 end
 
 local function parse_ehost_arg(lexer)
@@ -610,6 +660,11 @@ local function parse_primary_arithmetic(lexer, tok)
       lexer.consume(']')
       return { '['..tok..']', pos, size}
    else
+      -- 'tok' may be a constant
+      local val = constants.protocol_header_field_offsets[tok] or
+                  constants.icmp_type_fields[tok] or
+                  constants.tcp_flag_fields[tok]
+      if val ~= nil then return val end
       lexer.error('bad token while parsing arithmetic expression %s', tok)
    end
 end
@@ -794,16 +849,28 @@ function selftest ()
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
-   parse_test("tcp src portrange 80-90", 
+   parse_test("tcp src portrange 80-90",
               { 'tcp_src_portrange', { 80, 90 } })
-   parse_test("tcp port 80", 
+   parse_test("tcp src portrange ftp-data-90",
+              { 'tcp_src_portrange', { 20, 90 } })
+   parse_test("tcp src portrange 80-ftp-data",
+              { 'tcp_src_portrange', { 80, 20 } })
+   parse_test("tcp src portrange ftp-data-iso-tsap",
+              { 'tcp_src_portrange', { 20, 102 } })
+   parse_test("tcp src portrange echo-ftp-data",
+              { 'tcp_src_portrange', { 7, 20 } })
+   parse_test("tcp port 80",
               { 'tcp_port', 80 })
    parse_test("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)",
-              { "and", 
+              { "and",
                  { "tcp_port", 80 },
                  { "!=",
                     { "-", { "-", { "[ip]", 2, 1 },
                        { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
                     { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } })
+   parse_test("icmp[icmptype] != icmp-echo and icmp[icmptype] != icmp-echoreply",
+              { "and",
+                { "!=", { "[icmp]", 0, 1 }, 8 },
+                { "!=", { "[icmp]", 0, 1 }, 0 } })
    print("OK")
 end
