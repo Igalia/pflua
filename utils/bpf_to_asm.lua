@@ -15,16 +15,13 @@
 --
 --]]
 
-module("pf_pcap_asm", package.seeall)
+module("bpf_to_asm", package.seeall)
+
+package.path = package.path .. ";../src/?.lua"
 
 local savefile = require("pf.savefile")
 local libpcap = require("pf.libpcap")
-local bpf = require("pf.bpf")
-
--- Compiles pcap expression
-function compile_pcap_filter(filter_str, dlt_name)
-   return bpf.compile(libpcap.compile(filter_str, dlt_name))
-end
+local pf = require("pf")
 
 -- Counts number of packets within file
 function filter_count(pred, file)
@@ -58,14 +55,14 @@ function call_during_seconds(seconds, func, pred, file)
 end
 
 function selftest(filter)
-   print("selftest: pf_pcap_asm")
+   print("selftest: bpf_to_asm")
 
-   local file = "ts/pcaps/igalia/one-gigabyte.pcap"
+   local file = "../src/ts/pcaps/igalia/one-gigabyte.pcap"
    if (filter == nil or filter == '') then
       filter = "tcp port 80"
    end
 
-   local pred = compile_filter(filter, {dlt="EN10MB"})
+   local pred = pf.compile_filter(filter, {dlt="EN10MB"})
    call_during_seconds(1, filter_count, pred, file)
 
    print("OK")

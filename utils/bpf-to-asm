@@ -2,19 +2,38 @@
 
 PRINT=0
 
+usage() {
+cat << EOF
+Usage: $0 <bpf expression>
+
+    Prints out BPF asm code for a BPF expression.
+
+Options:
+    --help | -h         Prints this help.
+    <bpf expression>    BPF expression to compile. DEFAULT: "tcp port 80".
+
+See: http://biot.com/capstats/bpf.html 
+EOF
+}
+
+if [[ $1 == "--help" || $1 == "-h" ]]; then
+    usage
+    exit
+fi
+
 filter="tcp port 80"
 if [ $# == 1 ]; then
     filter=$1
 fi
 
 # Name of the script that prints out asm for a pred expression
-lua_script="pf_pcap_asm.lua"
+lua_script="bpf_to_asm.lua"
 
 # Linenumber where the 'execute_pred_ensuring_trace' function is defined
 lineno=`grep -n 'function execute_pred_ensuring_trace' $lua_script | cut -d : -f 1`
 
 # Iterate through all asm output but print out only the fragment of asm code for the compiled pred expression
-output=`luajit -jdump=m -l pf_pcap_asm -e 'pf_pcap_asm.selftest()'`;
+output=`luajit -jdump=m -l bpf_to_asm -e 'bpf_to_asm.selftest()'`;
 while read -r line; do
     # Was printing and found a blank line
     if [ $PRINT -eq 1 ] && [ -z "$line" ]; then
