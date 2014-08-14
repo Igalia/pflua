@@ -282,7 +282,11 @@ local function tokens(str)
    local function error(message, ...)
        primitive_error(error_str(message, ...))
    end
-   return { peek = peek, next = next, consume = consume, check = check, error = error }
+   local function put(tok)
+      str = string.sub(str, 1, pos - 1)..tok..string.sub(str, pos + 1)
+   end
+   return { peek = peek, next = next, consume = consume, check = check,
+            error = error, put = put }
 end
 
 local addressables = set(
@@ -770,6 +774,64 @@ local primitives = {
    metaconnect = nullary()
 }
 
+local parse_arithmetic
+
+local function parse_primary_arithmetic(lexer, tok)
+   tok = tok or lexer.next({maybe_arithmetic=true})
+   if tok == '(' then
+      local expr = parse_arithmetic(lexer)
+      lexer.consume(')')
+      return expr
+   elseif tok == 'len' or type(tok) == 'number' then
+      return tok
+   elseif addressables[tok] then
+      lexer.consume('[')
+      local pos = parse_arithmetic(lexer)
+      local size = 1
+      if lexer.check(':') then
+         if lexer.check(1) then size = 1
+         elseif lexer.check(2) then size = 1
+         else lexer.consume(4); size = 1 end
+      end
+      lexer.consume(']')
+      return { '['..tok..']', pos, size}
+   else
+      lexer.error('bad token while parsing arithmetic expression %s', tok)
+   end
+end
+
+local arithmetic_precedence = {
+   ['*'] = 1, ['/'] = 1,
+   ['+'] = 2, ['-'] = 2,
+   ['<<'] = 3, ['>>'] = 3,
+   ['&'] = 4,
+   ['^'] = 5,
+   ['|'] = 6
+}
+
+function parse_arithmetic(lexer, tok, max_precedence, parsed_exp)
+   local exp = parsed_exp or parse_primary_arithmetic(lexer, tok)
+   max_precedence = max_precedence or math.huge
+   while true do
+      local op = lexer.peek()
+      local prec = arithmetic_precedence[op]
+      if not prec or prec > max_precedence then return exp end
+      lexer.consume(op)
+      local rhs = parse_arithmetic(lexer, nil, prec - 1)
+      exp = { op, exp, rhs }
+   end
+end
+
+local last_keyword = (function()
+   local keyword = nil
+   return function(arg)
+      if arg ~= nil then
+         keyword = arg
+      end
+      return keyword
+   end
+end)()
+
 local function parse_primitive_or_arithmetic(lexer)
    local tok = lexer.next({maybe_arithmetic=true})
    if (type(tok) == 'number' or tok == 'len' or
@@ -778,15 +840,18 @@ local function parse_primitive_or_arithmetic(lexer)
    end
 
    local parser = primitives[tok]
-   if parser then return parser(lexer, tok) end
+   if parser then
+      last_keyword(tok)
+      return parser(lexer, tok)
+   else
+      lexer.put(tok)
+      local parser = primitives[last_keyword()]
+      if parser then
+         return parser(lexer, last_keyword())
+      end
+   end
 
-   -- At this point the official pcap grammar is squirrely.  It says:
-   -- "If an identifier is given without a keyword, the most recent
-   -- keyword is assumed.  For example, `not host vs and ace' is
-   -- short for `not host vs and host ace` and which should not be
-   -- confused with `not (host vs or ace)`."  For now we punt on this
-   -- part of the grammar.
-   lexer.error('keyword elision not implemented %s', tok)
+   lexer.error("keyword elision not implemented: ", tok)
 end
 
 local logical_ops = set('&&', 'and', '||', 'or')
@@ -849,6 +914,7 @@ function parse(str)
    if not lexer.peek({maybe_arithmetic=true}) then return { 'true' } end
    local expr = parse_logical(lexer)
    assert(not lexer.peek(), "unexpected token", lexer.peek())
+   last_keyword("")
    return expr
 end
 
@@ -984,5 +1050,9 @@ function selftest ()
              { 'src_net', { 'ipv4/mask', { 'ipv4', 192, 168, 1, 0 }, { 'ipv4', 255, 255, 255, 0 } } })
    parse_test("less 100", {"less", 100})
    parse_test("greater 50 + 50", {"greater", {"+", 50, 50}})
+   parse_test("not host vs and ace",
+              { 'not', { 'and', { 'host', 'vs' }, { 'host', 'ace' } } } )
+   parse_test("not ( host vs or ace )",
+              { 'not', { 'or', { 'host', 'vs' }, { 'host', 'ace' } } } )
    print("OK")
 end
