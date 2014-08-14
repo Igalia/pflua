@@ -745,12 +745,6 @@ local function parse_logical_or_arithmetic(lexer, max_precedence)
          if prec then
             if prec > max_precedence then return exp end
             lexer.consume(op)
-         else
-            -- The grammar is such that "tcp port 80" should actually
-            -- parse as "tcp and port 80".
-            op = 'and'
-            prec = 1
-            if prec > max_precedence then return exp end
          end
          local rhs = parse_logical(lexer, prec - 1)
          exp = { op, exp, rhs }
