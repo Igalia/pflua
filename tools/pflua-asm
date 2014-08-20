@@ -27,13 +27,13 @@ if [ $# == 1 ]; then
 fi
 
 # Name of the script that prints out asm for a pred expression
-lua_script="pflua_asm.lua"
+lua_script="helpers/pflua_asm.lua"
 
 # Linenumber where the 'execute_pred_ensuring_trace' function is defined
 lineno=`grep -n 'function execute_pred_ensuring_trace' $lua_script | cut -d : -f 1`
 
 # Iterate through all asm output but print out only the fragment of asm code for the compiled pred expression
-output=`luajit -jdump=m -l pflua_asm -e 'pflua_asm.selftest()'`;
+output=`luajit -jdump=m -l helpers/pflua_asm -e 'pflua_asm.selftest()'`;
 while read -r line; do
     # Was printing and found a blank line
     if [ $PRINT -eq 1 ] && [ -z "$line" ]; then
