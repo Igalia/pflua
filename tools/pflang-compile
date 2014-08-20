@@ -1,0 +1,120 @@
+#!/usr/bin/luajit
+
+local DEBUG = false;
+
+function usage()
+   local content = [=[
+Usage: pflang-compile [--bpf] [--lua] [--pflua] <pflang-expression>
+
+Options:
+
+   --bpf\tPrints out BPF asm code for <pflang-expression>
+   --lua\tPrints out libcap generated Lua code for <pflang--expression>
+   --pflua\tPrints out pflua generated Lua code for <pflang--expression>\t(DEFAULT)
+
+   ]=]
+   print(content);
+   os.exit()
+end
+
+local function execute(command)
+   local handle = io.popen(command)
+   local result = handle:read("*a")
+   handle:close()
+   return result
+end
+
+local function Set(list)
+   local set = {}
+   for _, l in ipairs(list) do set[l] = true end
+   return set
+end
+
+local function split(str, delim)
+   local result = { }
+   local pattern = string.format("([^%s]+)%s()", delim, delim)
+   while (true) do
+      line, pos = str:match(pattern, pos)
+      if line == nil then break end
+      table.insert(result, line)
+   end
+   return result
+end
+
+local function text_block_from(pattern, output)
+   local result = { }
+   local PRINT = DEBUG
+   for i, line in ipairs(split(output, "\n")) do
+      if (line:match(pattern)) then
+         PRINT = true
+      end
+      if (PRINT) then
+         table.insert(result, line)
+      end
+   end
+   return table.concat(result, "\n")
+end
+
+local function text_block_until(pattern, output)
+   local result = { }
+   for i, line in ipairs(split(output, "\n")) do
+      if (line:match(pattern)) then
+         break
+      end
+      table.insert(result, line)
+   end
+   return table.concat(result, "\n")
+end
+
+local function pflang_to_bpf(filter)
+   local command = "export PF_VERBOSE=1; luajit -l helpers/pflang_to_lua -e 'pflang_to_lua.compile(\"%s\")'"
+   local output = execute(command:format(filter))
+   return text_block_until("^return", output)
+end
+
+local function pflang_to_lua(filter)
+   local command = "export PF_VERBOSE=1; luajit -l helpers/pflang_to_lua -e 'pflang_to_lua.compile(\"%s\")'"
+   local output = execute(command:format(filter))
+   return text_block_from("^return", output)
+end
+
+
+local function pflang_to_pflua(filter)
+   local command = "export set PF_VERBOSE=1; cd ../src; luajit -l pf -e 'pf.compile_filter(\"%s\")'"
+   local output = execute(command:format(filter))
+   return text_block_from("^return", output)
+end
+
+-- Print help
+if (#arg == 0) then
+   usage()
+end
+
+local flags = Set(arg)
+
+-- Print help
+if flags["--help"] or flags["-h"] then
+   usage()
+end
+
+-- No code-generation flag defined
+if (not(flags["--bpf"] or flags["--lua"] or flags["--pflua"])) then
+   -- Default action
+   flags["--pflua"] = true
+end
+
+-- Print out everything in pflua mode
+if flags["--debug"] or flags["-d"] then
+   DEBUG = true
+end
+
+local filter = arg[#arg]
+if flags["--bpf"] then
+  print(pflang_to_bpf(filter));
+end
+if flags["--lua"] then
+  print(pflang_to_lua(filter));
+end
+if flags["--pflua"] then
+  print(pflang_to_pflua(filter));
+end
