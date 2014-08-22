@@ -455,7 +455,9 @@ function expand_arith(expr, dlt)
    if binops[op] then
       local lhs, lhs_assertions = expand_arith(expr[2], dlt)
       local rhs, rhs_assertions = expand_arith(expr[3], dlt)
-      return { op, lhs, rhs}, concat(lhs_assertions, rhs_assertions)
+      -- Mod 2^32 to preserve uint32 range.
+      local ret = { '%', { op, lhs, rhs }, 2^32 }
+      return ret, concat(lhs_assertions, rhs_assertions)
    end
 
    assert(op ~= '[]', "expr has already been expanded?")
@@ -468,7 +470,7 @@ function expand_arith(expr, dlt)
    local ret =  { '[]', { '+', offset, lhs }, size }
    if size == 1 then return ret, asserts end
    if size == 2 then return { 'ntohs', ret }, asserts end
-   if size == 4 then return { 'ntohl', ret }, asserts end
+   if size == 4 then return { '%', { 'ntohl', ret }, 2^32 }, asserts end
    error('unreachable')
 end
 
