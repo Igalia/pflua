@@ -251,16 +251,99 @@ local function expand_udp_dst_portrange(expr)
    return expand_proto_dst_portrange(expr, 17)
 end
 
+-- Network-byte-order 4 byte word to host-network-order uint32
+local function host_uint32(a, b, c, d)
+   return d * 2^24 + c * 2^16 + b * 2^8 + a
+end
+
+-- Network-byte-order 2 byte word to host-network-order uint16
+local function host_uint16(a, b)
+   return b * 2^8 + a
+end
+
+local function ipv4_to_int(addr)
+   assert(addr[1] == 'ipv4', "Not an IPV4 address")
+   return host_uint32(addr[2], addr[3], addr[4], addr[5])
+end
+
+-- IP protocol
+
+local function is_ip_protocol()
+   return has_ether_protocol(2048)
+end
+local function expand_ip_src_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', is_ip_protocol(), { '=', { '[ip]', 12, 4 }, host } }
+end
+local function expand_ip_dst_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', is_ip_protocol(), { '=', { '[ip]', 16, 4 }, host } }
+end
+local function expand_ip_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'or', expand_ip_src_host(expr), expand_ip_dst_host(expr) }
+end
+
+-- ARP protocol
+
+local function is_arp_protocol()
+   return has_ether_protocol(2054)
+end
+local function expand_arp_src_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', is_arp_protocol(), { '=', { '[arp]', 14, 4 }, host } }
+end
+local function expand_arp_dst_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', is_arp_protocol(), { '=', { '[arp]', 24, 4 }, host } }
+end
+local function expand_arp_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'or', expand_arp_src_host(expr), expand_arp_dst_host(expr) }
+end
+
+-- RARP protocol
+
+local function is_rarp_protocol()
+   return has_ether_protocol(32821)
+end
+local function expand_rarp_src_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', is_rarp_protocol(), { '=', { '[rarp]', 14, 4 }, host } }
+end
+local function expand_rarp_dst_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', is_rarp_protocol(), { '=', { '[rarp]', 24, 4 }, host } }
+end
+local function expand_rarp_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'or', expand_rarp_src_host(expr), expand_rarp_dst_host(expr) }
+end
+
+-- Host
+
+local function expand_src_host(expr)
+   return { 'or', expand_ip_src_host(expr),
+            { 'or', expand_arp_src_host(expr), expand_rarp_src_host(expr) } }
+end
+local function expand_dst_host(expr)
+   return { 'or', expand_ip_dst_host(expr),
+            { 'or', expand_arp_dst_host(expr), expand_rarp_dst_host(expr) } }
+end
+local function expand_host(expr)
+   return { 'and', expand_src_host(expr), expand_dst_host(expr) }
+end
+
 local primitive_expanders = {
-   dst_host = unimplemented,
+   dst_host = expand_dst_host,
    dst_net = unimplemented,
    dst_port = unimplemented,
    dst_portrange = unimplemented,
-   src_host = unimplemented,
+   src_host = expand_src_host,
    src_net = unimplemented,
    src_port = unimplemented,
    src_portrange = unimplemented,
-   host = unimplemented,
+   host = expand_host,
    ether_src = unimplemented,
    ether_dst = unimplemented,
    ether_host = unimplemented,
@@ -273,9 +356,12 @@ local primitive_expanders = {
    portrange = expand_portrange,
    less = unimplemented,
    greater = unimplemented,
-   ip = function(expr) return has_ether_protocol(2048) end,
+   ip = is_ip_protocol,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
+   ip_host = expand_ip_host,
+   ip_src_host = expand_ip_src_host,
+   ip_dst_host = expand_ip_dst_host,
    ip_broadcast = unimplemented,
    ip_multicast = unimplemented,
    ip6 = function(expr) return has_ether_protocol(34525) end,
@@ -299,8 +385,14 @@ local primitive_expanders = {
    udp_dst_portrange = expand_udp_dst_portrange,
    icmp = function(expr) return has_ip_protocol(1) end,
    protochain = unimplemented,
-   arp = function(expr) return has_ether_protocol(2054) end,
-   rarp = function(expr) return has_ether_protocol(32821) end,
+   arp = is_arp_protocol,
+   arp_host = expand_arp_host,
+   arp_src_host = expand_arp_src_host,
+   arp_dst_host = expand_arp_dst_host,
+   rarp = is_rarp_protocol,
+   rarp_host = expand_rarp_host,
+   rarp_src_host = expand_rarp_src_host,
+   rarp_dst_host = expand_rarp_dst_host,
    atalk = unimplemented,
    aarp = unimplemented,
    decnet_src = unimplemented,

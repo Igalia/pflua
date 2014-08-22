@@ -470,6 +470,9 @@ local ether_types = {
 }
 
 local ip_types = {
+   host = unary(parse_host_arg),
+   dst = table_parser(src_or_dst_types),
+   src = table_parser(src_or_dst_types),
    proto = unary(parse_ip_proto_arg),
    protochain = unary(parse_proto_arg),
    broadcast = nullary(),
@@ -513,6 +516,18 @@ local tcp_or_udp_types = {
    src = table_parser(src_or_dst_types),
 }
 
+local arp_types = {
+   host = unary(parse_host_arg),
+   dst = table_parser(src_or_dst_types),
+   src = table_parser(src_or_dst_types),
+}
+
+local rarp_types = {
+   host = unary(parse_host_arg),
+   dst = table_parser(src_or_dst_types),
+   src = table_parser(src_or_dst_types),
+}
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
@@ -531,8 +546,8 @@ local primitives = {
    udp = table_parser(tcp_or_udp_types, nullary()),
    icmp = nullary(),
    protochain = unary(parse_proto_arg),
-   arp = nullary(),
-   rarp = nullary(),
+   arp = table_parser(arp_types, nullary()),
+   rarp = table_parser(rarp_types, nullary()),
    atalk = nullary(),
    aarp = nullary(),
    decnet = table_parser(decnet_types),
