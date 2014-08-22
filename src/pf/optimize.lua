@@ -12,7 +12,7 @@ local set, concat, dup, pp = utils.set, utils.concat, utils.dup, utils.pp
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
 local binops = set(
-   '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
+   '+', '-', '*', '/', '%', '&', '|', '^', '<<', '>>'
 )
 local associative_binops = set(
    '+', '*', '&', '|', '^'
@@ -219,44 +219,150 @@ local function cfold(expr, db)
 end
 
 -- Range inference.
+local function Range(min, max)
+   -- if min is less than max, we have unreachable code.  still, let's
+   -- not violate assumptions (e.g. about wacky bitshift semantics)
+   if min > max then min, max = min, min end
+   local ret = { min_ = min, max_ = max }
+   function ret:min() return self.min_ end
+   function ret:max() return self.max_ end
+   function ret:range() return self:min(), self:max() end
+   function ret:fold()
+      if self:min() == self:max() then return self:min() end
+   end
+   function ret:lt(other) return self:max() < other:min() end
+   function ret:gt(other) return self:min() > other:max() end
+   function ret:crosses(val) return self:min() < val and self:max() > val end
+   function ret:union(other)
+      return Range(math.min(self:min(), other:min()),
+                   math.max(self:max(), other:max()))
+   end
+   function ret:restrict(other)
+      return Range(math.max(self:min(), other:min()),
+                   math.min(self:max(), other:max()))
+   end
+   function ret.binary(lhs, rhs, op) -- for monotonic functions
+      local fold = assert(folders[op])
+      local a = fold(lhs:min(), rhs:min())
+      local b = fold(lhs:min(), rhs:max())
+      local c = fold(lhs:max(), rhs:max())
+      local d = fold(lhs:max(), rhs:min())
+      return Range(math.min(a, b, c, d), math.max(a, b, c, d))
+   end
+   function ret.add(lhs, rhs) return lhs:binary(rhs, '+') end
+   function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
+   function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
+   function ret.div(lhs, rhs)
+      if not rhs:crosses(0) then return lhs:binary(rhs, '/') end
+      -- 0 is prohibited by assertions.
+      local low, high = Range(rhs:min(), -1), Range(1, rhs:max())
+      return lhs:binary(low, '/'):union(lhs:binary(high, '/'))
+   end
+   function ret.mod(lhs, rhs)
+      if rhs:min() > 0 then return lhs:restrict(Range(0, rhs:max() - 1)) end
+      if rhs:max() < 0 then return lhs:restrict(Range(rhs:min() + 1, 0)) end
+      return lhs:restrict(Range(rhs:min() + 1, rhs:max() - 1))
+   end
+   function ret.band(lhs, rhs)
+      if lhs:min() < 0 and rhs:min() < 0 then return Range(-2^31, 2^31-1) end
+      return Range(0, math.min(lhs:max(), rhs:max()))
+   end
+   function ret.bor(lhs, rhs)
+      local function saturate(x)
+         local y = 1
+         while y < x do y = y * 2 end
+         return y - 1
+      end
+      if lhs:min() < 0 or rhs:min() < 0 then return Range(-2^31, -1) end
+      return Range(bit.bor(lhs:min(), rhs:min()),
+                   saturate(bit.bor(lhs:max(), rhs:max())))
+   end
+   function ret.bxor(lhs, rhs) return lhs:bor(rhs) end
+   function ret.lshift(lhs, rhs)
+      local function npot(x) -- next power of two
+         if x >= 2^31 then return 32 end
+         local n, i = 1, 1
+         while n < x do n, i = n * 2, i + 1 end
+         return i
+      end
+      if lhs:min() >= 0 then
+         local min_lhs, max_lhs = lhs:min(), lhs:max()
+         -- It's nuts, but lshift does an implicit modulo on the RHS.
+         local min_shift, max_shift = 0, 31
+         if rhs:min() >= 0 and rhs:max() < 32 then
+            min_shift, max_shift = rhs:min(), rhs:max()
+         end
+         if npot(max_lhs) + max_shift < 32 then
+            assert(bit.lshift(max_lhs, max_shift) > 0)
+            return Range(bit.lshift(min_lhs, min_shift),
+                         bit.lshift(max_lhs, max_shift))
+         end
+      end
+      return Range(-2^31, 2^31-1)
+   end
+   function ret.rshift(lhs, rhs)
+      local min_lhs, max_lhs = lhs:min(), lhs:max()
+      -- Same comments wrt modulo of shift.
+         local min_shift, max_shift = 0, 31
+      if rhs:min() >= 0 and rhs:max() < 32 then
+         min_shift, max_shift = rhs:min(), rhs:max()
+      end
+      if min_shift > 0 then
+         -- If we rshift by 1 or more, result will not be negative.
+         if min_lhs >= 0 and max_lhs < 2^32 then
+            return Range(bit.rshift(min_lhs, max_shift),
+                         bit.rshift(max_lhs, min_shift))
+         else
+            -- -1 is "all bits set".
+            return Range(bit.rshift(-1, max_shift),
+                         bit.rshift(-1, min_shift))
+         end
+      elseif min_lhs >= 0 and max_lhs < 2^31 then
+         -- Left-hand-side in [0, 2^31): result not negative.
+         return Range(bit.rshift(min_lhs, max_shift),
+                      bit.rshift(max_lhs, min_shift))
+      else
+         -- Otherwise punt.
+         return Range(-2^31, 2^31-1)
+      end
+   end
+   return ret
+end
+
 local function infer_ranges(expr)
+   local Inf = 1/0
    local function cons(car, cdr) return { car, cdr } end
    local function car(pair) return pair[1] end
    local function cdr(pair) return pair[2] end
    local function cadr(pair) return car(cdr(pair)) end
    local function push(db)
-      return cons({ len={}, [1]={}, [2]={}, [4]={} }, db)
+      return cons({}, db)
    end
-   local function lookup(db, pos, size)
+   local function lookup(db, expr)
+      if type(expr) == 'number' then return Range(expr, expr) end
+      local key = cfkey(expr)
       while db do
-         local pair = car(db)[size][cfkey(pos)]
-         if pair then return pair[1], pair[2] end
+         local range = car(db)[key]
+         if range then return range end
          db = cdr(db)
       end
-      if size == 1 then return 0, 0xff end
-      if size == 2 then return 0, 0xffff end
-      assert(size == 4)
-      return 0, 0xffffffff
+      return Range(-Inf, Inf)
    end
-   local function intern(db, pos, size, min, max)
-      car(db)[size][cfkey(pos)] = { min, max }
+   local function define(db, expr, range)
+      if range:fold() then return range:min() end
+      car(db)[cfkey(expr)] = range
+      return expr
+   end
+   local function restrict(db, expr, range)
+      return define(db, expr, lookup(db, expr):restrict(range))
    end
    local function merge(db, head)
-      for size, tab in pairs(head) do
-         for key, pair in pairs(tab) do
-            car(db)[size][key] = pair
-         end
-      end
+      for key, range in pairs(head) do car(db)[key] = range end
    end
    local function union(db, h1, h2)
-      for size, tab in pairs(h1) do
-         for key, pair in pairs(tab) do
-            local min2, max2 = h2[size][key]
-            if min2 then
-               local min1, max1 = pair
-               car(db)[size][key] = { math.min(min1, min2), math.ax(max1, max2) }
-            end
-         end
+      for key, range1 in pairs(h1) do
+         local range2 = h2[key]
+         if h2[key] then car(db)[key] = range1:union(range2) end
       end
    end
 
@@ -267,60 +373,90 @@ local function infer_ranges(expr)
       return nil
    end
 
-   local function restrict_range(min, max, op, val)
-      if op == '<=' then
-         return min, math.min(max, val), math.max(min, val + 1), max
-      elseif op == '=' then
-         return val, val, min, max
-      elseif op == '~=' then
-         return min, max, val, val
-      else
-         print('implement me', op)
-         return min, max, min, max
+   -- Returns lhs false range, lhs true range, rhs false range, rhs true range
+   local function branch_ranges(op, lhs, rhs)
+      local function lt(a, b)
+         return Range(a:min(), math.min(a:max(), b:max() - 1))
       end
+      local function le(a, b)
+         return Range(a:min(), math.min(a:max(), b:max()))
+      end
+      local function eq(a, b)
+         return Range(math.max(a:min()), math.min(a:max(), b:max()))
+      end
+      local function ge(a, b)
+         return Range(math.max(a:min(), b:min()), a:max())
+      end
+      local function gt(a, b)
+         return Range(math.max(a:min(), b:min()+1), a:max())
+      end
+      if op == '<' then
+         return lt(lhs, rhs), ge(lhs, rhs), gt(rhs, lhs), le(rhs, lhs)
+      elseif op == '<=' then
+         return le(lhs, rhs), gt(lhs, rhs), ge(rhs, lhs), lt(rhs, lhs)
+      elseif op == '=' then
+         -- Could restrict false continuations more.
+         return eq(lhs, rhs), lhs, eq(rhs, lhs), rhs
+      elseif op == '!=' then
+         return lhs, eq(lhs, rhs), rhs, eq(rhs, lhs)
+      elseif op == '>=' then
+         return ge(lhs, rhs), lt(lhs, rhs), le(rhs, lhs), gt(rhs, lhs)
+      elseif op == '>' then
+         return gt(lhs, rhs), le(lhs, rhs), lt(rhs, lhs), ge(rhs, lhs)
+      else
+         error('unimplemented '..op)
+      end
+   end
+   local function unop_range(op, rhs)
+      if op == 'ntohs' then return Range(0, 0xffff) end
+      if op == 'ntohl' then return Range(-2^31, 2^31-1) end
+      error('unexpected op '..op)
+   end
+   local function binop_range(op, lhs, rhs)
+      if op == '+' then return lhs:add(rhs) end
+      if op == '-' then return lhs:sub(rhs) end
+      if op == '*' then return lhs:mul(rhs) end
+      if op == '/' then return lhs:div(rhs) end
+      if op == '%' then return lhs:mod(rhs) end
+      if op == '&' then return lhs:band(rhs) end
+      if op == '|' then return lhs:bor(rhs) end
+      if op == '^' then return lhs:bxor(rhs) end
+      if op == '<<' then return lhs:lshift(rhs) end
+      if op == '>>' then return lhs:rshift(rhs) end
+      error('unexpected op '..op)
    end
 
    local function visit(expr, db_t, db_f, kt, kf)
       if type(expr) ~= 'table' then return expr end
       local op = expr[1]
 
-      -- Arithmetic ops just use the store for lookup, so we can just
-      -- use db_t and not worry about continuations.
-      if op == '[]' then
-         local pos, size = visit(expr[2], db_t), expr[3]
-         local min, max = lookup(db_t, pos, size)
-         if min == max then return min end
-         return { op, pos, size }
-      elseif unops[op] then
-         local rhs = visit(expr[2], db_t)
-         if type(rhs) == 'number' then
-            return assert(folders[op])(rhs)
-         end
-         return { op, rhs }
-      elseif binops[op] then
-         local lhs, rhs = visit(expr[2], db_t), visit(expr[3], db_t)
-         if type(lhs) == 'number' and type(rhs) == 'number' then
-            return assert(folders[op])(lhs, rhs)
-         end
-         return { op, lhs, rhs }
-      end
-
       -- Logical ops add to their db_t and db_f stores.
       if relops[op] then
-         local lhs, rhs = visit(expr[2], db_t), visit(expr[3], db_t)
-         if type(lhs) == 'number' and type(rhs) == 'number' then
-            return { assert(folders[op])(lhs, rhs) and 'true' or 'false' }
+         local db = push(db_t)
+         local lhs, rhs = visit(expr[2], db), visit(expr[3], db)
+         merge(db_t, car(db))
+         merge(db_f, car(db))
+         local function fold(l, r)
+            return { assert(folders[op])(l, r) and 'true' or 'false' }
          end
-         if (type(lhs) == 'table' and lhs[1] == '[]'
-             and type(rhs) == 'number') then
-             local pos, size, val = lhs[2], lhs[3], rhs
-             local min, max = lookup(db_t, pos, size)
-             -- TODO: fold
-             min_t, max_t, min_f, max_f = restrict_range(min, max, op, val)
-             intern(db_t, pos, size, min_t, max_t)
-             intern(db_f, pos, size, min_f, max_f)
+         local lhs_range, rhs_range = lookup(db_t, lhs), lookup(db_t, rhs)
+         -- If we folded both sides, or if the ranges are strictly
+         -- ordered, the condition will fold.
+         if ((lhs_range:fold() and rhs_range:fold())
+             or lhs_range:lt(rhs_range) or lhs_range:gt(rhs_range)) then
+            return fold(lhs_range:min(), rhs_range:min())
          end
+         -- Otherwise, the relop may restrict the ranges for both
+         -- arguments along both continuations.
+         local lhs_range_t, lhs_range_f, rhs_range_t, rhs_range_f =
+            branch_ranges(op, lhs_range, rhs_range)
+         restrict(db_t, lhs, lhs_range_t)
+         restrict(db_f, lhs, lhs_range_f)
+         restrict(db_t, rhs, rhs_range_t)
+         restrict(db_f, rhs, rhs_range_f)
          return { op, lhs, rhs }
+      elseif op == 'false' or op == 'true' or op == 'fail' then
+         return expr
       elseif op == 'not' then
          return { op, visit(expr[2], db_f, db_t, kf, kt) }
       elseif op == 'if' then
@@ -357,7 +493,44 @@ local function infer_ranges(expr)
          end
          return { op, test, t, f }
       else
-         return expr
+         -- An arithmetic op, which interns into the fresh table pushed
+         -- by the containing relop.
+         local db = db_t
+         if op == '[]' then
+            local pos, size = visit(expr[2], db), expr[3]
+            local ret = { op, pos, size }
+            local size_max
+            if size == 1 then size_max = 0xff
+            elseif size == 2 then size_max = 0xffff
+            else size_max = 0xffffffff end
+            local range = lookup(db, ret):restrict(Range(0, size_max))
+            return define(db, ret, range)
+         elseif unops[op] then
+            local rhs = visit(expr[2], db)
+            if type(rhs) == 'number' then return assert(folders[op])(rhs) end
+            local range = unop_range(op, lookup(db, rhs))
+            return restrict(db, { op, rhs }, range)
+         elseif binops[op] then
+            local lhs, rhs = visit(expr[2], db), visit(expr[3], db)
+            if type(lhs) == 'number' and type(rhs) == 'number' then
+               return assert(folders[op])(lhs, rhs)
+            end
+            local lhs_range, rhs_range = lookup(db, lhs), lookup(db, rhs)
+            -- As a special case, remove % if it is unneeded.
+            if op == '%' then
+               local rhs_val = rhs_range:fold()
+               if rhs_val and rhs_val > 0 then
+                  if lhs_range:min() >= 0 and lhs_range:max() < rhs_val then
+                     return lhs
+                  end
+                  -- could do strength reduction here if rhs is power of 2
+               end
+            end
+            local range = binop_range(op, lhs_range, rhs_range)
+            return restrict(db, { op, lhs, rhs }, range)
+         else
+            error('what is this '..op)
+         end
       end
    end
    return visit(expr, push(), push(), 'ACCEPT', 'REJECT')
