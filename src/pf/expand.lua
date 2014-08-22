@@ -457,7 +457,12 @@ function expand_arith(expr, dlt)
       local rhs, rhs_assertions = expand_arith(expr[3], dlt)
       -- Mod 2^32 to preserve uint32 range.
       local ret = { '%', { op, lhs, rhs }, 2^32 }
-      return ret, concat(lhs_assertions, rhs_assertions)
+      local assertions = concat(lhs_assertions, rhs_assertions)
+      -- RHS of division can't be 0.
+      if op == '/' or op == '%' then
+         assertions = concat(assertions, { '!=', rhs, 0 })
+      end
+      return ret, assertions
    end
 
    assert(op ~= '[]', "expr has already been expanded?")
