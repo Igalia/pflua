@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local utils = require('pf.utils')
+local bit = require('bit')
 
 verbose = os.getenv("PF_VERBOSE");
 
@@ -251,6 +252,37 @@ local function expand_udp_dst_portrange(expr)
    return expand_proto_dst_portrange(expr, 17)
 end
 
+local function ipv4_to_int(addr)
+    assert(addr[1] == 'ipv4', "Not an IPV4 address")
+    return bit.bor(bit.lshift(addr[2], 24), bit.lshift(addr[3], 16), 
+       bit.lshift(addr[4], 8), addr[5])
+end
+local function expand_ip_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', has_ether_protocol(2048),
+            { 'or',
+              { '=', { '[ip]', 12, 4 }, host },
+              { '=', { '[ip]', 16, 4 }, host } } }
+end
+local function expand_arp_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', has_ether_protocol(2054),
+            { 'or',
+              { '=', { '[arp]', 14, 4 }, host},
+              { '=', { '[arp]', 24, 4 }, host} } }
+end
+local function expand_rarp_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', has_ether_protocol(32821),
+            { 'or',
+              { '=', { '[rarp]', 14, 4 }, host},
+              { '=', { '[rarp]', 24, 4 }, host} } }
+end
+local function expand_host(expr)
+   return { 'or', expand_ip_host(expr),
+            { 'or', expand_arp_host(expr), expand_rarp_host(expr) } }
+end
+
 local primitive_expanders = {
    dst_host = unimplemented,
    dst_net = unimplemented,
@@ -260,7 +292,7 @@ local primitive_expanders = {
    src_net = unimplemented,
    src_port = unimplemented,
    src_portrange = unimplemented,
-   host = unimplemented,
+   host = expand_host,
    ether_src = unimplemented,
    ether_dst = unimplemented,
    ether_host = unimplemented,
@@ -276,6 +308,7 @@ local primitive_expanders = {
    ip = function(expr) return has_ether_protocol(2048) end,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
+   ip_host = expand_ip_host,
    ip_broadcast = unimplemented,
    ip_multicast = unimplemented,
    ip6 = function(expr) return has_ether_protocol(34525) end,
@@ -300,7 +333,9 @@ local primitive_expanders = {
    icmp = function(expr) return has_ip_protocol(1) end,
    protochain = unimplemented,
    arp = function(expr) return has_ether_protocol(2054) end,
+   arp_host = expand_arp_host,
    rarp = function(expr) return has_ether_protocol(32821) end,
+   rarp_host = expand_rarp_host,
    atalk = unimplemented,
    aarp = unimplemented,
    decnet_src = unimplemented,
