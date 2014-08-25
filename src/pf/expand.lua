@@ -283,12 +283,35 @@ local function expand_host(expr)
             { 'or', expand_arp_host(expr), expand_rarp_host(expr) } }
 end
 
+local function expand_src_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'or', 
+            { 'and', has_ether_protocol(2048), { '=', { '[ip]', 12, 4 }, host } },
+            { 'or',
+              { 'and', has_ether_protocol(2054), { '=', { '[arp]', 14, 4 }, host } },
+              { 'and', has_ether_protocol(32821), { '=', { '[arp]', 14, 4 }, host } } } }
+end
+local function expand_dst_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'or', 
+            { 'and', has_ether_protocol(2048), { '=', { '[ip]', 16, 4 }, host } },
+            { 'or',
+              { 'and', has_ether_protocol(2054), { '=', { '[arp]', 24, 4 }, host } },
+              { 'and', has_ether_protocol(32821), { '=', { '[arp]', 24, 4 }, host } } } }
+end
+--[[
+local function expand_host(expr)
+   local host = ipv4_to_int(expr[2])
+   return { 'and', expand_src_host(expr), expand_dst_host(expr) }
+end
+]]--
+
 local primitive_expanders = {
-   dst_host = unimplemented,
+   dst_host = expand_dst_host,
    dst_net = unimplemented,
    dst_port = unimplemented,
    dst_portrange = unimplemented,
-   src_host = unimplemented,
+   src_host = expand_src_host,
    src_net = unimplemented,
    src_port = unimplemented,
    src_portrange = unimplemented,
