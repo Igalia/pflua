@@ -151,7 +151,9 @@ local function compile_bool(builder, expr, kt, kf, k)
             compile_bool(builder, expr[4], kt, kf, k)
             builder.pop()
          else
+            builder.push()
             compile_bool(builder, expr[3], kt, kf, k)
+            builder.pop()
          end
       elseif fresh_kf then
          compile_bool(builder, expr[2], test_kt, test_kf, test_kf)
