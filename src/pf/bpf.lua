@@ -297,13 +297,14 @@ function compile_lua(bpf)
 
    local function misc(op)
       if op == BPF_TAX then
-         write(assign(A(), X()))
+         write(assign(X(), A()))
       elseif op == BPF_TXA then
          write(assign(A(), X()))
       else error('bad op ' .. op)
       end
    end
 
+   if verbose then print(disassemble(bpf)) end
    for i=0, #bpf-1 do
       -- for debugging: write('print('..i..')')
       local inst = bpf[i]
@@ -328,6 +329,104 @@ function compile_lua(bpf)
                 'end')
    if verbose then print(ret) end
    return ret
+end
+
+function disassemble(bpf)
+   local asm = '';
+   local function write(code, ...) asm = asm .. code:format(...) end
+   local function writeln(code, ...) write(code..'\n', ...) end
+
+   local function ld(size, mode, k)
+      local bytes = assert(({ [BPF_W]=4, [BPF_H]=2, [BPF_B]=1 })[size])
+      if     mode == BPF_ABS then writeln('A = P[%u:%u]', k, bytes)
+      elseif mode == BPF_IND then writeln('A = P[X+%u:%u]', k, bytes)
+      elseif mode == BPF_IMM then writeln('A = %u', k)
+      elseif mode == BPF_LEN then writeln('A = length')
+      elseif mode == BPF_MEM then writeln('A = M[%u]', k)
+      else                        error('bad mode ' .. mode) end
+   end
+
+   local function ldx(size, mode, k)
+      if     mode == BPF_IMM then writeln('X = %u', k)
+      elseif mode == BPF_LEN then writeln('X = length')
+      elseif mode == BPF_MEM then writeln('X = M[%u]', k)
+      elseif mode == BPF_MSH then writeln('X = (P[%u:1] & 0xF) << 2', k)
+      else                        error('bad mode ' .. mode) end
+   end
+
+   local function st(k) writeln('M(%u) = A', k) end
+
+   local function stx(k) writeln('M(%u) = X', k) end
+
+   local function alu(op, src, k)
+      local b
+      if     src == BPF_K then b = k
+      elseif src == BPF_X then b = 'X'
+      else error('bad src ' .. src) end
+
+      if     op == BPF_ADD then writeln('A += %s', b)
+      elseif op == BPF_SUB then writeln('A -= %s', b)
+      elseif op == BPF_MUL then writeln('A *= %s', b)
+      elseif op == BPF_DIV then writeln('A /= %s', b)
+      elseif op == BPF_OR  then writeln('A |= %s', b)
+      elseif op == BPF_AND then writeln('A &= %s', b)
+      elseif op == BPF_LSH then writeln('A <<= %s', b)
+      elseif op == BPF_RSH then writeln('A >>= %s', b)
+      elseif op == BPF_NEG then writeln('A = -A')
+      else error('bad op ' .. op) end
+   end
+
+   local function jmp(i, op, src, k, jt, jf)
+      if op == BPF_JA then writeln('goto %u', k); return end
+
+      local rhs
+      if src == BPF_K then rhs = k
+      elseif src == BPF_X then rhs = 'X'
+      else error('bad src ' .. src) end
+
+      jt = jt + i + 1
+      jf = jf + i + 1
+
+      local function cond(op, lhs, rhs)
+         writeln('if (%s %s %s) goto %u else goto %u', lhs, op, rhs, jt, jf)
+      end
+
+      if     op == BPF_JEQ then cond('==', 'A', rhs)
+      elseif op == BPF_JGT then cond('>', 'A', rhs)
+      elseif op == BPF_JGE then cond('>=', 'A', rhs)
+      elseif op == BPF_JSET then cond('!=', 'A & '..rhs, 0)
+      else error('bad op ' .. op) end
+   end
+
+   local function ret(src, k)
+      if     src == BPF_K then writeln('return %u', k)
+      elseif src == BPF_A then writeln('return A')
+      else error('bad src ' .. src) end
+   end
+
+   local function misc(op)
+      if op == BPF_TAX then writeln('X = A')
+      elseif op == BPF_TXA then writeln('A = X')
+      else error('bad op ' .. op) end
+   end
+
+   for i=0, #bpf-1 do
+      local inst = bpf[i]
+      local code = inst.code
+      local class = BPF_CLASS(code)
+      write(string.format('%03d: ', i))
+      if     class == BPF_LD  then ld(BPF_SIZE(code), BPF_MODE(code), inst.k)
+      elseif class == BPF_LDX then ldx(BPF_SIZE(code), BPF_MODE(code), inst.k)
+      elseif class == BPF_ST  then st(inst.k)
+      elseif class == BPF_STX then stx(inst.k)
+      elseif class == BPF_ALU then alu(BPF_OP(code), BPF_SRC(code), inst.k)
+      elseif class == BPF_JMP then jmp(i, BPF_OP(code), BPF_SRC(code), inst.k,
+                                       inst.jt, inst.jf)
+      elseif class == BPF_RET then ret(BPF_SRC(code), inst.k)
+      elseif class == BPF_MISC then misc(BPF_MISCOP(code))
+      else error('bad class ' .. class) end
+   end
+   return asm
 end
 
 function compile(bpf)
