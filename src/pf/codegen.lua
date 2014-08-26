@@ -88,7 +88,7 @@ local function read_buffer_word_by_type(buffer, offset, size)
    elseif size == 2 then
       return ('ffi.cast("uint16_t*", '..buffer..'+'..offset..')[0]')
    elseif size == 4 then
-      return ('ffi.cast("int32_t*", '..buffer..'+'..offset..')[0]')
+      return ('ffi.cast("uint32_t*", '..buffer..'+'..offset..')[0]')
    else
       error("bad [] size: "..size)
    end
