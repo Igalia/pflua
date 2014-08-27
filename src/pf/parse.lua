@@ -72,15 +72,20 @@ local function lex_ipv6(str, pos)
 end
 
 local function lex_ehost(str, pos)
+   local function normalize(digits)
+      local result = tonumber(digits, 16)
+      if (result < 16) then result = result * 2^4 end
+      return result
+   end
    local addr = { 'ehost' }
-   local digits, dot = str:match("^(%x%x)()%:", pos)
+   local digits, dot = str:match("^(%x%x?)()%:", pos)
    assert(digits, "failed to parse ethernet host address at "..pos)
-   table.insert(addr, tonumber(digits, 16))
+   table.insert(addr, normalize(digits))
    pos = dot
    for i=1,5 do
-      local digits, dot = str:match("^%:(%x%x)()", pos)
+      local digits, dot = str:match("^%:(%x%x?)()", pos)
       assert(digits, "failed to parse ethernet host address at "..pos)
-      table.insert(addr, tonumber(digits, 16))
+      table.insert(addr, normalize(digits))
       pos = dot
    end
    local terminators = " \t\r\n)/"
@@ -95,7 +100,7 @@ local function lex_addr(str, pos)
       return lex_ipv4_or_host(str, pos)
    elseif str:match("^%x%x%x%x%:", pos) then
       return lex_ipv6(str, pos)
-   elseif str:match("^%x%x%:", pos) then
+   elseif str:match("^%x%x?%:", pos) then
       return lex_ehost(str, pos)
    else
       return lex_host_or_keyword(str, pos)
@@ -170,6 +175,11 @@ local function lex(str, pos, opts, in_brackets)
       else
          return lex_decimal_or_addr(str, pos, in_brackets)
       end
+   end
+
+   -- MAC address
+   if not in_brackets and str:match('%x%x?:%x%x?:%x%x?:%x%x?:%x%x?:%x%x?', pos) then
+      return lex_addr(str, pos)
    end
 
    -- IPV6 net address beginning with [a-fA-F].
@@ -820,5 +830,9 @@ function selftest ()
                     { "-", { "-", { "[ip]", 2, 1 },
                        { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
                     { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } })
+   parse_test("ether host ff:ff:ff:33:33:33",
+             { 'ether_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
+   parse_test("ether host f:f:f:3:3:3",
+             { 'ether_host', { 'ehost', 240, 240, 240, 48, 48, 48 } })
    print("OK")
 end
