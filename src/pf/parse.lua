@@ -470,9 +470,9 @@ local ether_types = {
 }
 
 local ip_types = {
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
-   dst = table_parser(src_or_dst_types),
-   src = table_parser(src_or_dst_types),
    proto = unary(parse_ip_proto_arg),
    protochain = unary(parse_proto_arg),
    broadcast = nullary(),
@@ -517,15 +517,15 @@ local tcp_or_udp_types = {
 }
 
 local arp_types = {
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
-   dst = table_parser(src_or_dst_types),
-   src = table_parser(src_or_dst_types),
 }
 
 local rarp_types = {
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
-   dst = table_parser(src_or_dst_types),
-   src = table_parser(src_or_dst_types),
 }
 
 local primitives = {
