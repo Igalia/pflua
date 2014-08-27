@@ -7,6 +7,8 @@ verbose = os.getenv("PF_VERBOSE");
 local expand_arith, expand_relop, expand_bool
 
 local set, concat, pp = utils.set, utils.concat, utils.pp
+local host_uint16, host_uint32 = utils.host_uint16, utils.host_uint32
+local ipv4_to_int = utils.ipv4_to_int
 
 local ether_protos = set(
    'ip', 'ip6', 'arp', 'rarp', 'atalk', 'aarp', 'decnet', 'sca', 'lat',
@@ -251,33 +253,22 @@ local function expand_udp_dst_portrange(expr)
    return expand_proto_dst_portrange(expr, 17)
 end
 
--- Network-byte-order 4 byte word to host-network-order uint32
-local function host_uint32(a, b, c, d)
-   return d * 2^24 + c * 2^16 + b * 2^8 + a
-end
-
--- Network-byte-order 2 byte word to host-network-order uint16
-local function host_uint16(a, b)
-   return b * 2^8 + a
-end
-
-local function ipv4_to_int(addr)
-   assert(addr[1] == 'ipv4', "Not an IPV4 address")
-   return host_uint32(addr[2], addr[3], addr[4], addr[5])
-end
-
 -- IP protocol
 
 local function is_ip_protocol()
    return has_ether_protocol(2048)
 end
-local function expand_ip_src_host(expr)
+local function expand_ip_src_host(expr, mask)
    local host = ipv4_to_int(expr[2])
-   return { 'and', is_ip_protocol(), { '=', { '[ip]', 12, 4 }, host } }
+   local val = { '[ip]', 12, 4 }
+   if mask then val = { '&', val, mask } end
+   return { 'and', is_ip_protocol(), { '=', val, host } }
 end
-local function expand_ip_dst_host(expr)
+local function expand_ip_dst_host(expr, mask)
    local host = ipv4_to_int(expr[2])
-   return { 'and', is_ip_protocol(), { '=', { '[ip]', 16, 4 }, host } }
+   local val = { '[ip]', 16, 4 }
+   if mask then val = { '&', val, mask } end
+   return { 'and', is_ip_protocol(), { '=', val, host } }
 end
 local function expand_ip_host(expr)
    local host = ipv4_to_int(expr[2])
@@ -289,13 +280,17 @@ end
 local function is_arp_protocol()
    return has_ether_protocol(2054)
 end
-local function expand_arp_src_host(expr)
+local function expand_arp_src_host(expr, mask)
    local host = ipv4_to_int(expr[2])
-   return { 'and', is_arp_protocol(), { '=', { '[arp]', 14, 4 }, host } }
+   local val = { '[ip]', 14, 4 }
+   if mask then val = { '&', val, mask } end
+   return { 'and', is_arp_protocol(), { '=', val, host } }
 end
-local function expand_arp_dst_host(expr)
+local function expand_arp_dst_host(expr, mask)
    local host = ipv4_to_int(expr[2])
-   return { 'and', is_arp_protocol(), { '=', { '[arp]', 24, 4 }, host } }
+   local val = { '[ip]', 24, 4 }
+   if mask then val = { '&', val, mask } end
+   return { 'and', is_arp_protocol(), { '=', val, host } }
 end
 local function expand_arp_host(expr)
    local host = ipv4_to_int(expr[2])
@@ -307,13 +302,17 @@ end
 local function is_rarp_protocol()
    return has_ether_protocol(32821)
 end
-local function expand_rarp_src_host(expr)
+local function expand_rarp_src_host(expr, mask)
    local host = ipv4_to_int(expr[2])
-   return { 'and', is_rarp_protocol(), { '=', { '[rarp]', 14, 4 }, host } }
+   local val = { '[ip]', 14, 4 }
+   if mask then val = { '&', val, mask } end
+   return { 'and', is_rarp_protocol(), { '=', val, host } }
 end
-local function expand_rarp_dst_host(expr)
+local function expand_rarp_dst_host(expr, mask)
    local host = ipv4_to_int(expr[2])
-   return { 'and', is_rarp_protocol(), { '=', { '[rarp]', 24, 4 }, host } }
+   local val = { '[rarp]', 24, 4 }
+   if mask then val = { '&', val, mask } end
+   return { 'and', is_rarp_protocol(), { '=', val, host } }
 end
 local function expand_rarp_host(expr)
    local host = ipv4_to_int(expr[2])
@@ -322,16 +321,16 @@ end
 
 -- Host
 
-local function expand_src_host(expr)
-   return { 'or', expand_ip_src_host(expr),
-            { 'or', expand_arp_src_host(expr), expand_rarp_src_host(expr) } }
+local function expand_src_host(expr, mask)
+   return { 'or', expand_ip_src_host(expr, mask),
+            { 'or', expand_arp_src_host(expr, mask), expand_rarp_src_host(expr, mask) } }
 end
-local function expand_dst_host(expr)
-   return { 'or', expand_ip_dst_host(expr),
-            { 'or', expand_arp_dst_host(expr), expand_rarp_dst_host(expr) } }
+local function expand_dst_host(expr, mask)
+   return { 'or', expand_ip_dst_host(expr, mask),
+            { 'or', expand_arp_dst_host(expr, mask), expand_rarp_dst_host(expr, mask) } }
 end
-local function expand_host(expr)
-   return { 'and', expand_src_host(expr), expand_dst_host(expr) }
+local function expand_host(expr, mask)
+   return { 'and', expand_src_host(expr, mask), expand_dst_host(expr, mask) }
 end
 
 -- Ether
@@ -357,13 +356,41 @@ local function expand_ether_host(expr)
    return { 'or', expand_ether_src_host(expr), expand_ether_dst_host(expr) }
 end
 
+-- Net
+
+local function expand_src_net(expr)
+   local arg = expr[2]
+   if arg[1] == 'ipv4' then
+      return expand_src_host(expr)
+   end
+   if arg[1] == 'ipv4/len' then
+      local mask_length = arg[3]
+      return expand_src_host(arg, 2^mask_length - 1)
+   end
+   error("Invalid address type")
+end
+local function expand_dst_net(expr)
+   local arg = expr[2]
+   if arg[1] == 'ipv4' then
+      return expand_dst_host(expr)
+   end
+   if arg[1] == 'ipv4/len' then
+      local mask_length = arg[3]
+      return expand_dst_host(arg, 2^mask_length - 1)
+   end
+   error("Invalid address type")
+end
+local function expand_net(expr)
+   return { 'or', expand_src_net(expr), expand_dst_net(expr) }
+end
+
 local primitive_expanders = {
    dst_host = expand_dst_host,
-   dst_net = unimplemented,
+   dst_net = expand_dst_net,
    dst_port = unimplemented,
    dst_portrange = unimplemented,
    src_host = expand_src_host,
-   src_net = unimplemented,
+   src_net = expand_src_net,
    src_port = unimplemented,
    src_portrange = unimplemented,
    host = expand_host,
@@ -376,7 +403,7 @@ local primitive_expanders = {
    ether_multicast = unimplemented,
    ether_proto = unimplemented,
    gateway = unimplemented,
-   net = unimplemented,
+   net = expand_net,
    port = expand_port,
    portrange = expand_portrange,
    less = unimplemented,

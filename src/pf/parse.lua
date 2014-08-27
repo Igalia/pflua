@@ -1,5 +1,9 @@
 module(...,package.seeall)
 
+local utils = require('pf.utils')
+
+local ipv4_to_int = utils.ipv4_to_int
+
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
       pos = pos + 1
@@ -290,6 +294,14 @@ function parse_net_arg(lexer)
    if arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       if lexer.check('/') then
          local len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
+         if (arg[1] == 'ipv4') then
+            local mask_val = 2^len - 1
+            local ipv4_val = ipv4_to_int(arg)
+            if (bit.band(ipv4_val, mask_val) ~= ipv4_val) then
+               lexer.error("Non-network bits set in %d.%d.%d.%d/%d",
+                  arg[2], arg[3], arg[4], arg[5], len)
+            end
+         end
          return { arg[1]..'/len', arg, len }
       elseif lexer.check('mask') then
          lexer.next()

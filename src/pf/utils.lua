@@ -94,6 +94,21 @@ function assert_equals(expected, actual)
    end
 end
 
+-- Network-byte-order 4 byte word to host-network-order uint32
+function host_uint32(a, b, c, d)
+   return d * 2^24 + c * 2^16 + b * 2^8 + a
+end
+
+-- Network-byte-order 2 byte word to host-network-order uint16
+function host_uint16(a, b)
+   return b * 2^8 + a
+end
+
+function ipv4_to_int(addr)
+   assert(addr[1] == 'ipv4', "Not an IPV4 address")
+   return host_uint32(addr[2], addr[3], addr[4], addr[5])
+end
+
 function selftest ()
    print("selftest: pf.utils")
    local tab = { 1, 2, 3 }
