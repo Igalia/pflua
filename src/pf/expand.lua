@@ -334,6 +334,29 @@ local function expand_host(expr)
    return { 'and', expand_src_host(expr), expand_dst_host(expr) }
 end
 
+-- Ether
+
+-- In host-byte-order (little endian)
+local function ehost_to_int(addr)
+   assert(addr[1] == 'ehost', "Not a valid ehost address")
+   return host_uint16(addr[2], addr[3]), host_uint32(addr[4], addr[5], addr[6], addr[7])
+end
+local function expand_ether_src_host(expr)
+   local hi, lo = ehost_to_int(expr[2])
+   return { 'and',
+            { '=', { '[ether]', 6, 2 }, hi },
+            { '=', { '[ether]', 8, 4 }, lo } }
+end
+local function expand_ether_dst_host(expr)
+   local hi, lo = ehost_to_int(expr[2])
+   return { 'and',
+            { '=', { '[ether]', 0, 2 }, hi },
+            { '=', { '[ether]', 2, 4 }, lo } }
+end
+local function expand_ether_host(expr)
+   return { 'or', expand_ether_src_host(expr), expand_ether_dst_host(expr) }
+end
+
 local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = unimplemented,
@@ -344,9 +367,11 @@ local primitive_expanders = {
    src_port = unimplemented,
    src_portrange = unimplemented,
    host = expand_host,
-   ether_src = unimplemented,
-   ether_dst = unimplemented,
-   ether_host = unimplemented,
+   ether_src = expand_ether_src_host,
+   ether_src_host = expand_ether_src_host,
+   ether_dst = expand_ether_dst_host,
+   ether_dst_host = expand_ether_dst_host,
+   ether_host = expand_ether_host,
    ether_broadcast = unimplemented,
    ether_multicast = unimplemented,
    ether_proto = unimplemented,

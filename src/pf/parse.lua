@@ -470,9 +470,13 @@ local src_or_dst_types = {
    portrange = unary(parse_portrange_arg)
 }
 
+local ether_host_type = {
+   host = unary(parse_ehost_arg)
+}
+
 local ether_types = {
-   dst = unary(parse_ehost_arg),
-   src = unary(parse_ehost_arg),
+   dst = table_parser(ether_host_type, unary(parse_ehost_arg)),
+   src = table_parser(ether_host_type, unary(parse_ehost_arg)),
    host = unary(parse_ehost_arg),
    broadcast = nullary(),
    multicast = nullary(),
