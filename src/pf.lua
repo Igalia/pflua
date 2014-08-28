@@ -14,8 +14,10 @@ function compile_filter(filter_str, opts)
    local dlt = opts.dlt or "EN10MB"
    if opts.pcap_offline_filter then
       local bytecode = libpcap.compile(filter_str, dlt)
+      local header = types.pcap_pkthdr(0, 0, 0, 0)
       return function(P, len)
-         local header = types.pcap_pkthdr(0, 0, len, len)
+         header.incl_len = len
+         header.orig_len = len
          return libpcap.offline_filter(bytecode, header, P) ~= 0
       end
    elseif opts.bpf then
