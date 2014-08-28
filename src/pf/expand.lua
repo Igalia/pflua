@@ -255,82 +255,65 @@ end
 
 -- IP protocol
 
-local function is_ip_protocol()
-   return has_ether_protocol(2048)
+local proto_info = {
+   ip   = { id = 2048,   access = "[ip]",    src = 12, dst = 16 },
+   arp  = { id = 2054,   access = "[arp]",   src = 14, dst = 24 },
+   rarp = { id = 32821,  access = "[rarp]",  src = 14, dst = 24 },
+}
+
+local function has_proto_dir_host(proto, dir, addr, mask)
+   local host = ipv4_to_int(addr)
+   local val = { proto_info[proto].access, proto_info[proto][dir], 4 }
+   if mask and tonumber(mask) then val = { '&', val, mask } end
+   return { 'and', has_ether_protocol(proto_info[proto].id), { '=', val, host } }
 end
-local function expand_ip_src_host(expr, mask)
-   local host = ipv4_to_int(expr[2])
-   local val = { '[ip]', 12, 4 }
-   if mask then val = { '&', val, mask } end
-   return { 'and', is_ip_protocol(), { '=', val, host } }
+
+local function expand_ip_src_host(expr)
+  return has_proto_dir_host("ip", "src", expr[2], expr[3])
 end
-local function expand_ip_dst_host(expr, mask)
-   local host = ipv4_to_int(expr[2])
-   local val = { '[ip]', 16, 4 }
-   if mask then val = { '&', val, mask } end
-   return { 'and', is_ip_protocol(), { '=', val, host } }
+local function expand_ip_dst_host(expr)
+   return has_proto_dir_host("ip", "dst", expr[2], expr[3])
 end
 local function expand_ip_host(expr)
-   local host = ipv4_to_int(expr[2])
    return { 'or', expand_ip_src_host(expr), expand_ip_dst_host(expr) }
 end
 
 -- ARP protocol
 
-local function is_arp_protocol()
-   return has_ether_protocol(2054)
+local function expand_arp_src_host(expr)
+   return has_proto_dir_host("arp", "src", expr[2], expr[3])
 end
-local function expand_arp_src_host(expr, mask)
-   local host = ipv4_to_int(expr[2])
-   local val = { '[ip]', 14, 4 }
-   if mask then val = { '&', val, mask } end
-   return { 'and', is_arp_protocol(), { '=', val, host } }
-end
-local function expand_arp_dst_host(expr, mask)
-   local host = ipv4_to_int(expr[2])
-   local val = { '[ip]', 24, 4 }
-   if mask then val = { '&', val, mask } end
-   return { 'and', is_arp_protocol(), { '=', val, host } }
+local function expand_arp_dst_host(expr)
+   return has_proto_dir_host("arp", "dst", expr[2], expr[3])
 end
 local function expand_arp_host(expr)
-   local host = ipv4_to_int(expr[2])
    return { 'or', expand_arp_src_host(expr), expand_arp_dst_host(expr) }
 end
 
 -- RARP protocol
 
-local function is_rarp_protocol()
-   return has_ether_protocol(32821)
+local function expand_rarp_src_host(expr)
+   return has_proto_dir_host("rarp", "src", expr[2], expr[3])
 end
-local function expand_rarp_src_host(expr, mask)
-   local host = ipv4_to_int(expr[2])
-   local val = { '[ip]', 14, 4 }
-   if mask then val = { '&', val, mask } end
-   return { 'and', is_rarp_protocol(), { '=', val, host } }
-end
-local function expand_rarp_dst_host(expr, mask)
-   local host = ipv4_to_int(expr[2])
-   local val = { '[rarp]', 24, 4 }
-   if mask then val = { '&', val, mask } end
-   return { 'and', is_rarp_protocol(), { '=', val, host } }
+local function expand_rarp_dst_host(expr)
+   return has_proto_dir_host("rarp", "dst", expr[2], expr[3])
 end
 local function expand_rarp_host(expr)
-   local host = ipv4_to_int(expr[2])
    return { 'or', expand_rarp_src_host(expr), expand_rarp_dst_host(expr) }
 end
 
 -- Host
 
-local function expand_src_host(expr, mask)
-   return { 'or', expand_ip_src_host(expr, mask),
-            { 'or', expand_arp_src_host(expr, mask), expand_rarp_src_host(expr, mask) } }
+local function expand_src_host(expr)
+   return { 'or', expand_ip_src_host(expr),
+            { 'or', expand_arp_src_host(expr), expand_rarp_src_host(expr) } }
 end
-local function expand_dst_host(expr, mask)
-   return { 'or', expand_ip_dst_host(expr, mask),
-            { 'or', expand_arp_dst_host(expr, mask), expand_rarp_dst_host(expr, mask) } }
+local function expand_dst_host(expr)
+   return { 'or', expand_ip_dst_host(expr),
+            { 'or', expand_arp_dst_host(expr), expand_rarp_dst_host(expr) } }
 end
-local function expand_host(expr, mask)
-   return { 'and', expand_src_host(expr, mask), expand_dst_host(expr, mask) }
+local function expand_host(expr)
+   return { 'and', expand_src_host(expr), expand_dst_host(expr) }
 end
 
 -- Ether
@@ -358,27 +341,23 @@ end
 
 -- Net
 
-local function expand_src_net(expr)
+local function expand_dir_net(expr, expansion_func)
    local arg = expr[2]
    if arg[1] == 'ipv4' then
-      return expand_src_host(expr)
+      return expansion_func(expr)
    end
    if arg[1] == 'ipv4/len' then
       local mask_length = arg[3]
-      return expand_src_host(arg, 2^mask_length - 1)
+      return expansion_func(arg, 2^mask_length - 1)
    end
    error("Invalid address type")
 end
+
+local function expand_src_net(expr)
+   return expand_dir_net(expr, expand_src_host)
+end
 local function expand_dst_net(expr)
-   local arg = expr[2]
-   if arg[1] == 'ipv4' then
-      return expand_dst_host(expr)
-   end
-   if arg[1] == 'ipv4/len' then
-      local mask_length = arg[3]
-      return expand_dst_host(arg, 2^mask_length - 1)
-   end
-   error("Invalid address type")
+   return expand_dir_net(expr, expand_dst_host)
 end
 local function expand_net(expr)
    return { 'or', expand_src_net(expr), expand_dst_net(expr) }
@@ -408,7 +387,7 @@ local primitive_expanders = {
    portrange = expand_portrange,
    less = unimplemented,
    greater = unimplemented,
-   ip = is_ip_protocol,
+   ip = function(expr) return has_ether_protocol(proto_info.ip.id) end,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
    ip_host = expand_ip_host,
@@ -439,13 +418,13 @@ local primitive_expanders = {
    udp_dst_portrange = expand_udp_dst_portrange,
    icmp = function(expr) return has_ip_protocol(1) end,
    protochain = unimplemented,
-   arp = is_arp_protocol,
+   arp = function(expr) return has_ether_protocol(proto_info.arp.id) end,
    arp_host = expand_arp_host,
    arp_src = expand_arp_src_host,
    arp_src_host = expand_arp_src_host,
    arp_dst = expand_arp_dst_host,
    arp_dst_host = expand_arp_dst_host,
-   rarp = is_rarp_protocol,
+   rarp = function(expr) return has_ether_protocol(proto_info.rarp.id) end,
    rarp_host = expand_rarp_host,
    rarp_src = expand_rarp_src_host,
    rarp_src_host = expand_rarp_src_host,
