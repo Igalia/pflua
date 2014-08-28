@@ -280,5 +280,5 @@ The assembly produced for this filter depends on the packets that the
 filter sees.  We'll post more information as we have it.
 
 These examples were produced using the
-(tools/pflang-compile)[https://github.com/Igalia/pflua/blob/master/tools/pflang-compile]
+[tools/pflang-compile](https://github.com/Igalia/pflua/blob/master/tools/pflang-compile)
 tool.
