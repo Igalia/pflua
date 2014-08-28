@@ -102,19 +102,19 @@ high-level `compile_filter` interface.
 
 ## Bugs
 
-Please check our (issue tracker)[https://github.com/Igalia/pflua/issues]
+Check our [issue tracker](https://github.com/Igalia/pflua/issues)
 for known bugs, and please file a bug if you find one.  Cheers :)
 
 ## Authors
 
 Pflua was written by Andy Wingo, Diego Pino, and Javier Muñoz at
-(Igalia, S.L.)[https://www.igalia.com/].  Development of pflua was
-supported by Luke Gorrie at (Snabb Gmbh)[http://snabb.co/], purveyors of
+[Igalia, S.L.](https://www.igalia.com/).  Development of pflua was
+supported by Luke Gorrie at [Snabb Gmbh](http://snabb.co/), purveyors of
 fine networking solutions.  Thanks, Snabb!
 
 Feedback is very welcome!  If you are interested in pflua in a Snabb
 context, probably the best thing is to post a message to the
-(snabb-devel)[https://groups.google.com/forum/#!forum/snabb-devel]
+[snabb-devel](https://groups.google.com/forum/#!forum/snabb-devel)
 group.  Or, if you like, you can contact Andy directly at
 `wingo@igalia.com`.  If you have a problem that pflua can help solve,
 let us know!
