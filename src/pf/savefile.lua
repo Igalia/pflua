@@ -34,6 +34,32 @@ function size(fd)
    return size
 end
 
+function open_and_mmap(filename)
+   local fd = open(filename, O_RDONLY)
+   if fd == -1 then
+      error("Error opening " .. filename)
+   end
+
+   local sz = size(fd)
+   local ptr = mmap(fd, sz)
+   ffi.C.close(fd)
+
+   if ptr == ffi.cast("void *", -1) then
+      error("Error mmapping " .. filename)
+   end
+
+   ptr = ffi.cast("unsigned char *", ptr)
+   local ptr_end = ptr + sz
+   local header = ffi.cast("struct pcap_file *", ptr)
+   if header.magic_number == 0xD4C3B2A1 then
+      error("Endian mismatch in " .. filename)
+   elseif header.magic_number ~= 0xA1B2C3D4 then
+      error("Bad PCAP magic number in " .. filename)
+   end
+
+   return header, ptr + ffi.sizeof("struct pcap_file"), ptr_end
+end
+
 function records_mm(filename)
    local fd = open(filename, O_RDONLY)
    if fd == -1 then
