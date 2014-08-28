@@ -12,8 +12,10 @@ struct timeval {
 int gettimeofday(struct timeval *tv, struct timezone *tz);
 ]]
 
+-- now() returns the current time.  The first time it is called, the
+-- return value will be zero.  This is to preserve precision, regardless
+-- of what the current epoch is.
 local zero_sec, zero_usec
-
 function now()
    local tv = ffi.new("struct timeval")
    assert(ffi.C.gettimeofday(tv, nil) == 0)
@@ -99,5 +101,7 @@ function selftest ()
    assert_equals(tab, dup(tab))
    assert_equals({ 1, 2, 3, 1, 2, 3 }, concat(tab, tab))
    assert_equals(set(3, 2, 1), set(1, 2, 3))
+   if not zero_sec then assert_equals(now(), 0) end
+   assert(now() > 0)
    print("OK")
 end
