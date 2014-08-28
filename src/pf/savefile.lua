@@ -109,9 +109,6 @@ function write_file_header(file)
    file:flush()
 end
 
-local pcap_extra = ffi.new("struct pcap_record_extra")
-ffi.fill(pcap_extra, ffi.sizeof(pcap_extra), 0)
-
 function write_record (file, ffi_buffer, length)
    write_record_header(file, length)
    file:write(ffi.string(ffi_buffer, length))

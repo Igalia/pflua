@@ -15,7 +15,7 @@ function compile_filter(filter_str, opts)
    if opts.pcap_offline_filter then
       local bytecode = libpcap.compile(filter_str, dlt)
       return function(P, len)
-         local header = types.pcap_record(0, 0, len, len)
+         local header = types.pcap_pkthdr(0, 0, len, len)
          return libpcap.offline_filter(bytecode, header, P) ~= 0
       end
    elseif opts.bpf then

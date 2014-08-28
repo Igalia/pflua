@@ -16,7 +16,7 @@ void pcap_perror(pcap_t *p, const char *suffix);
 int pcap_compile(pcap_t *p, struct bpf_program *fp, const char *str,
                  int optimize, uint32_t netmask);
 int pcap_offline_filter(const struct bpf_program *fp,
-                        const struct pcap_record *h, const uint8_t *pkt);
+                        const struct pcap_pkthdr *h, const uint8_t *pkt);
 ]]
 
 function offline_filter(bpf, hdr, pkt)
@@ -59,7 +59,7 @@ function compile(filter_str, dlt_name)
 end
 
 function selftest ()
-   print("selftest: pf")
+   print("selftest: pf.libpcap")
 
    compile("", "EN10MB")
    compile("ip", "EN10MB")

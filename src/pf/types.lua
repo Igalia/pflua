@@ -15,6 +15,7 @@ struct pcap_file {
     uint32_t network;        /* data link type */
 };
 
+/* This is the header of a packet on disk.  */
 struct pcap_record {
     /* record header */
     uint32_t ts_sec;         /* timestamp seconds */
@@ -23,11 +24,13 @@ struct pcap_record {
     uint32_t orig_len;       /* actual length of packet */
 };
 
-struct pcap_record_extra {
-   /* Extra metadata that we append to the pcap record, after the payload. */
-   uint32_t port_id; /* port the packet is captured on */
-   uint32_t flags;   /* bit 0 set means input, bit 0 clear means output */
-   uint64_t reserved0, reserved1, reserved2, reserved3;
+/* This is the header of a packet as passed to pcap_offline_filter.  */
+struct pcap_pkthdr {
+    /* record header */
+    long ts_sec;             /* timestamp seconds */
+    long ts_usec;            /* timestamp microseconds */
+    uint32_t incl_len;       /* number of octets of packet saved in file */
+    uint32_t orig_len;       /* actual length of packet */
 };
 ]]
 
@@ -50,6 +53,7 @@ local bpf_program_mt = {
 bpf_insn = ffi.typeof("struct bpf_insn")
 bpf_program = ffi.metatype("struct bpf_program", bpf_program_mt)
 pcap_record = ffi.typeof("struct pcap_record")
+pcap_pkthdr = ffi.typeof("struct pcap_pkthdr")
 
 function selftest ()
    print("selftest: ffi_types")

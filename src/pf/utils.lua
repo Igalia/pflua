@@ -4,7 +4,7 @@ local ffi = require("ffi")
 
 ffi.cdef[[
 typedef long time_t;
-typedef uint32_t suseconds_t;
+typedef long suseconds_t;
 struct timeval {
   time_t      tv_sec;     /* seconds */
   suseconds_t tv_usec;    /* microseconds */
@@ -21,7 +21,9 @@ function now()
       zero_sec = tv.tv_sec
       zero_usec = tv.tv_usec
    end
-   return tonumber(tv.tv_sec - zero_sec) + (tv.tv_usec - zero_usec) * 1e-6
+   local secs = tonumber(tv.tv_sec - zero_sec)
+   secs = secs + tonumber(tv.tv_usec - zero_usec) * 1e-6
+   return secs
 end
 
 function set(...)
