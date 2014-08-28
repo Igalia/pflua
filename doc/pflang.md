@@ -25,10 +25,15 @@ pcap-filter man page installed.  Try `man pcap-filter`.
 Quoth the documentation:
 
 > If an identifier is given without a keyword, the most recent keyword is assumed. For example,
+>
 > > not host vs and ace
+>
 > is short for
+>
 > > not host vs and host ace
+>
 > which should not be confused with
+>
 > > not ( host vs or ace )
 
 This is bizarre and ambiguous; what if you have a host whose name is a
@@ -67,7 +72,7 @@ Under the documentation for `ip proto _proto_`, the documentation says:
 > protocol. Protocol can be a number or one of the names icmp, icmp6,
 > igmp, igrp, pim, ah, esp, vrrp, udp, or tcp. Note that the identifiers
 > tcp, udp, and icmp are also keywords and must be escaped via backslash
-> (\), which is \\ in the C-shell.
+> (\\), which is \\\\ in the C-shell.
 
 This note does not make sense.  The context is unambiguous; `ip proto`
 _needs_ something to follow it, and can interpret the next token as it
