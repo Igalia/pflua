@@ -1,3 +1,5 @@
+#!/usr/bin/env luajit
+
 package.path = package.path .. ";../src/?.lua"
 
 local ffi = require("ffi")
