@@ -18,10 +18,12 @@ check_luajit:
 	fi
 
 check:
-	(cd src && $(MAKE) check)
+	$(MAKE) -C src check
+	$(MAKE) -C tools check
 
 clean:
-	(cd deps/luajit && $(MAKE) clean)
-	(cd src; $(MAKE) clean)
+	$(MAKE) -C deps/luajit clean
+	$(MAKE) -C src clean
+	$(MAKE) -C tools clean
 
 .SERIAL: all
