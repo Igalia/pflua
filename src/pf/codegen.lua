@@ -104,6 +104,10 @@ local function compile_value(builder, expr)
       return builder.v('bit.rshift(bit.bswap('..lhs..'), 16)')
    elseif op == 'ntohl' then
       return builder.v('bit.bswap('..lhs..')')
+   elseif op == 'int32' then
+      return builder.v('bit.tobit('..lhs..')')
+   elseif op == 'uint32' then
+      return builder.v(lhs..' % '..2^32)
    end
    local rhs = compile_value(builder, expr[3])
    if op == '[]' then
@@ -112,7 +116,6 @@ local function compile_value(builder, expr)
    elseif op == '-' then return builder.v(lhs..'-'..rhs)
    elseif op == '*' then return builder.v(lhs..'*'..rhs)
    elseif op == '/' then return builder.v('math.floor('..lhs..'/'..rhs..')')
-   elseif op == '%' then return builder.v(lhs..'%'..rhs)
    elseif op == '&' then return builder.v('bit.band('..lhs..','..rhs..')')
    elseif op == '^' then return builder.v('bit.bxor('..lhs..','..rhs..')')
    elseif op == '|' then return builder.v('bit.bor('..lhs..','..rhs..')')

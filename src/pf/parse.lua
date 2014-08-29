@@ -19,7 +19,7 @@ end
 
 local punctuation = set(
    '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
-   '+', '-', '*', '/', '%', '&', '|', '^', '&&', '||', '<<', '>>'
+   '+', '-', '*', '/', '&', '|', '^', '&&', '||', '<<', '>>'
 )
 
 local function lex_host_or_keyword(str, pos)
@@ -663,7 +663,7 @@ local function parse_primary_arithmetic(lexer, tok)
 end
 
 local arithmetic_precedence = {
-   ['*'] = 1, ['/'] = 1, ['%'] = 1,
+   ['*'] = 1, ['/'] = 1,
    ['+'] = 2, ['-'] = 2,
    ['<<'] = 3, ['>>'] = 3,
    ['&'] = 4,

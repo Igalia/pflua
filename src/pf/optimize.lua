@@ -12,20 +12,22 @@ local set, concat, dup, pp = utils.set, utils.concat, utils.dup, utils.pp
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
 local binops = set(
-   '+', '-', '*', '/', '%', '&', '|', '^', '<<', '>>'
+   '+', '-', '*', '/', '&', '|', '^', '<<', '>>'
 )
 local associative_binops = set(
    '+', '*', '&', '|', '^'
 )
 local bitops = set('&', '|', '^')
-local unops = set('ntohs', 'ntohl')
+local unops = set('ntohs', 'ntohl', 'uint32', 'int32')
+local bswap_ops = set('ntohs', 'ntohl')
+local int32ops = set('&', '|', '^', 'ntohs', 'ntohl', '<<', '>>', 'int32')
+local uint32ops = set('uint32', '[]')
 
 local folders = {
    ['+'] = function(a, b) return a + b end,
    ['-'] = function(a, b) return a - b end,
    ['*'] = function(a, b) return a * b end,
    ['/'] = function(a, b) return math.floor(a / b) end,
-   ['%'] = function(a, b) return a % b end,
    ['&'] = function(a, b) return bit.band(a, b) end,
    ['^'] = function(a, b) return bit.bxor(a, b) end,
    ['|'] = function(a, b) return bit.bor(a, b) end,
@@ -33,6 +35,8 @@ local folders = {
    ['>>'] = function(a, b) return bit.rshift(a, b) end,
    ['ntohs'] = function(a) return bit.rshift(bit.bswap(a), 16) end,
    ['ntohl'] = function(a) return bit.bswap(a) end,
+   ['uint32'] = function(a) return a % 2^32 end,
+   ['int32'] = function(a) return bit.tobit(a) end,
    ['='] = function(a, b) return a == b end,
    ['!='] = function(a, b) return a ~= b end,
    ['<'] = function(a, b) return a < b end,
@@ -67,20 +71,48 @@ end)
 
 local simple = set('true', 'false', 'fail')
 
-function try_invert(expr, relop)
+local commute = {
+   ['<']='>', ['<=']='>=', ['=']='=', ['!=']='!=', ['>=']='<=', ['>']='<'
+}
+
+function try_invert(relop, expr, C)
+   assert(type(C) == 'number' and type(expr) ~= 'number')
    local op = expr[1]
-   if unops[op] and (relop == '=' or relop == '!=') then
-      return assert(folders[op]), expr[2]
-   elseif bitops[op] and (relop == '=' or relop == '!=') then
+   local is_eq = relop == '=' or relop == '!='
+   if bswap_ops[op] and is_eq then
+      local rhs = expr[2]
+      if int32ops[rhs[1]] then
+         -- htonl(INT32) = C => INT32 = htonl(C)
+         return relop, rhs, assert(folders[op])(C)
+      elseif uint32ops[rhs[1]] then
+         -- htonl(UINT32) = C => UINT32 = uint32(htonl(C))
+         return relop, rhs, assert(folders[op])(C) % 2^32
+      end
+   elseif op == 'uint32' and is_eq then
+      local rhs = expr[2]
+      if int32ops[rhs[1]] then
+         -- uint32(INT32) = C => INT32 = int32(C)
+         return relop, rhs, bit.tobit(C)
+      end
+   elseif op == 'int32' and is_eq then
+      local rhs = expr[2]
+      if uint32ops[rhs[1]] then
+         -- int32(UINT32) = C => UINT32 = uint32(C)
+         return relop, rhs, C ^ 2^32
+      end
+   elseif bitops[op] and is_eq then
       local lhs, rhs = expr[2], expr[3]
-      if type(lhs) == 'number' and unops[rhs[1]] then
-         local fold =  assert(folders[rhs[1]])
-         return fold, { op, fold(lhs), rhs[2] }
-      elseif type(rhs) == 'number' and unops[lhs[1]] then
-         local fold =  assert(folders[lhs[1]])
-         return fold, { op, lhs[2], fold(rhs) }
+      if type(lhs) == 'number' and bswap_ops[rhs[1]] then
+         -- bitop(C, SWAP(X)) = C => bitop(SWAP(C), X) = SWAP(C)
+         local swap = assert(folders[rhs[1]])
+         return relop, { op, swap(lhs), rhs[2] }, swap(C)
+      elseif type(rhs) == 'number' and bswap_ops[lhs[1]] then
+         -- bitop(SWAP(X), C) = C => bitop(X, SWAP(C)) = SWAP(C)
+         local swap = assert(folders[lhs[1]])
+         return relop, { op, lhs[2], swap(rhs) }, swap(C)
       end
    end
+   return relop, expr, C
 end
 
 local simplify_if
@@ -109,6 +141,8 @@ local function simplify(expr)
    elseif unops[op] then
       local rhs = simplify(expr[2])
       if type(rhs) == 'number' then return assert(folders[op])(rhs) end
+      if op == 'int32' and int32ops[rhs[1]] then return rhs end
+      if op == 'uint32' and uint32ops[rhs[1]] then return rhs end
       return { op, rhs }
    elseif relops[op] then
       local lhs = simplify(expr[2])
@@ -117,11 +151,9 @@ local function simplify(expr)
          if type(rhs) == 'number' then
             return { assert(folders[op])(lhs, rhs) and 'true' or 'false' }
          end
-         invert_lhs, inverted_rhs = try_invert(rhs, op)
-         if invert_lhs then lhs, rhs = invert_lhs(lhs), inverted_rhs end
+         op, lhs, rhs = try_invert(assert(commute[op]), rhs, lhs)
       elseif type(rhs) == 'number' then
-         invert_rhs, inverted_lhs = try_invert(lhs, op)
-         if invert_rhs then lhs, rhs = inverted_lhs, invert_rhs(rhs) end
+         op, lhs, rhs = try_invert(op, lhs, rhs)
       end
       return { op, lhs, rhs }
    elseif op == 'not' then
@@ -410,6 +442,8 @@ local function infer_ranges(expr)
    local function unop_range(op, rhs)
       if op == 'ntohs' then return Range(0, 0xffff) end
       if op == 'ntohl' then return Range(-2^31, 2^31-1) end
+      if op == 'uint32' then return Range(0, 2^32) end
+      if op == 'int32' then return Range(-2^31, 2^31-1) end
       error('unexpected op '..op)
    end
    local function binop_range(op, lhs, rhs)
@@ -512,8 +546,18 @@ local function infer_ranges(expr)
             return define(db, ret, range)
          elseif unops[op] then
             local rhs = visit(expr[2], db)
-            if type(rhs) == 'number' then return assert(folders[op])(rhs) end
-            local range = unop_range(op, lookup(db, rhs))
+            local rhs_range = lookup(db, rhs)
+            if rhs_range:fold() then
+               return assert(folders[op])(rhs_range:fold())
+            end
+            if (op == 'uint32' and 0 <= rhs_range:min()
+                and rhs_range:max() <= 2^32) then
+               return rhs
+            elseif (op == 'int32' and -2^31 <= rhs_range:min()
+                and rhs_range:max() <= 2^31-1) then
+               return rhs
+            end
+            local range = unop_range(op, rhs_range)
             return restrict(db, { op, rhs }, range)
          elseif binops[op] then
             local lhs, rhs = visit(expr[2], db), visit(expr[3], db)
@@ -521,16 +565,6 @@ local function infer_ranges(expr)
                return assert(folders[op])(lhs, rhs)
             end
             local lhs_range, rhs_range = lookup(db, lhs), lookup(db, rhs)
-            -- As a special case, remove % if it is unneeded.
-            if op == '%' then
-               local rhs_val = rhs_range:fold()
-               if rhs_val and rhs_val > 0 then
-                  if lhs_range:min() >= 0 and lhs_range:max() < rhs_val then
-                     return lhs
-                  end
-                  -- could do strength reduction here if rhs is power of 2
-               end
-            end
             local range = binop_range(op, lhs_range, rhs_range)
             return restrict(db, { op, lhs, rhs }, range)
          else
@@ -551,9 +585,9 @@ local function lhoist(expr, db)
    end
    local function annotate(expr, kt, kf)
       local op = expr[1]
-      if (op == '<=' and kf == 'REJECT'
-          and type(expr[2]) == 'number' and expr[3] == 'len') then
-         return { expr[2], expr }
+      if (op == '>=' and kf == 'REJECT'
+          and expr[2] == 'len' and type(expr[3]) == 'number') then
+         return { expr[3], expr }
       elseif op == 'if' then
          local test, t, f = expr[2], expr[3], expr[4]
          local test_a = annotate(test, eta(t, kt, kf), eta(f, kt, kf))
@@ -570,7 +604,7 @@ local function lhoist(expr, db)
 
    local function reduce(aexpr, min)
       if min < aexpr[1] then
-         return { 'if', { '<=', aexpr[1], 'len' },
+         return { 'if', { '>=', 'len', aexpr[1] },
                   reduce(aexpr, aexpr[1]),
                   { 'fail' } }
       end
@@ -579,8 +613,8 @@ local function lhoist(expr, db)
       if op == 'if' then
          local t, kt, kf =
             reduce(expr[2], min), reduce(expr[3], min), reduce(expr[4], min)
-         if t[1] == '<=' and type(t[2]) == 'number' and t[3] == 'len' then
-            if t[2] <= min then return kt else return kf end
+         if t[1] == '>=' and t[2] == 'len' and type(t[3]) == 'number' then
+            if t[3] <= min then return kt else return kf end
          end
          return { op, t, kt, kf }
       else
@@ -620,9 +654,9 @@ function selftest ()
    local equals, assert_equals = utils.equals, utils.assert_equals
    assert_equals({ 'false' },
       opt("1 = 2"))
-   assert_equals({ '=', 1, "len" },
+   assert_equals({ '=', "len", 1 },
       opt("1 = len"))
-   assert_equals({ 'if', { '<=', 1, 'len'},
+   assert_equals({ 'if', { '>=', 'len', 1},
                    { '=', { '[]', 0, 1 }, 2 },
                    { 'fail' }},
       opt("ether[0] = 2"))

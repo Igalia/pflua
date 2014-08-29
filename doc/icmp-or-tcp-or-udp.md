@@ -58,12 +58,12 @@ end
 
 ```
 return function(P,length)
-   if not (21 <= length) then return false end
+   if not (length >= 21) then return false end
    do
       local v1 = ffi.cast("uint16_t*", P+12)[0]
       if not (v1 == 8) then goto L3 end
       do
-         if not (24 <= length) then return false end
+         if not (length >= 24) then return false end
          do
             local v2 = P[23]
             if v2 == 1 then return true end
@@ -82,23 +82,12 @@ return function(P,length)
             local v3 = P[20]
             if v3 == 6 then return true end
             do
-               if not (v3 == 44) then goto L9 end
+               if not (length >= 55) then return false end
                do
-                  if not (55 <= length) then return false end
+                  if not (v3 == 44) then return false end
                   do
                      local v4 = P[54]
-                     if v4 == 6 then return true end
-                  end
-               end
-::L9::
-               do
-                  if not (55 <= length) then return false end
-                  do
-                     if not (v3 == 44) then return false end
-                     do
-                        local v5 = P[54]
-                        do return v5 == 6 end
-                     end
+                     do return v4 == 6 end
                   end
                end
             end
