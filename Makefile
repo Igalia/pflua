@@ -3,6 +3,7 @@ LUAJIT_O := deps/luajit/src/libluajit.a
 LUAJIT_CFLAGS := -DLUAJIT_USE_PERFTOOLS -DLUAJIT_USE_GDBJIT
 
 all: $(LUAJIT_O)
+	$(MAKE) -C doc
 
 $(LUAJIT_O): check_luajit deps/luajit/Makefile
 	echo 'Building LuaJIT\n'

@@ -1,6 +1,10 @@
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-EXAMPLES = tcp-port-80.md icmp-or-tcp-or-udp.md portrange-0-6000.md
+EXAMPLES = \
+	tcp-port-80.md \
+	icmp-or-tcp-or-udp.md \
+	portrange-0-6000.md \
+	host-127.0.0.1.md
 
 all: $(EXAMPLES)
 
@@ -15,3 +19,6 @@ icmp-or-tcp-or-udp.md:
 
 portrange-0-6000.md:
 	../tools/dump-markdown "portrange 0-6000" > $@.tmp && mv $@.tmp $@
+
+host-127.0.0.1.md:
+	../tools/dump-markdown "host 127.0.0.1" > $@.tmp && mv $@.tmp $@

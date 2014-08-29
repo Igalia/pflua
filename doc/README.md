@@ -14,3 +14,11 @@ https://github.com/Igalia/pflua/blob/master/doc/tcp-port-80.md
 
 https://github.com/Igalia/pflua/blob/master/doc/icmp-or-tcp-or-udp.md
 
+### portrange 0-6000
+
+https://github.com/Igalia/pflua/blob/master/doc/portrange-0-6000.md
+
+### host 127.0.0.1
+
+https://github.com/Igalia/pflua/blob/master/doc/host-127.0.0.1.md
+
