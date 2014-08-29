@@ -1,5 +1,9 @@
 module(...,package.seeall)
 
+local utils = require('pf.utils')
+
+local ipv4_to_int = utils.ipv4_to_int
+
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
       pos = pos + 1
@@ -72,15 +76,20 @@ local function lex_ipv6(str, pos)
 end
 
 local function lex_ehost(str, pos)
+   local function normalize(digits)
+      local result = tonumber(digits, 16)
+      if (result < 16) then result = result * 2^4 end
+      return result
+   end
    local addr = { 'ehost' }
-   local digits, dot = str:match("^(%x%x)()%:", pos)
+   local digits, dot = str:match("^(%x%x?)()%:", pos)
    assert(digits, "failed to parse ethernet host address at "..pos)
-   table.insert(addr, tonumber(digits, 16))
+   table.insert(addr, normalize(digits))
    pos = dot
    for i=1,5 do
-      local digits, dot = str:match("^%:(%x%x)()", pos)
+      local digits, dot = str:match("^%:(%x%x?)()", pos)
       assert(digits, "failed to parse ethernet host address at "..pos)
-      table.insert(addr, tonumber(digits, 16))
+      table.insert(addr, normalize(digits))
       pos = dot
    end
    local terminators = " \t\r\n)/"
@@ -95,7 +104,7 @@ local function lex_addr(str, pos)
       return lex_ipv4_or_host(str, pos)
    elseif str:match("^%x%x%x%x%:", pos) then
       return lex_ipv6(str, pos)
-   elseif str:match("^%x%x%:", pos) then
+   elseif str:match("^%x%x?%:", pos) then
       return lex_ehost(str, pos)
    else
       return lex_host_or_keyword(str, pos)
@@ -170,6 +179,11 @@ local function lex(str, pos, opts, in_brackets)
       else
          return lex_decimal_or_addr(str, pos, in_brackets)
       end
+   end
+
+   -- MAC address
+   if not in_brackets and str:match('%x%x?:%x%x?:%x%x?:%x%x?:%x%x?:%x%x?', pos) then
+      return lex_addr(str, pos)
    end
 
    -- IPV6 net address beginning with [a-fA-F].
@@ -276,14 +290,29 @@ end
 function parse_uint16_arg(lexer) return parse_int_arg(lexer, 0xffff) end
 
 function parse_net_arg(lexer)
+
+   function check_non_network_bits_in_addr(addr, mask, mask_str)
+      local ipv4 =  ipv4_to_int(addr)
+      if (bit.band(ipv4, mask) ~= ipv4) then
+         lexer.error("Non-network bits set in %d.%d.%d.%d/%s",
+                       addr[2], addr[3], addr[4], addr[5], mask_str)
+      end
+   end
+
    local arg = lexer.next()
    if arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       if lexer.check('/') then
          local len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
+         if (arg[1] == 'ipv4') then
+            check_non_network_bits_in_addr(arg, 2^len - 1, tostring(len))
+         end
          return { arg[1]..'/len', arg, len }
       elseif lexer.check('mask') then
-         lexer.next()
          local mask = lexer.next()
+         if (arg[1] == 'ipv4') then
+            check_non_network_bits_in_addr(arg, ipv4_to_int(mask),
+               table.concat(mask, '.', 2))
+         end
          assert(mask[1] == arg[1], 'bad mask', mask)
          return { arg[1]..'/mask', arg, mask }
       else
@@ -460,9 +489,13 @@ local src_or_dst_types = {
    portrange = unary(parse_portrange_arg)
 }
 
+local ether_host_type = {
+   host = unary(parse_ehost_arg)
+}
+
 local ether_types = {
-   dst = unary(parse_ehost_arg),
-   src = unary(parse_ehost_arg),
+   dst = table_parser(ether_host_type, unary(parse_ehost_arg)),
+   src = table_parser(ether_host_type, unary(parse_ehost_arg)),
    host = unary(parse_ehost_arg),
    broadcast = nullary(),
    multicast = nullary(),
@@ -470,6 +503,9 @@ local ether_types = {
 }
 
 local ip_types = {
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   host = unary(parse_host_arg),
    proto = unary(parse_ip_proto_arg),
    protochain = unary(parse_proto_arg),
    broadcast = nullary(),
@@ -513,6 +549,18 @@ local tcp_or_udp_types = {
    src = table_parser(src_or_dst_types),
 }
 
+local arp_types = {
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   host = unary(parse_host_arg),
+}
+
+local rarp_types = {
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   host = unary(parse_host_arg),
+}
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
@@ -531,8 +579,8 @@ local primitives = {
    udp = table_parser(tcp_or_udp_types, nullary()),
    icmp = nullary(),
    protochain = unary(parse_proto_arg),
-   arp = nullary(),
-   rarp = nullary(),
+   arp = table_parser(arp_types, nullary()),
+   rarp = table_parser(rarp_types, nullary()),
    atalk = nullary(),
    aarp = nullary(),
    decnet = table_parser(decnet_types),
@@ -805,5 +853,9 @@ function selftest ()
                     { "-", { "-", { "[ip]", 2, 1 },
                        { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
                     { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } })
+   parse_test("ether host ff:ff:ff:33:33:33",
+             { 'ether_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
+   parse_test("ether host f:f:f:3:3:3",
+             { 'ether_host', { 'ehost', 240, 240, 240, 48, 48, 48 } })
    print("OK")
 end

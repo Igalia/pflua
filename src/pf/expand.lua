@@ -7,6 +7,8 @@ verbose = os.getenv("PF_VERBOSE");
 local expand_arith, expand_relop, expand_bool
 
 local set, concat, pp = utils.set, utils.concat, utils.pp
+local host_uint16, host_uint32 = utils.host_uint16, utils.host_uint32
+local ipv4_to_int = utils.ipv4_to_int
 
 local ether_protos = set(
    'ip', 'ip6', 'arp', 'rarp', 'atalk', 'aarp', 'decnet', 'sca', 'lat',
@@ -251,31 +253,139 @@ local function expand_udp_dst_portrange(expr)
    return expand_proto_dst_portrange(expr, 17)
 end
 
+-- IP protocol
+
+local proto_info = {
+   ip   = { id = 2048,   access = "[ip]",    src = 12, dst = 16 },
+   arp  = { id = 2054,   access = "[arp]",   src = 14, dst = 24 },
+   rarp = { id = 32821,  access = "[rarp]",  src = 14, dst = 24 },
+}
+
+local function has_proto_dir_host(proto, dir, addr, mask)
+   local host = ipv4_to_int(addr)
+   local val = { proto_info[proto].access, proto_info[proto][dir], 4 }
+   if mask then
+      mask = tonumber(mask) and 2^mask - 1 or ipv4_to_int(mask)
+      val = { '&', val, tonumber(mask) }
+   end
+   return { 'and', has_ether_protocol(proto_info[proto].id), { '=', val, host } }
+end
+
+local function expand_ip_src_host(expr)
+  return has_proto_dir_host("ip", "src", expr[2], expr[3])
+end
+local function expand_ip_dst_host(expr)
+   return has_proto_dir_host("ip", "dst", expr[2], expr[3])
+end
+local function expand_ip_host(expr)
+   return { 'or', expand_ip_src_host(expr), expand_ip_dst_host(expr) }
+end
+
+-- ARP protocol
+
+local function expand_arp_src_host(expr)
+   return has_proto_dir_host("arp", "src", expr[2], expr[3])
+end
+local function expand_arp_dst_host(expr)
+   return has_proto_dir_host("arp", "dst", expr[2], expr[3])
+end
+local function expand_arp_host(expr)
+   return { 'or', expand_arp_src_host(expr), expand_arp_dst_host(expr) }
+end
+
+-- RARP protocol
+
+local function expand_rarp_src_host(expr)
+   return has_proto_dir_host("rarp", "src", expr[2], expr[3])
+end
+local function expand_rarp_dst_host(expr)
+   return has_proto_dir_host("rarp", "dst", expr[2], expr[3])
+end
+local function expand_rarp_host(expr)
+   return { 'or', expand_rarp_src_host(expr), expand_rarp_dst_host(expr) }
+end
+
+-- Host
+
+local function expand_src_host(expr)
+   return { 'or', expand_ip_src_host(expr),
+            { 'or', expand_arp_src_host(expr), expand_rarp_src_host(expr) } }
+end
+local function expand_dst_host(expr)
+   return { 'or', expand_ip_dst_host(expr),
+            { 'or', expand_arp_dst_host(expr), expand_rarp_dst_host(expr) } }
+end
+local function expand_host(expr)
+   return { 'and', expand_src_host(expr), expand_dst_host(expr) }
+end
+
+-- Ether
+
+-- In host-byte-order (little endian)
+local function ehost_to_int(addr)
+   assert(addr[1] == 'ehost', "Not a valid ehost address")
+   return host_uint16(addr[2], addr[3]), host_uint32(addr[4], addr[5], addr[6], addr[7])
+end
+local function expand_ether_src_host(expr)
+   local hi, lo = ehost_to_int(expr[2])
+   return { 'and',
+            { '=', { '[ether]', 6, 2 }, hi },
+            { '=', { '[ether]', 8, 4 }, lo } }
+end
+local function expand_ether_dst_host(expr)
+   local hi, lo = ehost_to_int(expr[2])
+   return { 'and',
+            { '=', { '[ether]', 0, 2 }, hi },
+            { '=', { '[ether]', 2, 4 }, lo } }
+end
+local function expand_ether_host(expr)
+   return { 'or', expand_ether_src_host(expr), expand_ether_dst_host(expr) }
+end
+
+-- Net
+
+local function expand_src_net(expr)
+   return expand_src_host(expr[2])
+end
+local function expand_dst_net(expr)
+   return expand_dst_host(expr[2])
+end
+local function expand_net(expr)
+   return { 'or', expand_src_net(expr), expand_dst_net(expr) }
+end
+
 local primitive_expanders = {
-   dst_host = unimplemented,
-   dst_net = unimplemented,
+   dst_host = expand_dst_host,
+   dst_net = expand_dst_net,
    dst_port = unimplemented,
    dst_portrange = unimplemented,
-   src_host = unimplemented,
-   src_net = unimplemented,
+   src_host = expand_src_host,
+   src_net = expand_src_net,
    src_port = unimplemented,
    src_portrange = unimplemented,
-   host = unimplemented,
-   ether_src = unimplemented,
-   ether_dst = unimplemented,
-   ether_host = unimplemented,
+   host = expand_host,
+   ether_src = expand_ether_src_host,
+   ether_src_host = expand_ether_src_host,
+   ether_dst = expand_ether_dst_host,
+   ether_dst_host = expand_ether_dst_host,
+   ether_host = expand_ether_host,
    ether_broadcast = unimplemented,
    ether_multicast = unimplemented,
    ether_proto = unimplemented,
    gateway = unimplemented,
-   net = unimplemented,
+   net = expand_net,
    port = expand_port,
    portrange = expand_portrange,
    less = unimplemented,
    greater = unimplemented,
-   ip = function(expr) return has_ether_protocol(2048) end,
+   ip = function(expr) return has_ether_protocol(proto_info.ip.id) end,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
+   ip_host = expand_ip_host,
+   ip_src = expand_ip_src_host,
+   ip_src_host = expand_ip_src_host,
+   ip_dst = expand_ip_dst_host,
+   ip_dst_host = expand_ip_dst_host,
    ip_broadcast = unimplemented,
    ip_multicast = unimplemented,
    ip6 = function(expr) return has_ether_protocol(34525) end,
@@ -299,8 +409,18 @@ local primitive_expanders = {
    udp_dst_portrange = expand_udp_dst_portrange,
    icmp = function(expr) return has_ip_protocol(1) end,
    protochain = unimplemented,
-   arp = function(expr) return has_ether_protocol(2054) end,
-   rarp = function(expr) return has_ether_protocol(32821) end,
+   arp = function(expr) return has_ether_protocol(proto_info.arp.id) end,
+   arp_host = expand_arp_host,
+   arp_src = expand_arp_src_host,
+   arp_src_host = expand_arp_src_host,
+   arp_dst = expand_arp_dst_host,
+   arp_dst_host = expand_arp_dst_host,
+   rarp = function(expr) return has_ether_protocol(proto_info.rarp.id) end,
+   rarp_host = expand_rarp_host,
+   rarp_src = expand_rarp_src_host,
+   rarp_src_host = expand_rarp_src_host,
+   rarp_dst = expand_rarp_dst_host,
+   rarp_dst_host = expand_rarp_dst_host,
    atalk = unimplemented,
    aarp = unimplemented,
    decnet_src = unimplemented,
