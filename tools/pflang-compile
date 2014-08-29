@@ -41,11 +41,11 @@ end
 
 local filter = arg[#arg]
 if flags["--bpf-asm"] then
-  print(pf.compile_lua(filter, {pcap_offline_filter=true, source=true})
+   print(pf.compile_filter(filter, {pcap_offline_filter=true, source=true}))
 end
 if flags["--bpf-lua"] then
-  print(pf.compile_lua(filter, {bpf=true, source=true})
+   print(pf.compile_filter(filter, {bpf=true, source=true}))
 end
 if flags["--lua"] then
-  print(pf.compile_lua(filter, {source=true})
+   print(pf.compile_filter(filter, {source=true}))
 end
