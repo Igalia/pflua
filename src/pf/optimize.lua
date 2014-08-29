@@ -445,6 +445,11 @@ local function infer_ranges(expr)
          if ((lhs_range:fold() and rhs_range:fold())
              or lhs_range:lt(rhs_range) or lhs_range:gt(rhs_range)) then
             return fold(lhs_range:min(), rhs_range:min())
+         elseif (lhs_range:max() == rhs_range:min() and op == '<='
+                 or lhs_range:min() == rhs_range:max() and op == '>=') then
+            -- The ranges are ordered, but not strictly, and in the same
+            -- sense as the test: the condition is true.
+            return { 'true' }
          end
          -- Otherwise, the relop may restrict the ranges for both
          -- arguments along both continuations.
