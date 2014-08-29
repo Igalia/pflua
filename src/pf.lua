@@ -14,6 +14,7 @@ function compile_filter(filter_str, opts)
    local dlt = opts.dlt or "EN10MB"
    if opts.pcap_offline_filter then
       local bytecode = libpcap.compile(filter_str, dlt)
+      if opts.source then return bpf.disassemble(bytecode) end
       local header = types.pcap_pkthdr(0, 0, 0, 0)
       return function(P, len)
          header.incl_len = len
@@ -22,12 +23,14 @@ function compile_filter(filter_str, opts)
       end
    elseif opts.bpf then
       local bytecode = libpcap.compile(filter_str, dlt)
+      if opts.source then return bpf.compile_lua(bytecode) end
       local bpf_prog = bpf.compile(bytecode)
       return function(P, len) return bpf_prog(P, len) ~= 0 end
    else
       local expr = parse.parse(filter_str)
       expr = expand.expand(expr, dlt)
       expr = optimize.optimize(expr)
+      if opts.source then return codegen.compile_lua(expr) end
       return codegen.compile(expr)
    end
 end
