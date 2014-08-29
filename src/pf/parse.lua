@@ -290,22 +290,29 @@ end
 function parse_uint16_arg(lexer) return parse_int_arg(lexer, 0xffff) end
 
 function parse_net_arg(lexer)
+
+   function check_non_network_bits_in_addr(addr, mask, mask_str)
+      local ipv4 =  ipv4_to_int(addr)
+      if (bit.band(ipv4, mask) ~= ipv4) then
+         lexer.error("Non-network bits set in %d.%d.%d.%d/%s",
+                       addr[2], addr[3], addr[4], addr[5], mask_str)
+      end
+   end
+
    local arg = lexer.next()
    if arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       if lexer.check('/') then
          local len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
          if (arg[1] == 'ipv4') then
-            local mask_val = 2^len - 1
-            local ipv4_val = ipv4_to_int(arg)
-            if (bit.band(ipv4_val, mask_val) ~= ipv4_val) then
-               lexer.error("Non-network bits set in %d.%d.%d.%d/%d",
-                  arg[2], arg[3], arg[4], arg[5], len)
-            end
+            check_non_network_bits_in_addr(arg, 2^len - 1, tostring(len))
          end
          return { arg[1]..'/len', arg, len }
       elseif lexer.check('mask') then
-         lexer.next()
          local mask = lexer.next()
+         if (arg[1] == 'ipv4') then
+            check_non_network_bits_in_addr(arg, ipv4_to_int(mask),
+               table.concat(mask, '.', 2))
+         end
          assert(mask[1] == arg[1], 'bad mask', mask)
          return { arg[1]..'/mask', arg, mask }
       else

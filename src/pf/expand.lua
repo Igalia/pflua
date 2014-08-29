@@ -264,7 +264,10 @@ local proto_info = {
 local function has_proto_dir_host(proto, dir, addr, mask)
    local host = ipv4_to_int(addr)
    local val = { proto_info[proto].access, proto_info[proto][dir], 4 }
-   if mask and tonumber(mask) then val = { '&', val, mask } end
+   if mask then
+      mask = tonumber(mask) and 2^mask - 1 or ipv4_to_int(mask)
+      val = { '&', val, tonumber(mask) }
+   end
    return { 'and', has_ether_protocol(proto_info[proto].id), { '=', val, host } }
 end
 
@@ -341,23 +344,11 @@ end
 
 -- Net
 
-local function expand_dir_net(expr, expansion_func)
-   local arg = expr[2]
-   if arg[1] == 'ipv4' then
-      return expansion_func(expr)
-   end
-   if arg[1] == 'ipv4/len' then
-      local mask_length = arg[3]
-      return expansion_func(arg, 2^mask_length - 1)
-   end
-   error("Invalid address type")
-end
-
 local function expand_src_net(expr)
-   return expand_dir_net(expr, expand_src_host)
+   return expand_src_host(expr[2])
 end
 local function expand_dst_net(expr)
-   return expand_dir_net(expr, expand_dst_host)
+   return expand_dst_host(expr[2])
 end
 local function expand_net(expr)
    return { 'or', expand_src_net(expr), expand_dst_net(expr) }
