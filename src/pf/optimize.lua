@@ -277,7 +277,6 @@ local function Range(min, max)
    end
    function ret:lt(other) return self:max() < other:min() end
    function ret:gt(other) return self:min() > other:max() end
-   function ret:crosses(val) return self:min() < val and self:max() > val end
    function ret:union(other)
       return Range(math.min(self:min(), other:min()),
                    math.max(self:max(), other:max()))
@@ -285,6 +284,13 @@ local function Range(min, max)
    function ret:restrict(other)
       return Range(math.max(self:min(), other:min()),
                    math.min(self:max(), other:max()))
+   end
+   function ret:tobit()
+      if (self:max() - self:min() < 2^32
+          and bit.tobit(self:min()) <= bit.tobit(self:max())) then
+         return Range(bit.tobit(self:min()), bit.tobit(self:max()))
+      end
+      return Range(-2^31, 2^31-1)
    end
    function ret.binary(lhs, rhs, op) -- for monotonic functions
       local fold = assert(folders[op])
@@ -298,21 +304,18 @@ local function Range(min, max)
    function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
    function ret.div(lhs, rhs)
-      if not rhs:crosses(0) then return lhs:binary(rhs, '/') end
+      if rhs:min() > 0 or rhs:max() < 0 then return lhs:binary(rhs, '/') end
       -- 0 is prohibited by assertions.
       local low, high = Range(rhs:min(), -1), Range(1, rhs:max())
       return lhs:binary(low, '/'):union(lhs:binary(high, '/'))
    end
-   function ret.mod(lhs, rhs)
-      if rhs:min() > 0 then return lhs:restrict(Range(0, rhs:max() - 1)) end
-      if rhs:max() < 0 then return lhs:restrict(Range(rhs:min() + 1, 0)) end
-      return lhs:restrict(Range(rhs:min() + 1, rhs:max() - 1))
-   end
    function ret.band(lhs, rhs)
+      lhs, rhs = lhs:tobit(), rhs:tobit()
       if lhs:min() < 0 and rhs:min() < 0 then return Range(-2^31, 2^31-1) end
-      return Range(0, math.min(lhs:max(), rhs:max()))
+      return Range(0, math.max(math.min(lhs:max(), rhs:max()), 0))
    end
    function ret.bor(lhs, rhs)
+      lhs, rhs = lhs:tobit(), rhs:tobit()
       local function saturate(x)
          local y = 1
          while y < x do y = y * 2 end
@@ -324,6 +327,7 @@ local function Range(min, max)
    end
    function ret.bxor(lhs, rhs) return lhs:bor(rhs) end
    function ret.lshift(lhs, rhs)
+      lhs, rhs = lhs:tobit(), rhs:tobit()
       local function npot(x) -- next power of two
          if x >= 2^31 then return 32 end
          local n, i = 1, 1
@@ -346,9 +350,10 @@ local function Range(min, max)
       return Range(-2^31, 2^31-1)
    end
    function ret.rshift(lhs, rhs)
+      lhs, rhs = lhs:tobit(), rhs:tobit()
       local min_lhs, max_lhs = lhs:min(), lhs:max()
       -- Same comments wrt modulo of shift.
-         local min_shift, max_shift = 0, 31
+      local min_shift, max_shift = 0, 31
       if rhs:min() >= 0 and rhs:max() < 32 then
          min_shift, max_shift = rhs:min(), rhs:max()
       end
@@ -380,9 +385,7 @@ local function infer_ranges(expr)
    local function car(pair) return pair[1] end
    local function cdr(pair) return pair[2] end
    local function cadr(pair) return car(cdr(pair)) end
-   local function push(db)
-      return cons({}, db)
-   end
+   local function push(db) return cons({}, db) end
    local function lookup(db, expr)
       if type(expr) == 'number' then return Range(expr, expr) end
       local key = cfkey(expr)
@@ -394,8 +397,9 @@ local function infer_ranges(expr)
       return Range(-Inf, Inf)
    end
    local function define(db, expr, range)
-      if range:fold() then return range:min() end
+      if type(expr) == 'number' then return expr end
       car(db)[cfkey(expr)] = range
+      if range:fold() then return range:min() end
       return expr
    end
    local function restrict(db, expr, range)
@@ -407,7 +411,7 @@ local function infer_ranges(expr)
    local function union(db, h1, h2)
       for key, range1 in pairs(h1) do
          local range2 = h2[key]
-         if h2[key] then car(db)[key] = range1:union(range2) end
+         if range2 then car(db)[key] = range1:union(range2) end
       end
    end
 
@@ -427,7 +431,7 @@ local function infer_ranges(expr)
          return Range(a:min(), math.min(a:max(), b:max()))
       end
       local function eq(a, b)
-         return Range(math.max(a:min()), math.min(a:max(), b:max()))
+         return Range(math.max(a:min(), b:min()), math.min(a:max(), b:max()))
       end
       local function ge(a, b)
          return Range(math.max(a:min(), b:min()), a:max())
@@ -456,7 +460,7 @@ local function infer_ranges(expr)
       if op == 'ntohs' then return Range(0, 0xffff) end
       if op == 'ntohl' then return Range(-2^31, 2^31-1) end
       if op == 'uint32' then return Range(0, 2^32) end
-      if op == 'int32' then return Range(-2^31, 2^31-1) end
+      if op == 'int32' then return rhs:tobit() end
       error('unexpected op '..op)
    end
    local function binop_range(op, lhs, rhs)
@@ -464,7 +468,6 @@ local function infer_ranges(expr)
       if op == '-' then return lhs:sub(rhs) end
       if op == '*' then return lhs:mul(rhs) end
       if op == '/' then return lhs:div(rhs) end
-      if op == '%' then return lhs:mod(rhs) end
       if op == '&' then return lhs:band(rhs) end
       if op == '|' then return lhs:bor(rhs) end
       if op == '^' then return lhs:bxor(rhs) end
@@ -523,14 +526,14 @@ local function infer_ranges(expr)
          t = visit(t, kt_db_t, kt_db_f, kt, kf)
          f = visit(f, kf_db_t, kf_db_f, kt, kf)
 
-         if test_kt == 'fail' then
+         if test_kt == 'REJECT' then
             local head_t, head_f = car(kf_db_t), car(kf_db_f)
             local assertions = cadr(kf_db_t)
             merge(db_t, assertions)
             merge(db_t, head_t)
             merge(db_f, assertions)
             merge(db_f, head_f)
-         elseif test_kf == 'fail' then
+         elseif test_kf == 'REJECT' then
             local head_t, head_f = car(kt_db_t), car(kt_db_f)
             local assertions = cadr(kt_db_t)
             merge(db_t, assertions)
@@ -540,6 +543,7 @@ local function infer_ranges(expr)
          else
             local head_t_t, head_t_f = car(kt_db_t), car(kt_db_f)
             local head_f_t, head_f_f = car(kf_db_t), car(kf_db_f)
+            -- union the assertions?
             union(db_t, head_t_t, head_f_t)
             union(db_f, head_t_f, head_f_f)
          end
