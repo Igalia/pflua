@@ -66,12 +66,9 @@ return function(P,length)
          local v2 = P[23]
          if v2 == 1 then return true end
          do
-            if not (length >= 54) then return false end
+            if v2 == 6 then return true end
             do
-               if v2 == 6 then return true end
-               do
-                  do return v2 == 17 end
-               end
+               do return v2 == 17 end
             end
          end
       end
@@ -86,28 +83,31 @@ return function(P,length)
                do
                   if not (length >= 55) then return false end
                   do
-                     if not (v3 == 44) then goto L9 end
+                     if not (v3 == 44) then goto L8 end
                      do
                         local v4 = P[54]
                         if v4 == 1 then return true end
                      end
                   end
                end
-::L9::
+::L8::
                do
-                  if not (length >= 74) then return false end
+                  if v3 == 6 then return true end
                   do
-                     if v3 == 6 then return true end
+                     if not (length >= 55) then return false end
                      do
-                        if not (v3 == 44) then goto L14 end
+                        if not (v3 == 44) then goto L12 end
                         do
                            local v5 = P[54]
                            if v5 == 6 then return true end
                         end
                      end
-::L14::
+                  end
+::L12::
+                  do
+                     if v3 == 17 then return true end
                      do
-                        if v3 == 17 then return true end
+                        if not (length >= 55) then return false end
                         do
                            if not (v3 == 44) then return false end
                            do
