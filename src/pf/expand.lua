@@ -316,7 +316,8 @@ local function expand_dst_host(expr)
             { 'or', expand_arp_dst_host(expr), expand_rarp_dst_host(expr) } }
 end
 local function expand_host(expr)
-   return { 'or', expand_src_host(expr), expand_dst_host(expr) }
+   return { 'or', expand_ip_host(expr),
+            { 'or', expand_arp_host(expr), expand_rarp_host(expr) } }
 end
 
 -- Ether
