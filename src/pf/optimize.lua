@@ -583,32 +583,52 @@ local function lhoist(expr, db)
       if expr[1] == 'fail' then return 'REJECT' end
       return nil
    end
+
+   -- Recursively annotate the logical expressions in EXPR, returning
+   -- tables of the form { MIN_T, MIN_F, EXPR }.  MIN_T indicates that
+   -- for this expression to be true, the packet must be at least as
+   -- long as MIN_T.  Similarly for MIN_F.
    local function annotate(expr, kt, kf)
+      local function aexpr(min_t, min_f, expr) return { min_t, min_f, expr } end
+      local function branch_mins(abranch, min)
+         local branch_min_t, branch_min_f = abranch[1], abranch[1]
+         return math.max(branch_min_t, min), math.max(branch_min_f, min)
+      end
       local op = expr[1]
-      if (op == '>=' and kf == 'REJECT'
-          and expr[2] == 'len' and type(expr[3]) == 'number') then
-         return { expr[3], expr }
+      if (op == '>=' and expr[2] == 'len' and type(expr[3]) == 'number') then
+         return aexpr(expr[3], 0, expr)
       elseif op == 'if' then
          local test, t, f = expr[2], expr[3], expr[4]
          local test_a = annotate(test, eta(t, kt, kf), eta(f, kt, kf))
-         local t_a, f_a =  annotate(t, kt, kf), annotate(f, kt, kf)
-         local rhs_min
-         if eta(t, kt, kf) == 'REJECT' then rhs_min = f_a[1]
-         elseif eta(f, kt, kf) == 'REJECT' then rhs_min = t_a[1]
-         else rhs_min = math.min(t_a[1], f_a[1]) end
-         return { math.max(test_a[1], rhs_min), { op, test_a, t_a, f_a } }
+         local t_a, f_a = annotate(t, kt, kf), annotate(f, kt, kf)
+         local test_min_t, test_min_f = test_a[1], test_a[2]
+         local t_min_t, t_min_f = branch_mins(t_a, test_min_t)
+         local f_min_t, f_min_f = branch_mins(f_a, test_min_f)
+         local function if_mins()
+            if eta(t, kt, kf) == 'REJECT' then return f_min_t, f_min_f end
+            if eta(f, kt, kf) == 'REJECT' then return t_min_t, t_min_f end
+            if t[1] == 'true' then t_min_f = f_min_f end
+            if f[1] == 'true' then f_min_f = t_min_f end
+            if t[1] == 'false' then t_min_t = f_min_t end
+            if f[1] == 'false' then f_min_t = t_min_t end
+            return math.min(t_min_t, f_min_t), math.min(f_min_t, f_min_t)
+         end
+         local min_t, min_f = if_mins()
+         return aexpr(min_t, min_f, { op, test_a, t_a, f_a })
       else
-         return { 0, expr }
+         return aexpr(0, 0, expr)
       end
    end
 
+   -- Strip the annotated expression AEXPR.  Whenever the packet needs
+   -- be longer than the MIN argument, insert a length check and revisit
+   -- with the new MIN.  Elide other length checks.
    local function reduce(aexpr, min)
-      if min < aexpr[1] then
-         return { 'if', { '>=', 'len', aexpr[1] },
-                  reduce(aexpr, aexpr[1]),
-                  { 'fail' } }
+      local min_t, min_f, expr = aexpr[1], aexpr[2], aexpr[3]
+      if min < min_t and min < min_f then
+         min = math.min(min_t, min_f)
+         return { 'if', { '>=', 'len', min }, reduce(aexpr, min), { 'fail' } }
       end
-      local expr = aexpr[2]
       local op = expr[1]
       if op == 'if' then
          local t, kt, kf =
