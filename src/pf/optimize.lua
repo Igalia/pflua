@@ -20,8 +20,12 @@ local associative_binops = set(
 local bitops = set('&', '|', '^')
 local unops = set('ntohs', 'ntohl', 'uint32', 'int32')
 local bswap_ops = set('ntohs', 'ntohl')
+-- ops that produce results of known types
 local int32ops = set('&', '|', '^', 'ntohs', 'ntohl', '<<', '>>', 'int32')
 local uint32ops = set('uint32', '[]')
+-- ops that coerce their arguments to be within range
+local coerce_ops = set('&', '|', '^', 'ntohs', 'ntohl', '<<', '>>', 'int32',
+                       'uint32')
 
 local folders = {
    ['+'] = function(a, b) return a + b end,
@@ -120,6 +124,13 @@ local simplify_if
 local function simplify(expr)
    if type(expr) ~= 'table' then return expr end
    local op = expr[1]
+   local function decoerce(expr)
+      if (type(expr) == 'table'
+          and (expr[1] == 'uint32' or expr[1] == 'int32')) then
+         return expr[2]
+      end
+      return expr
+   end
    if binops[op] then
       local lhs = simplify(expr[2])
       local rhs = simplify(expr[3])
@@ -136,6 +147,7 @@ local function simplify(expr)
                return { op, lhs[2], assert(folders[op])(lhs[3], rhs) }
             end
          end
+         if coerce_ops[op] then lhs, rhs = decoerce(lhs), decoerce(rhs) end
       end
       return { op, lhs, rhs }
    elseif unops[op] then
@@ -143,6 +155,7 @@ local function simplify(expr)
       if type(rhs) == 'number' then return assert(folders[op])(rhs) end
       if op == 'int32' and int32ops[rhs[1]] then return rhs end
       if op == 'uint32' and uint32ops[rhs[1]] then return rhs end
+      if coerce_ops[op] then rhs = decoerce(rhs) end
       return { op, rhs }
    elseif relops[op] then
       local lhs = simplify(expr[2])

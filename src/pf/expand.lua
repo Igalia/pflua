@@ -341,7 +341,7 @@ local function has_proto_dir_host(proto, dir, addr, mask)
    local host = ipv4_to_int(addr)
    local val = { proto_info[proto].access, proto_info[proto][dir], 4 }
    if mask then
-      mask = tonumber(mask) and 2^32 - 2^(32 - len) or ipv4_to_int(mask)
+      mask = tonumber(mask) and 2^32 - 2^(32 - mask) or ipv4_to_int(mask)
       val = { '&', val, tonumber(mask) }
    end
    return { 'and', has_ether_protocol(proto_info[proto].id), { '=', val, host } }
