@@ -31,7 +31,7 @@ function compile_filter(filter_str, opts)
       expr = expand.expand(expr, dlt)
       expr = optimize.optimize(expr)
       if opts.source then return codegen.compile_lua(expr) end
-      return codegen.compile(expr)
+      return codegen.compile(expr, filter_str)
    end
 end
 
