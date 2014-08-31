@@ -1,0 +1,40 @@
+#!/usr/bin/env luajit
+
+package.path = package.path .. ";../src/?.lua"
+
+local ffi = require("ffi")
+local pf = require("pf")
+local utils = require("pf.utils")
+local savefile = require("pf.savefile")
+
+local function filter(ptr, ptr_end, pred)
+   local seen, matched = 0, 0
+   while ptr < ptr_end do
+      local record = ffi.cast("struct pcap_record *", ptr)
+      local packet = ffi.cast("unsigned char *", record + 1)
+      local ptr_next = packet + record.incl_len
+      if pred(packet, record.incl_len) then
+         matched = matched + 1
+      end
+      seen = seen + 1
+      ptr = ptr_next
+   end
+   return seen, matched
+end
+
+function main(in_file, filter_str)
+   local header, ptr, ptr_end = savefile.open_and_mmap(in_file)
+   local pred = pf.compile_filter(filter_str)
+   -- Warm up.
+   filter(ptr, ptr_end, pred)
+   local start = utils.now()
+   local seen, matched = filter(ptr, ptr_end, pred)
+   local elapsed = utils.now() - start
+   print(string.format("Matched %d/%d packets from %s (%f MPPS).",
+                       matched, seen, in_file, seen/elapsed*1e-6))
+end
+
+local in_file, filter_str = ...
+assert(filter_str, "usage: pflua-count IN.PCAP FILTER")
+
+main(in_file, filter_str)
