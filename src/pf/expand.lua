@@ -55,26 +55,98 @@ local function unimplemented(expr, dlt)
    error("not implemented: "..expr[1])
 end
 
+-- Ethernet protocols
+local PROTO_IPV4 = 2048
+local PROTO_ARP = 2054
+local PROTO_RARP = 32821
+local PROTO_IPV6 = 34525
+local ether_min_payloads = {
+   [PROTO_IPV4] = 20,
+   [PROTO_ARP] = 28,
+   [PROTO_RARP] = 28,
+   [PROTO_IPV6] = 40
+}
+
+-- IP protocols
+local PROTO_ICMP = 1
+local PROTO_TCP = 6
+local PROTO_UDP = 17
+local PROTO_SCTP = 132
+local ip_min_payloads = {
+   [PROTO_ICMP] = 8,
+   [PROTO_UDP] = 8,
+   [PROTO_TCP] = 20
+}
+
+-- Minimum payload checks insert a byte access to the last byte of the
+-- minimum payload size.  Since the comparison should fold (because it
+-- will always be >= 0), we will be left with just an eager assertion on
+-- the minimum packet size, which should help elide future packet size
+-- assertions.
+local function has_proto_min_payload(min_payloads, proto, accessor)
+   local min_payload = assert(min_payloads[proto])
+   return { '<=', 0, { accessor, min_payload - 1, 1 } }
+end
+local function has_protocol_with_payload(pred, proto, payload_pred)
+   return { 'if', pred(proto),
+            { 'if', payload_pred(proto), { 'true' }, { 'fail' } },
+            { 'false' } }
+end
+
 local function has_ether_protocol(proto)
    return { '=', { '[ether]', 12, 2 }, proto }
 end
+local function has_ether_protocol_min_payload(proto)
+   return has_proto_min_payload(ether_min_payloads, proto, '[ether*]')
+end
+local function has_ether_protocol_with_payload(proto)
+   return has_protocol_with_payload(has_ether_protocol, proto,
+                                    has_ether_protocol_min_payload)
+end
 local function has_ipv4_protocol(proto)
    return { '=', { '[ip]', 9, 1 }, proto }
+end
+local function has_ipv4_protocol_min_payload(proto)
+   -- Since the [ip*] accessor asserts that is_first_ipv4_fragment(),
+   -- and we don't want that, we use [ip] and assume the minimum IP
+   -- header size.
+   local min_payload = assert(ip_min_payloads[proto])
+   min_payload = min_payload + assert(ether_min_payloads[PROTO_IPV4])
+   return { '<=', 0, { '[ip]', min_payload - 1, 1 } }
+end
+local function has_ipv4_protocol_with_payload(proto)
+   return has_protocol_with_payload(has_ipv4_protocol, proto,
+                                    has_ipv4_protocol_min_payload)
 end
 local function is_first_ipv4_fragment()
    return { '=', { '&', { '[ip]', 6, 2 }, 0x1fff }, 0 }
 end
 local function has_ipv6_protocol(proto)
    return { 'or',
-            { '=', { '[ip6]', 6, 1 }, 6 },
+            { '=', { '[ip6]', 6, 1 }, proto },
             { 'and',
               { '=', { '[ip6]', 6, 1 }, 44 },
-              { '=', { '[ip6]', 40, 1 }, 6 } } }
+              { '=', { '[ip6]', 40, 1 }, proto } } }
+end
+local function has_ipv6_protocol_min_payload(proto)
+   -- Assume the minimum ipv6 header size.
+   local min_payload = assert(ip_min_payloads[proto])
+   min_payload = min_payload + assert(ether_min_payloads[PROTO_IPV6])
+   return { '<=', 0, { '[ip6]', min_payload - 1, 1 } }
+end
+local function has_ipv6_protocol_with_payload(proto)
+   return has_protocol_with_payload(has_ipv6_protocol, proto,
+                                    has_ipv6_protocol_min_payload)
 end
 local function has_ip_protocol(proto)
    return { 'if', { 'ip' },
             has_ipv4_protocol(proto),
             { 'and', { 'ip6' }, has_ipv6_protocol(proto) } }
+end
+local function has_ip_protocol_with_payload(proto)
+   return { 'if', { 'ip' },
+            has_ipv4_protocol_with_payload(proto),
+            { 'and', { 'ip6' }, has_ipv6_protocol_with_payload(proto) } }
 end
 
 -- Port operations
@@ -101,12 +173,14 @@ local function expand_port(expr)
    local port = expr[2]
    return { 'if', { 'ip' },
             { 'and',
-              { 'or', has_ipv4_protocol(6),
-                { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
+              { 'or', has_ipv4_protocol(PROTO_TCP),
+                { 'or', has_ipv4_protocol(PROTO_UDP),
+                  has_ipv4_protocol(PROTO_SCTP) } },
               has_ipv4_port(port) },
             { 'and',
-              { 'or', has_ipv6_protocol(6),
-                { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
+              { 'or', has_ipv6_protocol(PROTO_TCP),
+                { 'or', has_ipv6_protocol(PROTO_UDP),
+                  has_ipv6_protocol(PROTO_SCTP) } },
               has_ipv6_port(port) } }
 end
 
@@ -121,10 +195,10 @@ local function expand_proto_port(expr, proto)
               has_ipv6_port(port) } }
 end
 local function expand_tcp_port(expr)
-   return expand_proto_port(expr, 6)
+   return expand_proto_port(expr, PROTO_TCP)
 end
 local function expand_udp_port(expr)
-   return expand_proto_port(expr, 17)
+   return expand_proto_port(expr, PROTO_UDP)
 end
 
 local function expand_proto_src_port(expr, proto)
@@ -138,10 +212,10 @@ local function expand_proto_src_port(expr, proto)
               has_ipv6_src_port(port) } }
 end
 local function expand_tcp_src_port(expr)
-   return expand_proto_src_port(expr, 6)
+   return expand_proto_src_port(expr, PROTO_TCP)
 end
 local function expand_udp_src_port(expr)
-   return expand_proto_src_port(expr, 17)
+   return expand_proto_src_port(expr, PROTO_UDP)
 end
 
 local function expand_proto_dst_port(expr, proto)
@@ -155,10 +229,10 @@ local function expand_proto_dst_port(expr, proto)
               has_ipv6_dst_port(port) } }
 end
 local function expand_tcp_dst_port(expr)
-   return expand_proto_dst_port(expr, 6)
+   return expand_proto_dst_port(expr, PROTO_TCP)
 end
 local function expand_udp_dst_port(expr)
-   return expand_proto_dst_port(expr, 17)
+   return expand_proto_dst_port(expr, PROTO_UDP)
 end
 
 -- Portrange operations
@@ -193,12 +267,14 @@ local function expand_portrange(expr)
    local lo, hi = expr[2][1], expr[2][2]
    return { 'if', { 'ip' },
             { 'and',
-              { 'or', has_ipv4_protocol(6), 
-                { 'or', has_ipv4_protocol(17), has_ipv4_protocol(132) } },
+              { 'or', has_ipv4_protocol(PROTO_TCP),
+                { 'or', has_ipv4_protocol(PROTO_UDP),
+                  has_ipv4_protocol(PROTO_SCTP) } },
               has_ipv4_portrange(lo, hi) },
             { 'and',
-              { 'or', has_ipv6_protocol(6),
-                { 'or', has_ipv6_protocol(17), has_ipv6_protocol(132) } },
+              { 'or', has_ipv6_protocol(PROTO_TCP),
+                { 'or', has_ipv6_protocol(PROTO_UDP),
+                  has_ipv6_protocol(PROTO_SCTP) } },
               has_ipv6_portrange(lo, hi) } }
 end
 
@@ -213,10 +289,10 @@ local function expand_proto_portrange(expr, proto)
               has_ipv6_portrange(lo, hi) } }
 end
 local function expand_tcp_portrange(expr)
-   return expand_proto_portrange(expr, 6)
+   return expand_proto_portrange(expr, PROTO_TCP)
 end
 local function expand_udp_portrange(expr)
-   return expand_proto_portrange(expr, 17)
+   return expand_proto_portrange(expr, PROTO_UDP)
 end
 
 local function expand_proto_src_portrange(expr, proto)
@@ -230,10 +306,10 @@ local function expand_proto_src_portrange(expr, proto)
               has_ipv6_src_portrange(lo, hi) } }
 end
 local function expand_tcp_src_portrange(expr)
-   return expand_proto_src_portrange(expr, 6)
+   return expand_proto_src_portrange(expr, PROTO_TCP)
 end
 local function expand_udp_src_portrange(expr)
-   return expand_proto_src_portrange(expr, 17)
+   return expand_proto_src_portrange(expr, PROTO_UDP)
 end
 
 local function expand_proto_dst_portrange(expr, proto)
@@ -247,18 +323,18 @@ local function expand_proto_dst_portrange(expr, proto)
               has_ipv6_dst_portrange(lo, hi) } }
 end
 local function expand_tcp_dst_portrange(expr)
-   return expand_proto_dst_portrange(expr, 6)
+   return expand_proto_dst_portrange(expr, PROTO_TCP)
 end
 local function expand_udp_dst_portrange(expr)
-   return expand_proto_dst_portrange(expr, 17)
+   return expand_proto_dst_portrange(expr, PROTO_UDP)
 end
 
 -- IP protocol
 
 local proto_info = {
-   ip   = { id = 2048,   access = "[ip]",    src = 12, dst = 16 },
-   arp  = { id = 2054,   access = "[arp]",   src = 14, dst = 24 },
-   rarp = { id = 32821,  access = "[rarp]",  src = 14, dst = 24 },
+   ip   = { id = PROTO_IPV4,  access = "[ip]",    src = 12, dst = 16 },
+   arp  = { id = PROTO_ARP,   access = "[arp]",   src = 14, dst = 24 },
+   rarp = { id = PROTO_RARP,  access = "[rarp]",  src = 14, dst = 24 },
 }
 
 local function has_proto_dir_host(proto, dir, addr, mask)
@@ -378,7 +454,7 @@ local primitive_expanders = {
    portrange = expand_portrange,
    less = unimplemented,
    greater = unimplemented,
-   ip = function(expr) return has_ether_protocol(proto_info.ip.id) end,
+   ip = function(expr) return has_ether_protocol_with_payload(PROTO_IPV4) end,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
    ip_host = expand_ip_host,
@@ -388,34 +464,34 @@ local primitive_expanders = {
    ip_dst_host = expand_ip_dst_host,
    ip_broadcast = unimplemented,
    ip_multicast = unimplemented,
-   ip6 = function(expr) return has_ether_protocol(34525) end,
+   ip6 = function(expr) return has_ether_protocol_with_payload(PROTO_IPV6) end,
    ip6_proto = unimplemented,
    ip6_protochain = unimplemented,
    ip6_multicast = unimplemented,
    proto = unimplemented,
-   tcp = function(expr) return has_ip_protocol(6) end,
+   tcp = function(expr) return has_ip_protocol_with_payload(PROTO_TCP) end,
    tcp_port = expand_tcp_port,
    tcp_src_port = expand_tcp_src_port,
    tcp_dst_port = expand_tcp_dst_port,
    tcp_portrange = expand_tcp_portrange,
    tcp_src_portrange = expand_tcp_src_portrange,
    tcp_dst_portrange = expand_tcp_dst_portrange,
-   udp = function(expr) return has_ip_protocol(17) end,
+   udp = function(expr) return has_ip_protocol_with_payload(PROTO_UDP) end,
    udp_port = expand_udp_port,
    udp_src_port = expand_udp_src_port,
    udp_dst_port = expand_udp_dst_port,
    udp_portrange = expand_udp_portrange,
    udp_src_portrange = expand_udp_src_portrange,
    udp_dst_portrange = expand_udp_dst_portrange,
-   icmp = function(expr) return has_ip_protocol(1) end,
+   icmp = function(expr) return has_ip_protocol(PROTO_ICMP) end,
    protochain = unimplemented,
-   arp = function(expr) return has_ether_protocol(proto_info.arp.id) end,
+   arp = function(expr) return has_ether_protocol_with_payload(PROTO_ARP) end,
    arp_host = expand_arp_host,
    arp_src = expand_arp_src_host,
    arp_src_host = expand_arp_src_host,
    arp_dst = expand_arp_dst_host,
    arp_dst_host = expand_arp_dst_host,
-   rarp = function(expr) return has_ether_protocol(proto_info.rarp.id) end,
+   rarp = function(expr) return has_ether_protocol_with_payload(PROTO_RARP) end,
    rarp_host = expand_rarp_host,
    rarp_src = expand_rarp_src_host,
    rarp_src_host = expand_rarp_src_host,
@@ -510,13 +586,16 @@ local function expand_offset(level, dlt)
       return concat(asserts, { test })
    end
    local function assert_ether_protocol(proto)
-      return assert_expr(has_ether_protocol(proto))
+      return concat(assert_expr(has_ether_protocol(proto)),
+                    assert_expr(has_ether_protocol_min_payload(proto)))
    end
    function assert_ipv4_protocol(proto)
-      return assert_expr(has_ipv4_protocol(proto))
+      return concat(assert_expr(has_ipv4_protocol(proto)),
+                    assert_expr(has_ipv4_protocol_min_payload(proto)))
    end
    function assert_ipv6_protocol(proto)
-      return assert_expr(has_ipv6_protocol(proto))
+      return concat(assert_expr(has_ipv6_protocol(proto)),
+                    assert_expr(has_ipv6_protocol_min_payload(proto)))
    end
    function assert_first_ipv4_fragment()
       return assert_expr(is_first_ipv4_fragment())
@@ -545,24 +624,26 @@ local function expand_offset(level, dlt)
    -- for IPv4.
    if level == 'ether' then
       return 0, {}
+   elseif level == 'ether*' then
+      return 14, {}
    elseif level == 'arp' then
-      return 14, assert_ether_protocol(2054)
+      return 14, assert_ether_protocol(PROTO_ARP)
    elseif level == 'rarp' then
-      return 14, assert_ether_protocol(32821)
+      return 14, assert_ether_protocol(PROTO_RARP)
    elseif level == 'ip' then
-      return 14, assert_ether_protocol(2048)
+      return 14, assert_ether_protocol(PROTO_IPV4)
    elseif level == 'ip6' then
-      return 14, assert_ether_protocol(34525)
+      return 14, assert_ether_protocol(PROTO_IPV6)
    elseif level == 'ip*' then
       return ipv4_payload_offset()
    elseif level == 'ip6*' then
       return ipv6_payload_offset()
    elseif level == 'icmp' then
-      return ipv4_payload_offset(1)
+      return ipv4_payload_offset(PROTO_ICMP)
    elseif level == 'udp' then
-      return ipv4_payload_offset(17)
+      return ipv4_payload_offset(PROTO_UDP)
    elseif level == 'tcp' then
-      return ipv4_payload_offset(6)
+      return ipv4_payload_offset(PROTO_TCP)
    end
    error('invalid level '..level)
 end

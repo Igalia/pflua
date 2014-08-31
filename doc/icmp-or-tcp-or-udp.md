@@ -58,15 +58,15 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 21) then return false end
+   if not (length >= 34) then return false end
    do
       local v1 = ffi.cast("uint16_t*", P+12)[0]
       if not (v1 == 8) then goto L3 end
       do
-         if not (length >= 24) then return false end
+         local v2 = P[23]
+         if v2 == 1 then return true end
          do
-            local v2 = P[23]
-            if v2 == 1 then return true end
+            if not (length >= 54) then return false end
             do
                if v2 == 6 then return true end
                do
@@ -77,17 +77,45 @@ return function(P,length)
       end
 ::L3::
       do
-         if not (v1 == 56710) then return false end
+         if not (length >= 54) then return false end
          do
-            local v3 = P[20]
-            if v3 == 6 then return true end
+            if not (v1 == 56710) then return false end
             do
-               if not (length >= 55) then return false end
+               local v3 = P[20]
+               if v3 == 1 then return true end
                do
-                  if not (v3 == 44) then return false end
+                  if not (length >= 55) then return false end
                   do
-                     local v4 = P[54]
-                     do return v4 == 6 end
+                     if not (v3 == 44) then goto L9 end
+                     do
+                        local v4 = P[54]
+                        if v4 == 1 then return true end
+                     end
+                  end
+               end
+::L9::
+               do
+                  if not (length >= 74) then return false end
+                  do
+                     if v3 == 6 then return true end
+                     do
+                        if not (v3 == 44) then goto L14 end
+                        do
+                           local v5 = P[54]
+                           if v5 == 6 then return true end
+                        end
+                     end
+::L14::
+                     do
+                        if v3 == 17 then return true end
+                        do
+                           if not (v3 == 44) then return false end
+                           do
+                              local v6 = P[54]
+                              do return v6 == 17 end
+                           end
+                        end
+                     end
                   end
                end
             end
