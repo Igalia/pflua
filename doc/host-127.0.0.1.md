@@ -65,7 +65,7 @@ return function(P,length)
       if not (v1 == 8) then goto L3 end
       do
          local v2 = ffi.cast("uint32_t*", P+26)[0]
-         if v2 == 2130706433 then return true end
+         if v2 == 16777343 then return true end
       end
 ::L3::
       do
@@ -74,14 +74,14 @@ return function(P,length)
             if not (v1 == 1544) then goto L6 end
             do
                local v3 = ffi.cast("uint32_t*", P+28)[0]
-               if v3 == 2130706433 then return true end
+               if v3 == 16777343 then return true end
             end
 ::L6::
             do
                if not (v1 == 13696) then goto L2 end
                do
                   local v4 = ffi.cast("uint32_t*", P+28)[0]
-                  if v4 == 2130706433 then return true end
+                  if v4 == 16777343 then return true end
                end
             end
          end
@@ -93,7 +93,7 @@ return function(P,length)
             if not (v1 == 8) then goto L10 end
             do
                local v5 = ffi.cast("uint32_t*", P+30)[0]
-               if v5 == 2130706433 then return true end
+               if v5 == 16777343 then return true end
             end
 ::L10::
             do
@@ -102,14 +102,14 @@ return function(P,length)
                   if not (v1 == 1544) then goto L13 end
                   do
                      local v6 = ffi.cast("uint32_t*", P+38)[0]
-                     if v6 == 2130706433 then return true end
+                     if v6 == 16777343 then return true end
                   end
 ::L13::
                   do
                      if not (v1 == 13696) then return false end
                      do
                         local v7 = ffi.cast("uint32_t*", P+38)[0]
-                        do return v7 == 2130706433 end
+                        do return v7 == 16777343 end
                      end
                   end
                end

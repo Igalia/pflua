@@ -7,7 +7,7 @@ verbose = os.getenv("PF_VERBOSE");
 local expand_arith, expand_relop, expand_bool
 
 local set, concat, pp = utils.set, utils.concat, utils.pp
-local host_uint16, host_uint32 = utils.host_uint16, utils.host_uint32
+local uint16, uint32 = utils.uint16, utils.uint32
 local ipv4_to_int = utils.ipv4_to_int
 
 local ether_protos = set(
@@ -265,7 +265,7 @@ local function has_proto_dir_host(proto, dir, addr, mask)
    local host = ipv4_to_int(addr)
    local val = { proto_info[proto].access, proto_info[proto][dir], 4 }
    if mask then
-      mask = tonumber(mask) and 2^mask - 1 or ipv4_to_int(mask)
+      mask = tonumber(mask) and 2^32 - 2^(32 - len) or ipv4_to_int(mask)
       val = { '&', val, tonumber(mask) }
    end
    return { 'and', has_ether_protocol(proto_info[proto].id), { '=', val, host } }
@@ -321,10 +321,9 @@ end
 
 -- Ether
 
--- In host-byte-order (little endian)
 local function ehost_to_int(addr)
    assert(addr[1] == 'ehost', "Not a valid ehost address")
-   return host_uint16(addr[2], addr[3]), host_uint32(addr[4], addr[5], addr[6], addr[7])
+   return uint16(addr[2], addr[3]), uint32(addr[4], addr[5], addr[6], addr[7])
 end
 local function expand_ether_src_host(expr)
    local hi, lo = ehost_to_int(expr[2])

@@ -293,7 +293,7 @@ function parse_net_arg(lexer)
 
    function check_non_network_bits_in_addr(addr, mask, mask_str)
       local ipv4 =  ipv4_to_int(addr)
-      if (bit.band(ipv4, mask) ~= ipv4) then
+      if (bit.band(ipv4, mask) ~= bit.tobit(ipv4)) then
          lexer.error("Non-network bits set in %d.%d.%d.%d/%s",
                        addr[2], addr[3], addr[4], addr[5], mask_str)
       end
@@ -304,7 +304,8 @@ function parse_net_arg(lexer)
       if lexer.check('/') then
          local len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
          if (arg[1] == 'ipv4') then
-            check_non_network_bits_in_addr(arg, 2^len - 1, tostring(len))
+            local mask = 2^32 - 2^(32 - len)
+            check_non_network_bits_in_addr(arg, mask, tostring(len))
          end
          return { arg[1]..'/len', arg, len }
       elseif lexer.check('mask') then
