@@ -252,13 +252,13 @@ local function has_ipv4_portrange(lo, hi)
 end
 local function has_ipv6_src_portrange(lo, hi)
    return { 'and',
-            { '<=', lo, { '[ip*]', 0, 2 } },
-            { '<=', { '[ip*]', 0, 2 }, hi } }
+            { '<=', lo, { '[ip6*]', 0, 2 } },
+            { '<=', { '[ip6*]', 0, 2 }, hi } }
 end
 local function has_ipv6_dst_portrange(lo, hi)
    return { 'and',
-            { '<=', lo, { '[ip*]', 2, 2 } },
-            { '<=', { '[ip*]', 2, 2 }, hi } }
+            { '<=', lo, { '[ip6*]', 2, 2 } },
+            { '<=', { '[ip6*]', 2, 2 }, hi } }
 end
 local function has_ipv6_portrange(lo, hi)
    return { 'or', has_ipv6_src_portrange(lo, hi), has_ipv6_dst_portrange(lo, hi) }

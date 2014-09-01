@@ -141,39 +141,52 @@ return function(P,length)
       end
 ::L3::
       do
-         if not (length >= 55) then return false end
+         if not (length >= 56) then return false end
          do
             if not (v1 == 56710) then return false end
             do
                local v15 = P[20]
-               if v15 == 6 then return false end
+               if v15 == 6 then goto L13 end
                do
-                  if not (v15 == 44) then goto L13 end
+                  if not (v15 == 44) then goto L14 end
                   do
                      local v16 = P[54]
-                     if v16 == 6 then return false end
+                     if v16 == 6 then goto L13 end
                   end
                end
-::L13::
+::L14::
                do
-                  if v15 == 17 then return false end
+                  if v15 == 17 then goto L13 end
                   do
-                     if not (v15 == 44) then goto L16 end
+                     if not (v15 == 44) then goto L17 end
                      do
                         local v17 = P[54]
-                        if v17 == 17 then return false end
+                        if v17 == 17 then goto L13 end
                      end
                   end
-::L16::
+::L17::
                   do
-                     if v15 == 132 then return false end
+                     if v15 == 132 then goto L13 end
                      do
                         if not (v15 == 44) then return false end
                         do
                            local v18 = P[54]
-                           if v18 == 132 then return false end
-                           do return false end
+                           if not (v18 == 132) then return false end
                         end
+                     end
+                  end
+               end
+::L13::
+               do
+                  local v19 = ffi.cast("uint16_t*", P+54)[0]
+                  local v20 = bit.rshift(bit.bswap(v19), 16)
+                  if v20 <= 6000 then return true end
+                  do
+                     if not (length >= 58) then return false end
+                     do
+                        local v21 = ffi.cast("uint16_t*", P+56)[0]
+                        local v22 = bit.rshift(bit.bswap(v21), 16)
+                        do return v22 <= 6000 end
                      end
                   end
                end
