@@ -75,25 +75,17 @@ return function(P,length)
       do
          if not (length >= 42) then return false end
          do
-            if not (v1 == 1544) then goto L7 end
+            if v1 == 1544 then goto L6 end
+            do
+               if not (v1 == 13696) then return false end
+            end
+::L6::
             do
                local v4 = ffi.cast("uint32_t*", P+28)[0]
                if v4 == 16777343 then return true end
                do
                   local v5 = ffi.cast("uint32_t*", P+38)[0]
                   do return v5 == 16777343 end
-               end
-            end
-::L7::
-            do
-               if not (v1 == 13696) then return false end
-               do
-                  local v6 = ffi.cast("uint32_t*", P+28)[0]
-                  if v6 == 16777343 then return true end
-                  do
-                     local v7 = ffi.cast("uint32_t*", P+38)[0]
-                     do return v7 == 16777343 end
-                  end
                end
             end
          end
