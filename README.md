@@ -88,7 +88,7 @@ differences of implementation relative to what `libpcap` does.  For that
 reason, the `libpcap`-to-bytecode pipeline can be a useful alternative
 in some cases.
 
-See the [doc](https://github.com/Igalia/pflua/blob/master/src/pf.lua)
+See the [doc](https://github.com/Igalia/pflua/blob/master/doc)
 subdirectory for some examples of the Lua code generated for some simple
 pflang filters using these two pipelines.
 
@@ -97,6 +97,21 @@ pflang filters using these two pipelines.
 To our knowledge, pflua is the fastest implementation of pflang out
 there.  See https://github.com/Igalia/pflua-bench for our benchmarking
 experiments and results.
+
+Pflua can beat other implementations because:
+
+* LuaJIT trace compilation results in machine code that reflects the
+  actual traffic that your application sees
+
+* Pflua can hoist and eliminate bounds checks, whereas [BPF is obligated to
+  check that every packet access is valid](https://github.com/Igalia/pflua/blob/master/doc/pflang.md#packet-access)
+
+* Pflua can work on data in network byte order, whereas BPF must
+  convert to host byte order
+
+* Pflua takes advantage of LuaJIT's register allocator and excellent
+  optimizing compiler, whereas e.g. the Linux kernel JIT has a limited
+  optimizer
 
 ## API documentation
 
