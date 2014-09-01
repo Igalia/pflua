@@ -87,21 +87,12 @@ local function has_proto_min_payload(min_payloads, proto, accessor)
    local min_payload = assert(min_payloads[proto])
    return { '<=', 0, { accessor, min_payload - 1, 1 } }
 end
-local function has_protocol_with_payload(pred, proto, payload_pred)
-   return { 'if', pred(proto),
-            { 'if', payload_pred(proto), { 'true' }, { 'fail' } },
-            { 'false' } }
-end
 
 local function has_ether_protocol(proto)
    return { '=', { '[ether]', 12, 2 }, proto }
 end
 local function has_ether_protocol_min_payload(proto)
    return has_proto_min_payload(ether_min_payloads, proto, '[ether*]')
-end
-local function has_ether_protocol_with_payload(proto)
-   return has_protocol_with_payload(has_ether_protocol, proto,
-                                    has_ether_protocol_min_payload)
 end
 local function has_ipv4_protocol(proto)
    return { '=', { '[ip]', 9, 1 }, proto }
@@ -113,10 +104,6 @@ local function has_ipv4_protocol_min_payload(proto)
    local min_payload = assert(ip_min_payloads[proto])
    min_payload = min_payload + assert(ether_min_payloads[PROTO_IPV4])
    return { '<=', 0, { '[ip]', min_payload - 1, 1 } }
-end
-local function has_ipv4_protocol_with_payload(proto)
-   return has_protocol_with_payload(has_ipv4_protocol, proto,
-                                    has_ipv4_protocol_min_payload)
 end
 local function is_first_ipv4_fragment()
    return { '=', { '&', { '[ip]', 6, 2 }, 0x1fff }, 0 }
@@ -134,19 +121,10 @@ local function has_ipv6_protocol_min_payload(proto)
    min_payload = min_payload + assert(ether_min_payloads[PROTO_IPV6])
    return { '<=', 0, { '[ip6]', min_payload - 1, 1 } }
 end
-local function has_ipv6_protocol_with_payload(proto)
-   return has_protocol_with_payload(has_ipv6_protocol, proto,
-                                    has_ipv6_protocol_min_payload)
-end
 local function has_ip_protocol(proto)
    return { 'if', { 'ip' },
             has_ipv4_protocol(proto),
             { 'and', { 'ip6' }, has_ipv6_protocol(proto) } }
-end
-local function has_ip_protocol_with_payload(proto)
-   return { 'if', { 'ip' },
-            has_ipv4_protocol_with_payload(proto),
-            { 'and', { 'ip6' }, has_ipv6_protocol_with_payload(proto) } }
 end
 
 -- Port operations

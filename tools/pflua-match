@@ -35,6 +35,6 @@ function main(in_file, filter_str)
 end
 
 local in_file, filter_str = ...
-assert(filter_str, "usage: pflua-count IN.PCAP FILTER")
+assert(filter_str, "usage: pflua-match IN.PCAP FILTER")
 
 main(in_file, filter_str)
