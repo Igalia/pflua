@@ -362,16 +362,19 @@ end
 -- Host
 
 local function expand_src_host(expr)
-   return { 'or', expand_ip_src_host(expr),
-            { 'or', expand_arp_src_host(expr), expand_rarp_src_host(expr) } }
+   return { 'if', { 'ip' }, expand_ip_src_host(expr),
+            { 'if', { 'arp' }, expand_arp_src_host(expr),
+              expand_rarp_src_host(expr) } }
 end
 local function expand_dst_host(expr)
-   return { 'or', expand_ip_dst_host(expr),
-            { 'or', expand_arp_dst_host(expr), expand_rarp_dst_host(expr) } }
+   return { 'if', { 'ip' }, expand_ip_dst_host(expr),
+            { 'if', { 'arp' }, expand_arp_dst_host(expr),
+              expand_rarp_dst_host(expr) } }
 end
 local function expand_host(expr)
-   return { 'or', expand_ip_host(expr),
-            { 'or', expand_arp_host(expr), expand_rarp_host(expr) } }
+   return { 'if', { 'ip' }, expand_ip_host(expr),
+            { 'if', { 'arp' }, expand_arp_host(expr),
+              expand_rarp_host(expr) } }
 end
 
 -- Ether
@@ -405,7 +408,7 @@ local function expand_dst_net(expr)
    return expand_dst_host(expr[2])
 end
 local function expand_net(expr)
-   return { 'or', expand_src_net(expr), expand_dst_net(expr) }
+   return expand_host(expr[2])
 end
 
 local primitive_expanders = {
