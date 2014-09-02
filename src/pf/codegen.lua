@@ -9,14 +9,23 @@ local function dup(db)
 end
 
 local function filter_builder(...)
-   local written = 'return function('
+   local head = 'return (function()\n'
+   local written = '   return function('
+   local cache = {}
    local vcount = 0
    local lcount = 0
-   local indent = '   '
+   local indent = '      '
    local jumps = {}
    local builder = {}
    local db_stack = {}
    local db = {}
+   function builder.c(str) -- Cache a global in a local.
+      if cache[str] then return cache[str] end
+      local name = assert(str:match("([^.]+)$"))
+      cache[str] = name
+      head = head..'   local '..name..' = '..str..'\n'
+      return name
+   end
    function builder.write(str)
       written = written .. str
    end
@@ -68,7 +77,8 @@ local function filter_builder(...)
       if jumps[label] then builder.write('::'..label..'::\n') end
    end
    function builder.finish(str)
-      builder.write('end')
+      builder.write('end\nend)()')
+      head, written = '', head..written
       if verbose then print(written) end
       return written
    end
@@ -82,45 +92,45 @@ local function filter_builder(...)
    return builder
 end
 
-local function read_buffer_word_by_type(buffer, offset, size)
+local function read_buffer_word_by_type(b, buffer, offset, size)
    if size == 1 then
       return buffer..'['..offset..']'
    elseif size == 2 then
-      return ('ffi.cast("uint16_t*", '..buffer..'+'..offset..')[0]')
+      return b.c('ffi.cast')..'("uint16_t*", '..buffer..'+'..offset..')[0]'
    elseif size == 4 then
-      return ('ffi.cast("uint32_t*", '..buffer..'+'..offset..')[0]')
+      return b.c('ffi.cast')..'("uint32_t*", '..buffer..'+'..offset..')[0]'
    else
       error("bad [] size: "..size)
    end
 end
 
-local function compile_value(builder, expr)
+local function compile_value(b, expr)
    if expr == 'len' then return 'length' end
    if type(expr) == 'number' then return expr end
    assert(type(expr) == 'table', 'unexpected type '..type(expr))
    local op = expr[1]
-   local lhs = compile_value(builder, expr[2])
+   local lhs = compile_value(b, expr[2])
    if op == 'ntohs' then
-      return builder.v('bit.rshift(bit.bswap('..lhs..'), 16)')
+      return b.v(b.c('bit.rshift')..'('..b.c('bit.bswap')..'('..lhs..'), 16)')
    elseif op == 'ntohl' then
-      return builder.v('bit.bswap('..lhs..')')
+      return b.v(b.c('bit.bswap')..'('..lhs..')')
    elseif op == 'int32' then
-      return builder.v('bit.tobit('..lhs..')')
+      return b.v(b.c('bit.tobit')..'('..lhs..')')
    elseif op == 'uint32' then
-      return builder.v(lhs..' % '..2^32)
+      return b.v(lhs..' % '..2^32)
    end
-   local rhs = compile_value(builder, expr[3])
+   local rhs = compile_value(b, expr[3])
    if op == '[]' then
-      return builder.v(read_buffer_word_by_type('P', lhs, rhs))
-   elseif op == '+' then return builder.v(lhs..'+'..rhs)
-   elseif op == '-' then return builder.v(lhs..'-'..rhs)
-   elseif op == '*' then return builder.v(lhs..'*'..rhs)
-   elseif op == '/' then return builder.v('math.floor('..lhs..'/'..rhs..')')
-   elseif op == '&' then return builder.v('bit.band('..lhs..','..rhs..')')
-   elseif op == '^' then return builder.v('bit.bxor('..lhs..','..rhs..')')
-   elseif op == '|' then return builder.v('bit.bor('..lhs..','..rhs..')')
-   elseif op == '<<' then return builder.v('bit.lshift('..lhs..','..rhs..')')
-   elseif op == '>>' then return builder.v('bit.rshift('..lhs..','..rhs..')')
+      return b.v(read_buffer_word_by_type(b, 'P', lhs, rhs))
+   elseif op == '+' then return b.v(lhs..'+'..rhs)
+   elseif op == '-' then return b.v(lhs..'-'..rhs)
+   elseif op == '*' then return b.v(lhs..'*'..rhs)
+   elseif op == '/' then return b.v(b.c('math.floor')..'('..lhs..'/'..rhs..')')
+   elseif op == '&' then return b.v(b.c('bit.band')..'('..lhs..','..rhs..')')
+   elseif op == '^' then return b.v(b.c('bit.bxor')..'('..lhs..','..rhs..')')
+   elseif op == '|' then return b.v(b.c('bit.bor')..'('..lhs..','..rhs..')')
+   elseif op == '<<' then return b.v(b.c('bit.lshift')..'('..lhs..','..rhs..')')
+   elseif op == '>>' then return b.v(b.c('bit.rshift')..'('..lhs..','..rhs..')')
    else error('unexpected op', op) end
 end
 
