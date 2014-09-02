@@ -8,6 +8,8 @@ local function dup(db)
    return ret
 end
 
+local enable_cse = false
+
 local function filter_builder(...)
    local head = 'return (function()\n'
    local written = '   return function('
@@ -33,6 +35,7 @@ local function filter_builder(...)
       builder.write(indent .. str .. '\n')
    end
    function builder.v(str)
+      if not enable_cse then return str end
       if db[str] then return db[str] end
       vcount = vcount + 1
       local var = 'v'..vcount
