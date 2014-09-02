@@ -4,7 +4,8 @@ EXAMPLES = \
 	tcp-port-80.md \
 	icmp-or-tcp-or-udp.md \
 	portrange-0-6000.md \
-	host-127.0.0.1.md
+	host-127.0.0.1.md \
+	net-127.0.0.0-8.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -30,3 +31,6 @@ portrange-0-6000.md: $(PFLUA)
 
 host-127.0.0.1.md: $(PFLUA)
 	../tools/dump-markdown "host 127.0.0.1" > $@.tmp && mv $@.tmp $@
+
+net-127.0.0.0-8.md: $(PFLUA)
+	../tools/dump-markdown "net 127.0.0.0/8" > $@.tmp && mv $@.tmp $@

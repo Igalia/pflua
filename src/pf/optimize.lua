@@ -199,7 +199,8 @@ function simplify_if(test, t, f)
       elseif test[4][1] == 'fail' then
          -- if (if A B fail) C D -> if A (if B C D) fail
          return simplify_if(test[2], simplify_if(test[3], t, f), {'fail'})
-      elseif t[1] == 'if' and cfkey(test[2]) == cfkey(t[2]) then
+      end
+      if t[1] == 'if' and cfkey(test[2]) == cfkey(t[2]) then
          if f[1] == 'if' and cfkey(test[2]) == cfkey(f[2]) then
             -- if (if A B C) (if A D E) (if A F G)
             -- -> if A (if B D F) (if C E G)
@@ -213,14 +214,22 @@ function simplify_if(test, t, f)
                                simplify_if(test[3], t[3], f),
                                simplify_if(test[4], t[4], f))
          end
-      elseif (f[1] == 'if' and cfkey(test[2]) == cfkey(f[2])
-              and simple[t[1]]) then
+      end
+      if (f[1] == 'if' and cfkey(test[2]) == cfkey(f[2]) and simple[t[1]]) then
          -- if (if A B C) D (if A E F)
          -- -> if A (if B D E) (if C D F)
          return simplify_if(test[2],
                             simplify_if(test[3], t, f[3]),
                             simplify_if(test[4], t, f[4]))
       end
+   end
+   if f[1] == 'if' and cfkey(t) == cfkey(f[3]) and not simple[t[1]] then
+      -- if A B (if C B D) -> if (if A true C) B D
+      return simplify_if(simplify_if(test, { 'true' }, f[2]), t, f[4])
+   end
+   if t[1] == 'if' and cfkey(f) == cfkey(t[3]) and not simple[f[1]] then
+      -- if A (if B C D) D -> if (if A B false) C D
+      return simplify_if(simplify_if(test, t[2], { 'false' }), t[3], f)
    end
    return { 'if', test, t, f }
 end
