@@ -57,21 +57,48 @@ local function lex_ipv4_or_host(str, pos)
 end
 
 local function lex_ipv6(str, pos)
+   local function expand_zeros_into(addr, number_of_zeros)
+      for i=1, number_of_zeros do table.insert(addr, 0) end
+   end
+   local function expand_ipv6(addr)
+      local result = { addr[1] }
+      local i = 2
+      while (i <= #addr) do
+         if type(addr[i]) == 'string' then
+            if type(addr[i+1]) == 'string' then
+               expand_zeros_into(result, 7)
+               i = i + 1
+            else
+               expand_zeros_into(result, 10 - #addr)
+            end
+         else
+            table.insert(result, addr[i])
+         end
+         i = i + 1
+      end
+      return result
+   end
+
    local addr = { 'ipv6' }
-   -- FIXME: Currently only supporting fully-specified IPV6 names.
-   local digits, dot = str:match("^(%x%x%x%x)()%:", pos)
-   assert(digits, "failed to parse ipv6 address at "..pos)
-   table.insert(addr, tonumber(digits, 16))
+   local digits, dot = str:match("^(%x?%x?%x?%x?)()%:", pos)
+   if not digits then digits = "" end
+   table.insert(addr, #digits == 0 and digits or tonumber(digits, 16))
    pos = dot
-   for i=1,15 do
-      local digits, dot = str:match("^%:(%x%x%x%x)()", pos)
-      assert(digits, "failed to parse ipv6 address at "..pos)
-      table.insert(addr, tonumber(digits, 16))
+   local hole = 0
+   while (true) do
+      local digits, dot = str:match("^%:(%x?%x?%x?%x?)()", pos)
+      if not dot then break end
+      if not digits then digits = "" end
+      if pos <= #str and dot - pos == 1 then hole = hole + 1 end
+      assert(hole <= 2, "wrong IPv6 address")
+      table.insert(addr, #digits == 0 and digits or tonumber(digits, 16))
       pos = dot
    end
    local terminators = " \t\r\n)/"
    assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
           "unexpected terminator for ipv6 address")
+   addr = expand_ipv6(addr)
+   assert(#addr == 9, "wrong IPv6 address")
    return addr, pos
 end
 
@@ -81,6 +108,7 @@ local function lex_ehost(str, pos)
       if (result < 16) then result = result * 2^4 end
       return result
    end
+   local start = pos
    local addr = { 'ehost' }
    local digits, dot = str:match("^(%x%x?)()%:", pos)
    assert(digits, "failed to parse ethernet host address at "..pos)
@@ -93,7 +121,10 @@ local function lex_ehost(str, pos)
       pos = dot
    end
    local terminators = " \t\r\n)/"
-   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
+   local last_char = str:sub(pos, pos)
+   -- MAC address is actually an IPv6 address
+   if last_char == ':' then return nil, start end
+   assert(pos > #str or terminators:find(last_char, 1, true),
           "unexpected terminator for ethernet host address")
    return addr, pos
 end
@@ -102,10 +133,12 @@ local function lex_addr(str, pos)
    local start_pos = pos
    if str:match("^%d%d?%d?%.", pos) then
       return lex_ipv4_or_host(str, pos)
-   elseif str:match("^%x%x%x%x%:", pos) then
-      return lex_ipv6(str, pos)
    elseif str:match("^%x%x?%:", pos) then
-      return lex_ehost(str, pos)
+      local result, pos = lex_ehost(str, pos)
+      if result then return result, pos end
+      return lex_ipv6(str, pos)
+   elseif str:match("^%x?%x?%x?%x?%:", pos) then
+      return lex_ipv6(str, pos)
    else
       return lex_host_or_keyword(str, pos)
    end
@@ -858,5 +891,19 @@ function selftest ()
              { 'ether_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
    parse_test("ether host f:f:f:3:3:3",
              { 'ether_host', { 'ehost', 240, 240, 240, 48, 48, 48 } })
+   parse_test("src net 192.168.1.0/24",
+             { 'src_net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
+   parse_test("src net 192.168.1.0 mask 255.255.255.0",
+             { 'src_net', { 'ipv4/mask', { 'ipv4', 192, 168, 1, 0 }, { 'ipv4', 255, 255, 255, 0 } } })
+   parse_test("host 0:0:0:0:0:0:0:1",
+             { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 } })
+   parse_test("host ::1",
+             { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 } })
+   parse_test("host 1::1",
+             { 'host', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 1 } })
+   parse_test("host 1::",
+             { 'host', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 0 } })
+   parse_test("src net eee:eee::0/96",
+             { 'src_net', { 'ipv6/len', { 'ipv6', 3822, 3822, 0, 0, 0, 0, 0, 0 }, 96 } })
    print("OK")
 end
