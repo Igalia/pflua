@@ -109,6 +109,11 @@ function ipv4_to_int(addr)
    return uint32(addr[2], addr[3], addr[4], addr[5])
 end
 
+function ipv6_as_4x32(addr)
+   local function c(i, j) return addr[i] * 2^16 + addr[j] end
+   return { c(2,3), c(4,5), c(6,7), c(8,9) }
+end
+
 function selftest ()
    print("selftest: pf.utils")
    local tab = { 1, 2, 3 }
