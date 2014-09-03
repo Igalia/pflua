@@ -478,9 +478,9 @@ end
 
 local function parse_optional_int(lexer, tok)
    if (type(lexer.peek()) == 'number') then
-      return parser(tok, lexer.next())
+      return { tok, lexer.next() }
    end
-   return parser(tok)
+   return { tok }
 end
 
 local src_or_dst_types = {
