@@ -362,6 +362,23 @@ end
 local function expand_ip_host(expr)
    return { 'or', expand_ip_src_host(expr), expand_ip_dst_host(expr) }
 end
+local function expand_ip_broadcast(expr)
+   error("netmask not known, so 'ip broadcast' not supported")
+end
+local function expand_ip_multicast(expr)
+   return { '=', { '[ip]', 16, 1 }, 224 }
+end
+local function expand_ip6_multicast(expr)
+   return { '=', { '[ip6]', 24, 1 }, 255 }
+end
+local function expand_ip_protochain(expr)
+   -- FIXME: Not implemented yet. BPF code of ip protochain is rather complex.
+   return unimplemented(expr)
+end
+local function expand_ip6_protochain(expr)
+   -- FIXME: Not implemented yet. BPF code of ip6 protochain is rather complex.
+   return unimplemented(expr)
+end
 
 local ip_protos = {
    icmp = PROTO_ICMP,
@@ -658,18 +675,18 @@ local primitive_expanders = {
    greater = unimplemented,
    ip = expand_ip,
    ip_proto = function(expr) return expand_ip_proto(expr, 'ip') end,
-   ip_protochain = unimplemented,
+   ip_protochain = expand_ip_protochain,
    ip_host = expand_ip_host,
    ip_src = expand_ip_src_host,
    ip_src_host = expand_ip_src_host,
    ip_dst = expand_ip_dst_host,
    ip_dst_host = expand_ip_dst_host,
-   ip_broadcast = unimplemented,
-   ip_multicast = unimplemented,
+   ip_broadcast = expand_ip_broadcast,
+   ip_multicast = expand_ip_multicast,
    ip6 = expand_ip6,
    ip6_proto = function(expr) return expand_ip_proto(expr, 'ip6') end,
-   ip6_protochain = unimplemented,
-   ip6_multicast = unimplemented,
+   ip6_protochain = expand_ip6_protochain,
+   ip6_multicast = expand_ip6_multicast,
    proto = unimplemented,
    tcp = function(expr) return has_ip_protocol(PROTO_TCP) end,
    tcp_port = expand_tcp_port,

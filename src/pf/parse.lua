@@ -566,7 +566,7 @@ local ip_types = {
    src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
    proto = unary(parse_ip_proto_arg),
-   protochain = unary(parse_proto_arg),
+   protochain = unary(parse_int_arg),
    broadcast = nullary(),
    multicast = nullary(),
 }
