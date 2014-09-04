@@ -250,7 +250,7 @@ end
 local function has_ipv6_portrange(lo, hi)
    return { 'or', has_ipv6_src_portrange(lo, hi), has_ipv6_dst_portrange(lo, hi) }
 end
-local function expand_portrange(expr)
+local function expand_dir_portrange(expr, has_ipv4_portrange, has_ipv6_portrange)
    local lo, hi = expr[2][1], expr[2][2]
    return { 'if', { 'ip' },
             { 'and',
@@ -263,6 +263,15 @@ local function expand_portrange(expr)
                 { 'or', has_ipv6_protocol(PROTO_UDP),
                   has_ipv6_protocol(PROTO_SCTP) } },
               has_ipv6_portrange(lo, hi) } }
+end
+local function expand_portrange(expr)
+   return expand_dir_portrange(expr, has_ipv4_portrange, has_ipv6_portrange)
+end
+local function expand_src_portrange(expr)
+   return expand_dir_portrange(expr, has_ipv4_src_portrange, has_ipv6_dst_portrange)
+end
+local function expand_dst_portrange(expr)
+   return expand_dir_portrange(expr, has_ipv4_src_portrange, has_ipv6_dst_portrange)
 end
 
 local function expand_proto_portrange(expr, proto)
@@ -489,11 +498,11 @@ local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
    dst_port = expand_dst_port,
-   dst_portrange = unimplemented,
+   dst_portrange = expand_dst_portrange,
    src_host = expand_src_host,
    src_net = expand_src_net,
    src_port = expand_src_port,
-   src_portrange = unimplemented,
+   src_portrange = expand_src_portrange,
    host = expand_host,
    ether_src = expand_ether_src_host,
    ether_src_host = expand_ether_src_host,
