@@ -147,7 +147,7 @@ end
 local function has_ipv6_port(port)
    return { 'or', has_ipv6_src_port(port), has_ipv6_dst_port(port) }
 end
-local function expand_port(expr)
+local function expand_dir_port(expr, has_ipv4_port, has_ipv6_port)
    local port = expr[2]
    return { 'if', { 'ip' },
             { 'and',
@@ -160,6 +160,15 @@ local function expand_port(expr)
                 { 'or', has_ipv6_protocol(PROTO_UDP),
                   has_ipv6_protocol(PROTO_SCTP) } },
               has_ipv6_port(port) } }
+end
+local function expand_port(expr)
+   return expand_dir_port(expr, has_ipv4_port, has_ipv6_port)
+end
+local function expand_src_port(expr)
+   return expand_dir_port(expr, has_ipv4_src_port, has_ipv4_dst_port)
+end
+local function expand_dst_port(expr)
+   return expand_dir_port(expr, has_ipv4_dst_port, has_ipv6_dst_port)
 end
 
 local function expand_proto_port(expr, proto)
@@ -479,11 +488,11 @@ end
 local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
-   dst_port = unimplemented,
+   dst_port = expand_dst_port,
    dst_portrange = unimplemented,
    src_host = expand_src_host,
    src_net = expand_src_net,
-   src_port = unimplemented,
+   src_port = expand_src_port,
    src_portrange = unimplemented,
    host = expand_host,
    ether_src = expand_ether_src_host,
