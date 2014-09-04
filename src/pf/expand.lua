@@ -511,7 +511,12 @@ local primitive_expanders = {
    type_subtype = unimplemented,
    subtype = unimplemented,
    dir = unimplemented,
-   vlan = unimplemented,
+   vlan = function(expr)
+      return { 'or',
+                has_ether_protocol(33024),
+                has_ether_protocol(37120)
+             }
+   end,
    mpls = unimplemented,
    pppoed = unimplemented,
    pppoes = unimplemented,
