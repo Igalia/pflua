@@ -482,6 +482,9 @@ local function expand_ether_broadcast(expr)
             { '=', { '[ether]', 0, 2 }, hi },
             { '=', { '[ether]', 2, 4 }, lo } }
 end
+local function expand_ether_multicast(expr)
+   return { '!=', { '&', { '[ether]', 0, 1 }, 1 }, 0 }
+end
 
 -- Net
 
@@ -518,7 +521,8 @@ local primitive_expanders = {
    ether_host = expand_ether_host,
    ether_broadcast = expand_ether_broadcast,
    broadcast = expand_ether_broadcast,
-   ether_multicast = unimplemented,
+   ether_multicast = expand_ether_multicast,
+   multicast = expand_ether_multicast,
    ether_proto = unimplemented,
    gateway = unimplemented,
    net = expand_net,

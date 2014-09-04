@@ -626,6 +626,7 @@ local primitives = {
    host = unary(parse_host_arg),
    ether = table_parser(ether_types),
    broadcast = nullary(),
+   multicast = nullary(),
    gateway = unary(parse_string_arg),
    net = unary(parse_net_arg),
    port = unary(parse_port_arg),
