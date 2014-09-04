@@ -10,7 +10,9 @@ EXAMPLES = \
 	net-ipv6-0-mask-16.md \
 	net-ipv6-ee.cc.9954.0-mask-111.md \
 	src-net-ffff.ffff.eeee.eeee.1.0.0.0-82.md \
-	src-net-ffff.ffff.eeee.eeee.0.0.0.0-72.md
+	src-net-ffff.ffff.eeee.eeee.0.0.0.0-72.md \
+	src-port-80.md \
+	dst-portrange-80-90.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -54,3 +56,9 @@ src-net-ffff.ffff.eeee.eeee.1.0.0.0-82.md: $(PFLUA)
 
 src-net-ffff.ffff.eeee.eeee.0.0.0.0-72.md: $(PFLUA)
 	../tools/dump-markdown "src net ffff:ffff:eeee:eeee:0:0:0:0/72" > $@.tmp && mv $@.tmp $@
+
+src-port-80.md:
+	../tools/dump-markdown "src port 80" > $@.tmp && mv $@.tmp $@
+
+dst-portrange-80-90.md:
+	../tools/dump-markdown "dst portrange 80-90" > $@.tmp && mv $@.tmp $@
