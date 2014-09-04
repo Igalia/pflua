@@ -24,10 +24,10 @@ local punctuation = set(
 )
 
 local function lex_host_or_keyword(str, pos)
-   local name, next_pos = str:match("^([%w.-]+)()", pos)
+   local name, next_pos = str:match("^(\\?[%w.-]+)()", pos)
    assert(name, "failed to parse hostname or keyword at "..pos)
-   assert(name:match("^%w", 1, 1), "bad hostname or keyword "..name)
-   assert(name:match("^%w", #name, #name), "bad hostname or keyword "..name)
+   assert(name:match("^\\?%w", 1, 1), "bad hostname or keyword "..name)
+   assert(name:match("^\\?%w", #name, #name), "bad hostname or keyword "..name)
    return tonumber(name, 10) or name, next_pos
 end
 
@@ -417,8 +417,10 @@ local ether_protos = set(
 
 local function parse_ether_proto_arg(lexer)
    local arg = lexer.next()
-   if type(arg) == 'number' or ether_protos[arg] then
-      return arg
+   if type(arg) == 'number' then return arg end
+   if type(arg) == 'string' then
+      local proto = arg:match("^\\?(%w+)")
+      if ether_protos[proto] then return proto end
    end
    lexer.error('invalid ethernet proto %s', arg)
 end
@@ -429,8 +431,9 @@ local ip_protos = set(
 
 local function parse_ip_proto_arg(lexer)
    local arg = lexer.next()
-   if type(arg) == 'number' or ip_protos[arg] then
-      return arg
+   if type(arg) == 'string' then
+      local proto = arg:match("^\\?(%w+)")
+      if ip_protos[proto] then return proto end
    end
    lexer.error('invalid ip proto %s', arg)
 end
@@ -880,6 +883,12 @@ function selftest ()
                 { 'ipv4/len', { 'ipv4', 10, 0, 0, 0 }, 24 }})
    parse_test("ether proto rarp",
               { 'ether_proto', 'rarp' })
+   parse_test("ether proto \\rarp",
+              { 'ether_proto', 'rarp' })
+   parse_test("ip proto tcp",
+              { 'ip_proto', 'tcp' })
+   parse_test("ip proto \\tcp",
+              { 'ip_proto', 'tcp' })
    parse_test("decnet host 10.23",
               { 'decnet_host', { 'decnet', 10, 23 } })
    parse_test("ip proto icmp",
