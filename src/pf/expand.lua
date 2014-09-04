@@ -475,6 +475,13 @@ end
 local function expand_ether_host(expr)
    return { 'or', expand_ether_src_host(expr), expand_ether_dst_host(expr) }
 end
+local function expand_ether_broadcast(expr)
+   local broadcast = { 'ehost', 255, 255, 255, 255, 255, 255 }
+   local hi, lo = ehost_to_int(broadcast)
+   return { 'and',
+            { '=', { '[ether]', 0, 2 }, hi },
+            { '=', { '[ether]', 2, 4 }, lo } }
+end
 
 -- Net
 
@@ -509,7 +516,8 @@ local primitive_expanders = {
    ether_dst = expand_ether_dst_host,
    ether_dst_host = expand_ether_dst_host,
    ether_host = expand_ether_host,
-   ether_broadcast = unimplemented,
+   ether_broadcast = expand_ether_broadcast,
+   broadcast = expand_ether_broadcast,
    ether_multicast = unimplemented,
    ether_proto = unimplemented,
    gateway = unimplemented,
