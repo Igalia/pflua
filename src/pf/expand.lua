@@ -40,8 +40,6 @@ local wlan_frame_data_subtypes = set(
 
 local wlan_directions = set('nods', 'tods', 'fromds', 'dstods')
 
-local iso_proto_types = set('clnp', 'esis', 'isis')
-
 local function unimplemented(expr, dlt)
    error("not implemented: "..expr[1])
 end
@@ -629,6 +627,32 @@ local function expand_ether_proto(expr)
    return ether_protos[expr[2]](expr)
 end
 
+-- ISO
+
+local PROTO_CLNP = 129    -- 0x81
+local PROTO_ESIS = 130    -- 0x82
+local PROTO_ISIS = 131    -- 0x83
+
+local iso_protos = {
+   clnp = PROTO_CLNP,
+   esis = PROTO_ESIS,
+   isis = PROTO_ISIS,
+}
+
+local function has_iso_protocol(proto)
+  return { 'and',
+           { '<=', { '[ether]', 12, 2 }, 1500 },
+           { 'and',
+             { '=', { '[ether]', 14, 2 }, 65278 },
+             { '=', { '[ether]', 17, 1 }, proto } } }
+end
+
+local function expand_iso_proto(expr)
+   local proto = iso_protos[expr[2]]
+   assert(proto, "Invalid ISO protocol")
+   return has_iso_protocol(proto)
+end
+
 -- Net
 
 local function expand_src_net(expr)
@@ -761,10 +785,10 @@ local primitive_expanders = {
    mpls = unimplemented,
    pppoed = unimplemented,
    pppoes = unimplemented,
-   iso_proto = unimplemented,
-   clnp = unimplemented,
-   esis = unimplemented,
-   isis = unimplemented,
+   iso_proto = expand_iso_proto,
+   clnp = function(expr) return has_iso_protocol(PROTO_CLNP) end,
+   esis = function(expr) return has_iso_protocol(PROTO_ESIS) end,
+   isis = function(expr) return has_iso_protocol(PROTO_ISIS) end,
    l1 = unimplemented,
    l2 = unimplemented,
    iih = unimplemented,
