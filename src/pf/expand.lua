@@ -728,6 +728,51 @@ local function expand_decnet_host(expr)
    return { 'or', expand_decnet_src(expr), expand_decnet_dst(expr) }
 end
 
+-- IS-IS
+
+local function expand_isis_protocol(...)
+
+   local function concat(lop, reg, values)
+      local result = { '=', reg, values[1] }
+      if #values == 1 then return result end
+      for i = 2, #values do
+         result = { 'or', { '=', reg, values[i] }, result }
+      end
+      return result
+   end
+
+   return { 'if', { 'and',
+            { '<=', { '[ether]', 12, 2 }, 1500 },
+            { 'and',
+              { '=', { '[ether]', 14, 2 }, 65278 },
+              { '=', { '[ether]', 17, 1, }, 131 } } },
+                concat('or', { '[ether]', 21, 1 }, {...} ),
+                { 'fail' } }
+end
+
+local function expand_l1(expr)
+   return expand_isis_protocol(15, 17, 18, 24, 26)
+end
+local function expand_l2(expr)
+   return expand_isis_protocol(16, 17, 20, 25, 27)
+end
+local function expand_iih(expr)
+   return expand_isis_protocol(15, 16, 17)
+end
+local function expand_lsp(expr)
+   return expand_isis_protocol(18, 20)
+end
+local function expand_snp(expr)
+   return expand_isis_protocol(24, 25, 26, 27)
+end
+local function expand_csnp(expr)
+   return expand_isis_protocol(24, 25)
+end
+local function expand_psnp(expr)
+   return expand_isis_protocol(26, 27)
+end
+
+
 local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
@@ -848,13 +893,13 @@ local primitive_expanders = {
    clnp = function(expr) return has_iso_protocol(PROTO_CLNP) end,
    esis = function(expr) return has_iso_protocol(PROTO_ESIS) end,
    isis = function(expr) return has_iso_protocol(PROTO_ISIS) end,
-   l1 = unimplemented,
-   l2 = unimplemented,
-   iih = unimplemented,
-   lsp = unimplemented,
-   snp = unimplemented,
-   csnp = unimplemented,
-   psnp = unimplemented,
+   l1 = expand_l1,
+   l2 = expand_l2,
+   iih = expand_iih,
+   lsp = expand_lsp,
+   snp = expand_snp,
+   csnp = expand_csnp,
+   psnp = expand_psnp,
    vpi = unimplemented,
    vci = unimplemented,
    lane = unimplemented,
