@@ -672,6 +672,30 @@ local function expand_net(expr)
    return expand_host(expr[2])
 end
 
+-- VLAN
+
+-- Each use of 'vlan' expression increments the filter offsets by 4.
+
+-- FIXME: The function is called two times even when there's only one single 'vlan'
+-- expression to be evaluated. As the value -- of 'offset' increments in each call,
+-- the resulting code is incorrect. The last value of 'offset' is the one used.
+local expand_vlan = (function()
+  local offset = 8
+  local function is_vlan_protocol(offset)
+     return { 'or',
+              { '=', { '[ether]', offset, 2 }, 33024 },
+              { '=', { '[ether]', offset, 2 }, 37120 } }
+  end
+  return function(expr, dlt)
+     offset = offset + 4
+     local vlan_id = expr[2]
+     if not vlan_id then return is_vlan_protocol(offset) end
+     return { 'and',
+              is_vlan_protocol(offset),
+              { '=', { '&', { '[ether]', offset + 2, 2 }, 4095 }, vlan_id } }
+  end
+end)()
+
 local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
@@ -782,7 +806,7 @@ local primitive_expanders = {
    type_subtype = unimplemented,
    subtype = unimplemented,
    dir = unimplemented,
-   vlan = unimplemented,
+   vlan = expand_vlan,
    mpls = unimplemented,
    pppoed = unimplemented,
    pppoes = unimplemented,
