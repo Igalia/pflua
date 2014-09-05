@@ -772,7 +772,6 @@ local function expand_psnp(expr)
    return expand_isis_protocol(26, 27)
 end
 
-
 -- Packet length
 
 local function expand_less(expr)
@@ -782,6 +781,20 @@ local function expand_greater(expr)
    return { '>=', 'len', expr[2] }
 end
 
+-- PPP
+
+local PROTO_PPPOED = 34915
+local PROTO_PPPOES = 34916
+
+-- FIXME: The first pppoes keyword encountered in expression changes the
+-- decoding offsets for the remainder of expression on the assumption that the
+-- packet is a PPPoE session packet.
+local function expand_pppoes(expr)
+   local pppoes_id = expr[2]
+   if not pppoes_id then return has_ether_protocol(PROTO_PPPOES) end
+   return { 'and', has_ether_protocol(PROTO_PPPOES),
+            { '=', { '&', { '[ether]', 14, 2 }, 65535 }, pppoes_id } }
+end
 
 
 local primitive_expanders = {
@@ -898,8 +911,8 @@ local primitive_expanders = {
    dir = unimplemented,
    vlan = expand_vlan,
    mpls = unimplemented,
-   pppoed = unimplemented,
-   pppoes = unimplemented,
+   pppoed = function(expr) return has_ether_protocol(PROTO_PPPOED) end,
+   pppoes = expand_pppoes,
    iso_proto = expand_iso_proto,
    clnp = function(expr) return has_iso_protocol(PROTO_CLNP) end,
    esis = function(expr) return has_iso_protocol(PROTO_ESIS) end,
