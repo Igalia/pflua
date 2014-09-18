@@ -328,7 +328,7 @@ function parse_net_arg(lexer)
    local function check_non_network_bits_in_ipv4(addr, mask_bits, mask_str)
       local ipv4 = uint32(addr[2], addr[3], addr[4], addr[5])
       if (bit.band(ipv4, mask_bits) ~= bit.tobit(ipv4)) then
-         lexer.error("Non-network bits set in %s/%s", 
+         lexer.error("Non-network bits set in %s/%s",
             table.concat(addr, ".", 2), mask_str)
      end
    end
@@ -341,7 +341,7 @@ function parse_net_arg(lexer)
       end
       local ipv6 = ipv6_as_4x32(addr)
       for i, fragment in ipairs(ipv6) do
-         local mask_len_fragment = mask_len / 32 >= 1 and 32 or mask_len % 32
+         local mask_len_fragment = mask_len > 32 and 32 or mask_len
          local mask_bits = 2^32 - 2^(32 - mask_len_fragment)
          if (bit.band(fragment, mask_bits) ~= bit.tobit(fragment)) then
             lexer.error("Non-network bits set in %s", format_ipv6(addr, mask_len))
