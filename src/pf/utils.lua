@@ -28,11 +28,11 @@ function now()
    return secs
 end
 
-function gmtime_usecs()
+function gmtime()
    local tv = ffi.new("struct timeval")
    assert(ffi.C.gettimeofday(tv, nil) == 0)
-   local secs = tonumber(tv.tv_sec) * 1e6
-   secs = secs + tonumber(tv.tv_usec)
+   local secs = tonumber(tv.tv_sec)
+   secs = secs + tonumber(tv.tv_usec) * 1e-6
    return secs
 end
 
@@ -127,8 +127,8 @@ function selftest ()
    if not zero_sec then assert_equals(now(), 0) end
    assert(now() > 0)
    assert_equals(ipv4_to_int({'ipv4', 255, 0, 0, 0}), 0xff000000)
-   local gu1 = gmtime_usecs()
-   local gu2 = gmtime_usecs()
+   local gu1 = gmtime()
+   local gu2 = gmtime()
    assert(gu1, gu2)
    print("OK")
 end
