@@ -670,7 +670,7 @@ end
 function expand_bool(expr, dlt)
    assert(type(expr) == 'table', 'logical expression must be a table')
    if expr[1] == 'not' or expr[1] == '!' then
-      return { 'not', expand_bool(expr[2], dlt) }
+      return { 'if', expand_bool(expr[2], dlt), { 'false' }, { 'true' } }
    elseif expr[1] == 'and' or expr[1] == '&&' then
       return { 'if', expand_bool(expr[2], dlt),
                expand_bool(expr[3], dlt),
