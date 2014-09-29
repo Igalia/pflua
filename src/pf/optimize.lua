@@ -272,7 +272,10 @@ local function Range(min, max)
    function ret:max() return self.max_ end
    function ret:range() return self:min(), self:max() end
    function ret:fold()
-      if self:min() == self:max() then return self:min() end
+      if self:min() == self:max() then
+         assert(self:min() ~= Inf)
+         return self:min()
+      end
    end
    function ret:lt(other) return self:max() < other:min() end
    function ret:gt(other) return self:min() > other:max() end
