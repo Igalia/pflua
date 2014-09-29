@@ -169,11 +169,6 @@ local function simplify(expr)
          op, lhs, rhs = try_invert(op, lhs, rhs)
       end
       return { op, lhs, rhs }
-   elseif op == 'not' then
-      local rhs = simplify(expr[2])
-      if rhs[1] == 'true' then return { 'false' }
-      elseif rhs[1] == 'false' then return { 'true' }
-      else return { op, rhs } end
    elseif op == 'if' then
       local test, t, f = simplify(expr[2]), simplify(expr[3]), simplify(expr[4])
       return simplify_if(test, t, f)
@@ -186,8 +181,7 @@ end
 
 function simplify_if(test, t, f)
    local op = test[1]
-   if op == 'not' then return simplify_if(test[2], f, t)
-   elseif op == 'true' then return t
+   if op == 'true' then return t
    elseif op == 'false' then return f
    elseif op == 'fail' then return test
    elseif t[1] == 'true' and f[1] == 'false' then return test
@@ -199,6 +193,9 @@ function simplify_if(test, t, f)
       elseif test[4][1] == 'fail' then
          -- if (if A B fail) C D -> if A (if B C D) fail
          return simplify_if(test[2], simplify_if(test[3], t, f), {'fail'})
+      elseif test[3][1] == 'false' and test[4][1] == 'true' then
+         -- if (if A false true) C D -> if A D C
+         return simplify_if(test[2], f, t)
       end
       if t[1] == 'if' and cfkey(test[2]) == cfkey(t[2]) then
          if f[1] == 'if' and cfkey(test[2]) == cfkey(f[2]) then
@@ -247,13 +244,6 @@ local function cfold(expr, db)
       else
          return expr
       end
-   elseif op == 'not' then
-      local rhs = cfold(expr[2], db)
-      local key = cfkey(rhs)
-      if db[key] ~= nil then return { db[key] and 'false' or 'true' }
-      elseif rhs[1] == 'true' then return { 'false' }
-      elseif rhs[1] == 'false' then return { 'true' }
-      else return { op, rhs } end
    elseif op == 'if' then
       local test = cfold(expr[2], db)
       local key = cfkey(test)
@@ -521,8 +511,6 @@ local function infer_ranges(expr)
          return { op, lhs, rhs }
       elseif op == 'false' or op == 'true' or op == 'fail' then
          return expr
-      elseif op == 'not' then
-         return { op, visit(expr[2], db_f, db_t, kf, kt) }
       elseif op == 'if' then
          local test, t, f = expr[2], expr[3], expr[4]
 

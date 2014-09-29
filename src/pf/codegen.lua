@@ -131,9 +131,7 @@ local relop_map = {
 local function compile_bool(builder, expr, kt, kf, k)
    assert(type(expr) == 'table', 'logical expression must be a table')
    local op = expr[1]
-   if op == 'not' then
-      return compile_bool(builder, expr[2], kf, kt, k)
-   elseif op == 'if' then
+   if op == 'if' then
       local function eta_reduce(expr)
          if expr[1] == 'false' then return kf, false
          elseif expr[1] == 'true' then return kt, false
