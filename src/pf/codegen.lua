@@ -56,7 +56,7 @@ local function filter_builder(...)
       if kt == 'ACCEPT' and kf == 'REJECT' then
          builder.writeln('do return '..cond..' end')
       elseif kf == 'ACCEPT' and kt == 'REJECT' then
-         builder.writeln('do return not '..cond..' end')
+         builder.writeln('do return not ('..cond..') end')
       elseif kt == k then
          builder.writeln('if not ('..cond..') then '..builder.jump(kf)..' end')
       else
