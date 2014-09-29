@@ -390,6 +390,7 @@ local function infer_ranges(expr)
    local function push(db) return cons({}, db) end
    local function lookup(db, expr)
       if type(expr) == 'number' then return Range(expr, expr) end
+      if expr == 'len' then return Range(0, 2^16-1) end
       local key = cfkey(expr)
       while db do
          local range = car(db)[key]
