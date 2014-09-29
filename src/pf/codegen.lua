@@ -47,8 +47,8 @@ local function filter_builder(...)
       return 'L'..lcount
    end
    function builder.jump(label)
-      if label == 'ACCEPT' then return 'return true' end
-      if label == 'REJECT' then return 'return false' end
+      if label == 'ACCEPT' then return 'do return true end' end
+      if label == 'REJECT' then return 'do return false end' end
       jumps[label] = true
       return 'goto '..label
    end
