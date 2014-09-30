@@ -48,16 +48,16 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 54) then return false end
+   if not (length >= 54) then do return false end end
    do
       local v1 = ffi.cast("uint16_t*", P+12)[0]
-      if not (v1 == 56710) then return false end
+      if not (v1 == 56710) then do return false end end
       do
          local v2 = ffi.cast("uint32_t*", P+22)[0]
-         if not (v2 == 4294967295) then return false end
+         if not (v2 == 4294967295) then do return false end end
          do
             local v3 = ffi.cast("uint32_t*", P+26)[0]
-            if not (v3 == 4008636142) then return false end
+            if not (v3 == 4008636142) then do return false end end
             do
                local v4 = ffi.cast("uint32_t*", P+30)[0]
                local v5 = bit.band(v4,12648447)

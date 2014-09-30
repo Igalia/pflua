@@ -78,30 +78,30 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 34) then return false end
+   if not (length >= 34) then do return false end end
    do
       local v1 = ffi.cast("uint16_t*", P+12)[0]
       if not (v1 == 8) then goto L3 end
       do
          local v2 = P[23]
-         if not (v2 == 6) then return false end
+         if not (v2 == 6) then do return false end end
          do
             local v3 = ffi.cast("uint16_t*", P+20)[0]
             local v4 = bit.band(v3,65311)
-            if not (v4 == 0) then return false end
+            if not (v4 == 0) then do return false end end
             do
                local v5 = P[14]
                local v6 = bit.band(v5,15)
                local v7 = bit.lshift(v6,2)
-               local v8 = v7+16
-               if not (v8 <= length) then return false end
+               local v8 = v7 + 16
+               if not (v8 <= length) then do return false end end
                do
-                  local v9 = v7+14
+                  local v9 = v7 + 14
                   local v10 = ffi.cast("uint16_t*", P+v9)[0]
-                  if v10 == 20480 then return true end
+                  if v10 == 20480 then do return true end end
                   do
-                     local v11 = v7+18
-                     if not (v11 <= length) then return false end
+                     local v11 = v7 + 18
+                     if not (v11 <= length) then do return false end end
                      do
                         local v12 = ffi.cast("uint16_t*", P+v8)[0]
                         do return v12 == 20480 end
@@ -113,25 +113,25 @@ return function(P,length)
       end
 ::L3::
       do
-         if not (length >= 56) then return false end
+         if not (length >= 56) then do return false end end
          do
-            if not (v1 == 56710) then return false end
+            if not (v1 == 56710) then do return false end end
             do
                local v13 = P[20]
                if v13 == 6 then goto L11 end
                do
-                  if not (v13 == 44) then return false end
+                  if not (v13 == 44) then do return false end end
                   do
                      local v14 = P[54]
-                     if not (v14 == 6) then return false end
+                     if not (v14 == 6) then do return false end end
                   end
                end
 ::L11::
                do
                   local v15 = ffi.cast("uint16_t*", P+54)[0]
-                  if v15 == 20480 then return true end
+                  if v15 == 20480 then do return true end end
                   do
-                     if not (length >= 58) then return false end
+                     if not (length >= 58) then do return false end end
                      do
                         local v16 = ffi.cast("uint16_t*", P+56)[0]
                         do return v16 == 20480 end
