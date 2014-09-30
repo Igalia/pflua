@@ -121,6 +121,7 @@ local function compile_value(builder, expr)
    elseif op == '|' then return builder.v('bit.bor('..lhs..','..rhs..')')
    elseif op == '<<' then return builder.v('bit.lshift('..lhs..','..rhs..')')
    elseif op == '>>' then return builder.v('bit.rshift('..lhs..','..rhs..')')
+   elseif op == 'len' then return builder.v('bit.tobit(length)')
    else error('unexpected op', op) end
 end
 
