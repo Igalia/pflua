@@ -1,4 +1,4 @@
-# tcp port 80
+# src port 80
 
 
 ## BPF
@@ -7,20 +7,20 @@
 000: A = P[12:2]
 001: if (A == 34525) goto 2 else goto 8
 002: A = P[20:1]
-003: if (A == 6) goto 4 else goto 19
-004: A = P[54:2]
-005: if (A == 80) goto 18 else goto 6
-006: A = P[56:2]
+003: if (A == 132) goto 6 else goto 4
+004: if (A == 6) goto 6 else goto 5
+005: if (A == 17) goto 6 else goto 19
+006: A = P[54:2]
 007: if (A == 80) goto 18 else goto 19
 008: if (A == 2048) goto 9 else goto 19
 009: A = P[23:1]
-010: if (A == 6) goto 11 else goto 19
-011: A = P[20:2]
-012: if (A & 8191 != 0) goto 19 else goto 13
-013: X = (P[14:1] & 0xF) << 2
-014: A = P[X+14:2]
-015: if (A == 80) goto 18 else goto 16
-016: A = P[X+16:2]
+010: if (A == 132) goto 13 else goto 11
+011: if (A == 6) goto 13 else goto 12
+012: if (A == 17) goto 13 else goto 19
+013: A = P[20:2]
+014: if (A & 8191 != 0) goto 19 else goto 15
+015: X = (P[14:1] & 0xF) << 2
+016: A = P[X+14:2]
 017: if (A == 80) goto 18 else goto 19
 018: return 65535
 019: return 0
@@ -39,29 +39,28 @@ return function (P, length)
    if not (A==34525) then goto L7 end
    if 21 > length then return 0 end
    A = P[20]
-   if not (A==6) then goto L18 end
+   if (A==132) then goto L5 end
+   if (A==6) then goto L5 end
+   if not (A==17) then goto L18 end
+   ::L5::
    if 56 > length then return 0 end
    A = bit.bor(bit.lshift(P[54], 8), P[54+1])
-   if (A==80) then goto L17 end
-   if 58 > length then return 0 end
-   A = bit.bor(bit.lshift(P[56], 8), P[56+1])
    if (A==80) then goto L17 end
    goto L18
    ::L7::
    if not (A==2048) then goto L18 end
    if 24 > length then return 0 end
    A = P[23]
-   if not (A==6) then goto L18 end
+   if (A==132) then goto L12 end
+   if (A==6) then goto L12 end
+   if not (A==17) then goto L18 end
+   ::L12::
    if 22 > length then return 0 end
    A = bit.bor(bit.lshift(P[20], 8), P[20+1])
    if not (bit.band(A, 8191)==0) then goto L18 end
    if 14 >= length then return 0 end
    X = bit.lshift(bit.band(P[14], 15), 2)
    T = bit.tobit((X+14))
-   if T < 0 or T + 2 > length then return 0 end
-   A = bit.bor(bit.lshift(P[T], 8), P[T+1])
-   if (A==80) then goto L17 end
-   T = bit.tobit((X+16))
    if T < 0 or T + 2 > length then return 0 end
    A = bit.bor(bit.lshift(P[T], 8), P[T+1])
    if not (A==80) then goto L18 end
@@ -84,7 +83,14 @@ return function(P,length)
       if not (v1 == 8) then goto L3 end
       do
          local v2 = P[23]
-         if not (v2 == 6) then do return false end end
+         if v2 == 6 then goto L4 end
+         do
+            if v2 == 17 then goto L4 end
+            do
+               if not (v2 == 132) then do return false end end
+            end
+         end
+::L4::
          do
             local v3 = ffi.cast("uint16_t*", P+20)[0]
             local v4 = bit.band(v3,65311)
@@ -98,43 +104,46 @@ return function(P,length)
                do
                   local v9 = v7 + 14
                   local v10 = ffi.cast("uint16_t*", P+v9)[0]
-                  if v10 == 20480 then do return true end end
-                  do
-                     local v11 = v7 + 18
-                     if not (v11 <= length) then do return false end end
-                     do
-                        local v12 = ffi.cast("uint16_t*", P+v8)[0]
-                        do return v12 == 20480 end
-                     end
-                  end
+                  do return v10 == 20480 end
                end
             end
          end
       end
 ::L3::
       do
-         if not (length >= 56) then do return false end end
+         if not (length >= 55) then do return false end end
          do
             if not (v1 == 56710) then do return false end end
             do
-               local v13 = P[20]
-               if v13 == 6 then goto L11 end
+               local v11 = P[20]
+               if v11 == 6 then do return false end end
                do
-                  if not (v13 == 44) then do return false end end
+                  if not (v11 == 44) then goto L11 end
                   do
-                     local v14 = P[54]
-                     if not (v14 == 6) then do return false end end
+                     local v12 = P[54]
+                     if v12 == 6 then do return false end end
                   end
                end
 ::L11::
                do
-                  local v15 = ffi.cast("uint16_t*", P+54)[0]
-                  if v15 == 20480 then do return true end end
+                  if v11 == 17 then do return false end end
                   do
-                     if not (length >= 58) then do return false end end
+                     if not (v11 == 44) then goto L14 end
                      do
-                        local v16 = ffi.cast("uint16_t*", P+56)[0]
-                        do return v16 == 20480 end
+                        local v13 = P[54]
+                        if v13 == 17 then do return false end end
+                     end
+                  end
+::L14::
+                  do
+                     if v11 == 132 then do return false end end
+                     do
+                        if not (v11 == 44) then do return false end end
+                        do
+                           local v14 = P[54]
+                           if v14 == 132 then do return false end end
+                           do do return false end end
+                        end
                      end
                   end
                end
