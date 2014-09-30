@@ -31,7 +31,8 @@ local folders = {
    ['+'] = function(a, b) return a + b end,
    ['-'] = function(a, b) return a - b end,
    ['*'] = function(a, b) return a * b end,
-   ['/'] = function(a, b) return math.floor(a / b) end,
+   -- At run-time, b cannot be 0.  See Range:div() for more notes.
+   ['/'] = function(a, b) return b == 0 and 0 or math.floor(a / b) end,
    ['&'] = function(a, b) return bit.band(a, b) end,
    ['^'] = function(a, b) return bit.bxor(a, b) end,
    ['|'] = function(a, b) return bit.bor(a, b) end,
@@ -306,9 +307,23 @@ local function Range(min, max)
    function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
    function ret.div(lhs, rhs)
-      if rhs:min() > 0 or rhs:max() < 0 then return lhs:binary(rhs, '/') end
-      -- 0 is prohibited by assertions.
-      local low, high = Range(rhs:min(), -1), Range(1, rhs:max())
+      local rhs_min, rhs_max = rhs:min(), rhs:max()
+      if rhs_min > 0 or rhs_max < 0 then return lhs:binary(rhs, '/') end
+      -- 0 is prohibited by assertions, so we won't hit it at runtime,
+      -- but we could still see { '/', 0, 0 } in the IR when it is
+      -- dominated by an assertion that { '!=', 0, 0 }.  The resulting
+      -- range won't include the rhs-is-zero case.
+      if rhs_min == 0 then
+         -- If the RHS is (or folds to) literal 0, we certainly won't
+         -- reach here so we can make up whatever value we want.
+         if rhs_max == 0 then return Range(0, 0) end
+         rhs_min = 1
+      elseif rhs_max == 0 then
+         rhs_max = -1
+      end
+      -- Now that we have removed 0 from the limits, we can use binary()
+      -- on the two semi-ranges.
+      local low, high = Range(rhs_min, -1), Range(1, rhs_max)
       return lhs:binary(low, '/'):union(lhs:binary(high, '/'))
    end
    function ret.band(lhs, rhs)
