@@ -1,0 +1,122 @@
+# net ee:cc::9954:0/111
+
+
+## BPF
+
+```
+000: A = P[12:2]
+001: if (A == 34525) goto 2 else goto 21
+002: A = P[22:4]
+003: if (A == 15597772) goto 4 else goto 11
+004: A = P[26:4]
+005: if (A == 0) goto 6 else goto 11
+006: A = P[30:4]
+007: if (A == 0) goto 8 else goto 11
+008: A = P[34:4]
+009: A &= -131072
+010: if (A == -1722548224) goto 20 else goto 11
+011: A = P[38:4]
+012: if (A == 15597772) goto 13 else goto 21
+013: A = P[42:4]
+014: if (A == 0) goto 15 else goto 21
+015: A = P[46:4]
+016: if (A == 0) goto 17 else goto 21
+017: A = P[50:4]
+018: A &= -131072
+019: if (A == -1722548224) goto 20 else goto 21
+020: return 65535
+021: return 0
+```
+
+
+## BPF cross-compiled to Lua
+
+```
+return function (P, length)
+   local A = 0
+   if 14 > length then return 0 end
+   A = bit.bor(bit.lshift(P[12], 8), P[12+1])
+   if not (A==34525) then goto L20 end
+   if 26 > length then return 0 end
+   A = bit.bor(bit.lshift(P[22], 24),bit.lshift(P[22+1], 16), bit.lshift(P[22+2], 8), P[22+3])
+   if not (A==15597772) then goto L10 end
+   if 30 > length then return 0 end
+   A = bit.bor(bit.lshift(P[26], 24),bit.lshift(P[26+1], 16), bit.lshift(P[26+2], 8), P[26+3])
+   if not (A==0) then goto L10 end
+   if 34 > length then return 0 end
+   A = bit.bor(bit.lshift(P[30], 24),bit.lshift(P[30+1], 16), bit.lshift(P[30+2], 8), P[30+3])
+   if not (A==0) then goto L10 end
+   if 38 > length then return 0 end
+   A = bit.bor(bit.lshift(P[34], 24),bit.lshift(P[34+1], 16), bit.lshift(P[34+2], 8), P[34+3])
+   A = bit.band(A, -131072)
+   if (A==-1722548224) then goto L19 end
+   ::L10::
+   if 42 > length then return 0 end
+   A = bit.bor(bit.lshift(P[38], 24),bit.lshift(P[38+1], 16), bit.lshift(P[38+2], 8), P[38+3])
+   if not (A==15597772) then goto L20 end
+   if 46 > length then return 0 end
+   A = bit.bor(bit.lshift(P[42], 24),bit.lshift(P[42+1], 16), bit.lshift(P[42+2], 8), P[42+3])
+   if not (A==0) then goto L20 end
+   if 50 > length then return 0 end
+   A = bit.bor(bit.lshift(P[46], 24),bit.lshift(P[46+1], 16), bit.lshift(P[46+2], 8), P[46+3])
+   if not (A==0) then goto L20 end
+   if 54 > length then return 0 end
+   A = bit.bor(bit.lshift(P[50], 24),bit.lshift(P[50+1], 16), bit.lshift(P[50+2], 8), P[50+3])
+   A = bit.band(A, -131072)
+   if not (A==-1722548224) then goto L20 end
+   ::L19::
+   do return 65535 end
+   ::L20::
+   do return 0 end
+   error("end of bpf")
+end
+```
+
+
+## Direct pflang compilation
+
+```
+return function(P,length)
+   if not (length >= 54) then return false end
+   do
+      local v1 = ffi.cast("uint16_t*", P+12)[0]
+      if not (v1 == 56710) then return false end
+      do
+         local v2 = ffi.cast("uint32_t*", P+22)[0]
+         if not (v2 == 3422612992) then goto L3 end
+         do
+            local v3 = ffi.cast("uint32_t*", P+26)[0]
+            if not (v3 == 0) then goto L3 end
+            do
+               local v4 = ffi.cast("uint32_t*", P+30)[0]
+               if not (v4 == 0) then goto L3 end
+               do
+                  local v5 = ffi.cast("uint32_t*", P+34)[0]
+                  local v6 = bit.band(v5,65279)
+                  if v6 == 21657 then return true end
+               end
+            end
+         end
+::L3::
+         do
+            local v7 = ffi.cast("uint32_t*", P+38)[0]
+            if not (v7 == 3422612992) then return false end
+            do
+               local v8 = ffi.cast("uint32_t*", P+42)[0]
+               if not (v8 == 0) then return false end
+               do
+                  local v9 = ffi.cast("uint32_t*", P+46)[0]
+                  if not (v9 == 0) then return false end
+                  do
+                     local v10 = ffi.cast("uint32_t*", P+50)[0]
+                     local v11 = bit.band(v10,65279)
+                     do return v11 == 21657 end
+                  end
+               end
+            end
+         end
+      end
+   end
+end
+```
+

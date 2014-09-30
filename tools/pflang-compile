@@ -12,9 +12,9 @@ Usage: pflang-compile [--bpf] [--lua] [--pflua] <pflang-expression>
 
 Options:
 
-   --bpf-asm\tPrint libpcap-generated BPF asm code for <pflang-expression>
-   --bpf-lua\tPrint Lua code compiled from BPF for <pflang--expression>
-   --lua\tPrint Lua code compiled directly for <pflang--expression>\t(DEFAULT)
+   --bpf-asm   Print libpcap-generated BPF asm code for <pflang-expression>
+   --bpf-lua   Print Lua code compiled from BPF for <pflang-expression>
+   --lua       Print Lua code compiled directly for <pflang-expression> (DEFAULT)
 
    ]=]
    print(content);

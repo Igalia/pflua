@@ -2,7 +2,8 @@ module(...,package.seeall)
 
 local utils = require('pf.utils')
 
-local ipv4_to_int = utils.ipv4_to_int
+local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
+local uint32 = utils.uint32
 
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
@@ -57,21 +58,48 @@ local function lex_ipv4_or_host(str, pos)
 end
 
 local function lex_ipv6(str, pos)
+   local function expand_zeros_into(addr, number_of_zeros)
+      for i=1, number_of_zeros do table.insert(addr, 0) end
+   end
+   local function expand_ipv6(addr)
+      local result = { addr[1] }
+      local i = 2
+      while (i <= #addr) do
+         if type(addr[i]) == 'string' then
+            if type(addr[i+1]) == 'string' then
+               expand_zeros_into(result, 7)
+               i = i + 1
+            else
+               expand_zeros_into(result, 10 - #addr)
+            end
+         else
+            table.insert(result, addr[i])
+         end
+         i = i + 1
+      end
+      return result
+   end
+
    local addr = { 'ipv6' }
-   -- FIXME: Currently only supporting fully-specified IPV6 names.
-   local digits, dot = str:match("^(%x%x%x%x)()%:", pos)
-   assert(digits, "failed to parse ipv6 address at "..pos)
-   table.insert(addr, tonumber(digits, 16))
+   local digits, dot = str:match("^(%x?%x?%x?%x?)()%:", pos)
+   if not digits then digits = "" end
+   table.insert(addr, #digits == 0 and digits or tonumber(digits, 16))
    pos = dot
-   for i=1,15 do
-      local digits, dot = str:match("^%:(%x%x%x%x)()", pos)
-      assert(digits, "failed to parse ipv6 address at "..pos)
-      table.insert(addr, tonumber(digits, 16))
+   local hole = 0
+   while (true) do
+      local digits, dot = str:match("^%:(%x?%x?%x?%x?)()", pos)
+      if not dot then break end
+      if not digits then digits = "" end
+      if pos <= #str and dot - pos == 1 then hole = hole + 1 end
+      assert(hole <= 2, "wrong IPv6 address")
+      table.insert(addr, #digits == 0 and digits or tonumber(digits, 16))
       pos = dot
    end
    local terminators = " \t\r\n)/"
    assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
           "unexpected terminator for ipv6 address")
+   addr = expand_ipv6(addr)
+   assert(#addr == 9, "wrong IPv6 address")
    return addr, pos
 end
 
@@ -81,6 +109,7 @@ local function lex_ehost(str, pos)
       if (result < 16) then result = result * 2^4 end
       return result
    end
+   local start = pos
    local addr = { 'ehost' }
    local digits, dot = str:match("^(%x%x?)()%:", pos)
    assert(digits, "failed to parse ethernet host address at "..pos)
@@ -93,7 +122,10 @@ local function lex_ehost(str, pos)
       pos = dot
    end
    local terminators = " \t\r\n)/"
-   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
+   local last_char = str:sub(pos, pos)
+   -- MAC address is actually an IPv6 address
+   if last_char == ':' then return nil, start end
+   assert(pos > #str or terminators:find(last_char, 1, true),
           "unexpected terminator for ethernet host address")
    return addr, pos
 end
@@ -102,10 +134,12 @@ local function lex_addr(str, pos)
    local start_pos = pos
    if str:match("^%d%d?%d?%.", pos) then
       return lex_ipv4_or_host(str, pos)
-   elseif str:match("^%x%x%x%x%:", pos) then
-      return lex_ipv6(str, pos)
    elseif str:match("^%x%x?%:", pos) then
-      return lex_ehost(str, pos)
+      local result, pos = lex_ehost(str, pos)
+      if result then return result, pos end
+      return lex_ipv6(str, pos)
+   elseif str:match("^%x?%x?%x?%x?%:", pos) then
+      return lex_ipv6(str, pos)
    else
       return lex_host_or_keyword(str, pos)
    end
@@ -291,29 +325,50 @@ function parse_uint16_arg(lexer) return parse_int_arg(lexer, 0xffff) end
 
 function parse_net_arg(lexer)
 
-   function check_non_network_bits_in_addr(addr, mask, mask_str)
-      local ipv4 =  ipv4_to_int(addr)
-      if (bit.band(ipv4, mask) ~= bit.tobit(ipv4)) then
-         lexer.error("Non-network bits set in %d.%d.%d.%d/%s",
-                       addr[2], addr[3], addr[4], addr[5], mask_str)
+   local function check_non_network_bits_in_ipv4(addr, mask_bits, mask_str)
+      local ipv4 = uint32(addr[2], addr[3], addr[4], addr[5])
+      if (bit.band(ipv4, mask_bits) ~= bit.tobit(ipv4)) then
+         lexer.error("Non-network bits set in %s/%s",
+            table.concat(addr, ".", 2), mask_str)
+     end
+   end
+
+   local function check_non_network_bits_in_ipv6(addr, mask_len)
+      local function format_ipv6(addr, mask_len)
+         return string.format("%x:%x:%x:%x:%x:%x:%x:%x/%d, ",
+            addr[2], addr[3], addr[4], addr[5], addr[5], addr[6], addr[7],
+            addr[8], mask_len)
+      end
+      local ipv6 = ipv6_as_4x32(addr)
+      for i, fragment in ipairs(ipv6) do
+         local mask_len_fragment = mask_len > 32 and 32 or mask_len
+         local mask_bits = 2^32 - 2^(32 - mask_len_fragment)
+         if (bit.band(fragment, mask_bits) ~= bit.tobit(fragment)) then
+            lexer.error("Non-network bits set in %s", format_ipv6(addr, mask_len))
+         end
+         mask_len = mask_len - mask_len_fragment
       end
    end
 
    local arg = lexer.next()
    if arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       if lexer.check('/') then
-         local len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
+         local mask_len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
          if (arg[1] == 'ipv4') then
-            local mask = 2^32 - 2^(32 - len)
-            check_non_network_bits_in_addr(arg, mask, tostring(len))
+            local mask_bits = 2^32 - 2^(32 - mask_len)
+            check_non_network_bits_in_ipv4(arg, mask_bits, tostring(mask_len))
          end
-         return { arg[1]..'/len', arg, len }
+         if (arg[1] == 'ipv6') then
+            check_non_network_bits_in_ipv6(arg, mask_len)
+         end
+         return { arg[1]..'/len', arg, mask_len }
       elseif lexer.check('mask') then
-         local mask = lexer.next()
-         if (arg[1] == 'ipv4') then
-            check_non_network_bits_in_addr(arg, ipv4_to_int(mask),
-               table.concat(mask, '.', 2))
+         if (arg[1] == 'ipv6') then
+            lexer.error("Not valid syntax for IPv6")
          end
+         local mask = lexer.next()
+         check_non_network_bits_in_ipv4(arg, ipv4_to_int(mask),
+            table.concat(mask, '.', 2))
          assert(mask[1] == arg[1], 'bad mask', mask)
          return { arg[1]..'/mask', arg, mask }
       else
@@ -858,5 +913,23 @@ function selftest ()
              { 'ether_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
    parse_test("ether host f:f:f:3:3:3",
              { 'ether_host', { 'ehost', 240, 240, 240, 48, 48, 48 } })
+   parse_test("src net 192.168.1.0/24",
+             { 'src_net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
+   parse_test("src net 192.168.1.0 mask 255.255.255.0",
+             { 'src_net', { 'ipv4/mask', { 'ipv4', 192, 168, 1, 0 }, { 'ipv4', 255, 255, 255, 0 } } })
+   parse_test("host 0:0:0:0:0:0:0:1",
+             { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 } })
+   parse_test("host ::1",
+             { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 } })
+   parse_test("host 1::1",
+             { 'host', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 1 } })
+   parse_test("host 1::",
+             { 'host', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 0 } })
+   parse_test("src net eee:eee::0/96",
+             { 'src_net', { 'ipv6/len', { 'ipv6', 3822, 3822, 0, 0, 0, 0, 0, 0 }, 96 } })
+   parse_test("src net 192.168.1.0/24",
+             { 'src_net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
+   parse_test("src net 192.168.1.0 mask 255.255.255.0",
+             { 'src_net', { 'ipv4/mask', { 'ipv4', 192, 168, 1, 0 }, { 'ipv4', 255, 255, 255, 0 } } })
    print("OK")
 end

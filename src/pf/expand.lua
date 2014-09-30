@@ -8,7 +8,7 @@ local expand_arith, expand_relop, expand_bool
 
 local set, concat, pp = utils.set, utils.concat, utils.pp
 local uint16, uint32 = utils.uint16, utils.uint32
-local ipv4_to_int = utils.ipv4_to_int
+local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
 
 local ether_protos = set(
    'ip', 'ip6', 'arp', 'rarp', 'atalk', 'aarp', 'decnet', 'sca', 'lat',
@@ -313,6 +313,7 @@ local proto_info = {
    ip   = { id = PROTO_IPV4,  access = "[ip]",    src = 12, dst = 16 },
    arp  = { id = PROTO_ARP,   access = "[arp]",   src = 14, dst = 24 },
    rarp = { id = PROTO_RARP,  access = "[rarp]",  src = 14, dst = 24 },
+   ip6  = { id = PROTO_IPV6,  access = "[ip6]",   src =  8, dst = 24 },
 }
 
 local function has_proto_dir_host(proto, dir, addr, mask)
@@ -359,19 +360,77 @@ local function expand_rarp_host(expr)
    return { 'or', expand_rarp_src_host(expr), expand_rarp_dst_host(expr) }
 end
 
+-- IPv6
+
+local function ipv6_dir_host(proto, dir, addr, mask_len)
+   mask_len = mask_len or 128
+   local offset = proto_info.ip6[dir]
+   local ipv6 = ipv6_as_4x32(addr)
+
+   local function match_ipv6_fragment(i)
+      local fragment = ipv6[i]
+
+      -- Calculate mask for fragment
+      local mask = mask_len >= 32 and 0 or mask_len
+      mask_len = mask_len >= 32 and mask_len - 32 or 0
+
+      -- Retrieve address current offset
+      local val = { proto_info.ip6.access, offset, 4 }
+      offset = offset + 4
+
+      if mask ~= 0 then val = { '&', val, 2^32 - 2^(32 - mask) } end
+      return { '=', val, fragment }
+   end
+
+   -- Lowering of an IPv6 address does not require to go iterate through all
+   -- IPv6 fragments (4x32). Once mask_len becomes 0 is possible to exit.
+   local function match_ipv6(i)
+      local i = i or 1
+      local expr = match_ipv6_fragment(i)
+      if mask_len == 0 or i > 4 then return expr end
+      return { 'and', expr, match_ipv6(i + 1) }
+   end
+
+   return { 'and', has_ether_protocol(PROTO_IPV6), match_ipv6() }
+end
+
+local function expand_src_ipv6_host(expr)
+   return ipv6_dir_host('ip6', 'src', expr[2], expr[3])
+end
+local function expand_dst_ipv6_host(expr)
+   return ipv6_dir_host('ip6', 'dst', expr[2], expr[3])
+end
+local function expand_ipv6_host(expr)
+   return { 'or',
+            ipv6_dir_host('ip6', 'src', expr[2], expr[3]),
+            ipv6_dir_host('ip6', 'dst', expr[2], expr[3]) }
+end
+
 -- Host
 
+-- Format IPv4 expr: { { 'ipv4', 127, 0, 0, 1 }, 8 }
+-- Format IPv6 expr: { { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 }, 128 }
+local function is_ipv6_addr(expr)
+   return expr[2][1] == 'ipv6'
+end
+
 local function expand_src_host(expr)
+   if is_ipv6_addr(expr) then return expand_src_ipv6_host(expr) end
    return { 'if', { 'ip' }, expand_ip_src_host(expr),
             { 'if', { 'arp' }, expand_arp_src_host(expr),
               expand_rarp_src_host(expr) } }
 end
 local function expand_dst_host(expr)
+   if is_ipv6_addr(expr) then return expand_dst_ipv6_host(expr) end
    return { 'if', { 'ip' }, expand_ip_dst_host(expr),
             { 'if', { 'arp' }, expand_arp_dst_host(expr),
               expand_rarp_dst_host(expr) } }
 end
+-- Format IPv4: { 'ipv4/len', { 'ipv4', 127, 0, 0, 1 }, 8 }
+-- Format IPv4: { 'ipv4/mask', { 'ipv4', 127, 0, 0, 1 }, { 'ipv4', 255, 0, 0, 0 } }
+-- Format IPv6: { 'ipv6/len', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 }, 128 }
 local function expand_host(expr)
+   if is_ipv6_addr(expr) then return expand_ipv6_host(expr) end
    return { 'if', { 'ip' }, expand_ip_host(expr),
             { 'if', { 'arp' }, expand_arp_host(expr),
               expand_rarp_host(expr) } }
@@ -402,12 +461,18 @@ end
 -- Net
 
 local function expand_src_net(expr)
+   if is_ipv6_addr(expr[2]) then return expand_src_ipv6_host(expr[2]) end
    return expand_src_host(expr[2])
 end
 local function expand_dst_net(expr)
+   if is_ipv6_addr(expr[2]) then return expand_dst_ipv6_host(expr[2]) end
    return expand_dst_host(expr[2])
 end
+
+-- Format IPv4 expr: { 'net', { 'ipv4/len', { 'ipv4', 127, 0, 0, 0 }, 8 } }
+-- Format IPV6 expr: { 'net', { 'ipv6/len', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 }, 128 } }
 local function expand_net(expr)
+   if is_ipv6_addr(expr[2]) then return expand_ipv6_host(expr[2]) end
    return expand_host(expr[2])
 end
 
