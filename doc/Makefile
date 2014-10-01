@@ -16,6 +16,9 @@ EXAMPLES = \
 	ether-multicast.md \
 	ether-broadcast.md \
 	ether-proto-decnet.md
+	dst-portrange-80-90.md \
+	src-host-192.68.1.1-and-less-100.md \
+	dst-host-192.68.1.1-and-greater-100.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -74,3 +77,9 @@ ether-broadcast.md:
 
 ether-proto-decnet.md:
 	../tools/dump-markdown "ether proto \decnet" > $@.tmp && mv $@.tmp $@
+
+src-host-192.68.1.1-and-less-100.md: $(PFLUA)
+	../tools/dump-markdown "src host 192.68.1.1 and less 100" > $@.tmp && mv $@.tmp $@
+
+dst-host-192.68.1.1-and-greater-100.md: $(PFLUA)
+	../tools/dump-markdown "dst host 192.68.1.1 and greater 50 + 50" > $@.tmp && mv $@.tmp $@
