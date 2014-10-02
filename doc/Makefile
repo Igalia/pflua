@@ -13,6 +13,9 @@ EXAMPLES = \
 	src-net-ffff.ffff.eeee.eeee.0.0.0.0-72.md \
 	src-port-80.md \
 	dst-portrange-80-90.md
+	ether-multicast.md \
+	ether-broadcast.md \
+	ether-proto-decnet.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -62,3 +65,12 @@ src-port-80.md:
 
 dst-portrange-80-90.md:
 	../tools/dump-markdown "dst portrange 80-90" > $@.tmp && mv $@.tmp $@
+
+ether-multicast.md:
+	../tools/dump-markdown "ether multicast" > $@.tmp && mv $@.tmp $@
+
+ether-broadcast.md:
+	../tools/dump-markdown "ether broadcast" > $@.tmp && mv $@.tmp $@
+
+ether-proto-decnet.md:
+	../tools/dump-markdown "ether proto \decnet" > $@.tmp && mv $@.tmp $@

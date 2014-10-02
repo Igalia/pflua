@@ -10,11 +10,6 @@ local set, concat, pp = utils.set, utils.concat, utils.pp
 local uint16, uint32 = utils.uint16, utils.uint32
 local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
 
-local ether_protos = set(
-   'ip', 'ip6', 'arp', 'rarp', 'atalk', 'aarp', 'decnet', 'sca', 'lat',
-   'mopdl', 'moprc', 'iso', 'stp', 'ipx', 'netbeui'
-)
-
 local ip_protos = set(
    'icmp', 'icmp6', 'igmp', 'igrp', 'pim', 'ah', 'esp', 'vrrp', 'udp', 'tcp'
 )
@@ -56,10 +51,21 @@ local function unimplemented(expr, dlt)
 end
 
 -- Ethernet protocols
-local PROTO_IPV4 = 2048
-local PROTO_ARP = 2054
-local PROTO_RARP = 32821
-local PROTO_IPV6 = 34525
+local PROTO_IPV4 = 2048       -- 0x800
+local PROTO_ARP = 2054        -- 0x806
+local PROTO_RARP = 32821      -- 0x8035
+local PROTO_ATALK = 32923     -- 0x809b
+local PROTO_AARP = 33011      -- 0x80f3
+local PROTO_IPV6 = 34525      -- 0x86dd
+local PROTO_DECNET = 24579    -- 0x6003
+local PROTO_SCA = 24583       -- 0x6007
+local PROTO_LAT = 24580       -- 0x6004
+local PROTO_MOPDL = 24577     -- 0x6001
+local PROTO_MOPRC = 24578     -- 0x6002
+local PROTO_ISO = 65278       -- 0xfefe
+local PROTO_STP = 66          -- 0x42
+local PROTO_IPX = 33079       -- 0X8137
+local PROTO_NETBEUI = 61680   -- 0xf0f0
 local ether_min_payloads = {
    [PROTO_IPV4] = 20,
    [PROTO_ARP] = 28,
@@ -475,6 +481,114 @@ end
 local function expand_ether_host(expr)
    return { 'or', expand_ether_src_host(expr), expand_ether_dst_host(expr) }
 end
+local function expand_ether_broadcast(expr)
+   local broadcast = { 'ehost', 255, 255, 255, 255, 255, 255 }
+   local hi, lo = ehost_to_int(broadcast)
+   return { 'and',
+            { '=', { '[ether]', 0, 2 }, hi },
+            { '=', { '[ether]', 2, 4 }, lo } }
+end
+local function expand_ether_multicast(expr)
+   return { '!=', { '&', { '[ether]', 0, 1 }, 1 }, 0 }
+end
+
+-- Ether protos
+
+local function expand_ip(expr)
+   return has_ether_protocol(PROTO_IPV4)
+end
+local function expand_ip6(expr)
+   return has_ether_protocol(PROTO_IPV6)
+end
+local function expand_arp(expr)
+   return has_ether_protocol(PROTO_ARP)
+end
+local function expand_rarp(expr)
+   return has_ether_protocol(PROTO_RARP)
+end
+local function expand_atalk(expr)
+  return { 'or',
+           has_ether_protocol(PROTO_ATALK),
+           { 'if', { '>', { '[ether]', 12, 2}, 1500 },
+             { 'fail' },
+             { 'and',
+               { '=', { '[ether]', 18, 2 }, 491675 },
+               { '=', { '[ether]', 14, 4 }, 2863268616 } } } }
+end
+local function expand_aarp(expr)
+  return { 'or',
+           has_ether_protocol(PROTO_AARP),
+           { 'if', { '>', { '[ether]', 12, 2}, 1500 },
+             { 'fail' },
+             { 'and',
+               { '=', { '[ether]', 18, 2 }, 33011 },
+               { '=', { '[ether]', 14, 4 }, 2863268608 } } } }
+end
+local function expand_decnet(expr)
+   return has_ether_protocol(PROTO_DECNET)
+end
+local function expand_sca(expr)
+   return has_ether_protocol(PROTO_SCA)
+end
+local function expand_lat(expr)
+   return has_ether_protocol(PROTO_LAT)
+end
+local function expand_mopdl(expr)
+   return has_ether_protocol(PROTO_MOPDL)
+end
+local function expand_moprc(expr)
+   return has_ether_protocol(PROTO_MOPRC)
+end
+local function expand_iso(expr)
+   return { 'and',
+            { '<=', { '[ether]', 12, 2 }, 1500 },
+            { '=', { '[ether]', 14, 2 }, PROTO_ISO } }
+end
+local function expand_stp(expr)
+   return { 'and',
+            { '<=', { '[ether]', 12, 2 }, 1500 },
+            { '=', { '[ether]', 14, 1 }, PROTO_STP } }
+end
+local function expand_ipx(expr)
+  return { 'or',
+           has_ether_protocol(PROTO_IPX),
+           { 'if', { '>', { '[ether]', 12, 2}, 1500 },
+             { 'fail' },
+             { 'or',
+               { 'and',
+                 { '=', { '[ether]', 18, 2 }, 33079 },
+                 { '=', { '[ether]', 14, 4 }, 2863268608 } },
+               { 'or',
+                 { '=', { '[ether]', 14, 1 }, 224 },
+                 { '=', { '[ether]', 14, 2 }, 65535 } } } } }
+end
+local function expand_netbeui(expr)
+   return { 'and',
+            { '<=', { '[ether]', 12, 2 }, 1500 },
+            { '=', { '[ether]', 14, 2 }, PROTO_NETBEUI } }
+end
+
+local ether_protos = {
+   ip      = expand_ip,
+   ip6     = expand_ip6,
+   arp     = expand_arp,
+   rarp    = expand_rarp,
+   atalk   = expand_atalk,
+   aarp    = expand_aarp,
+   decnet  = expand_decnet,
+   sca     = expand_sca,
+   lat     = expand_lat,
+   mopdl   = expand_mopdl,
+   moprc   = expand_moprc,
+   iso     = expand_iso,
+   stp     = expand_stp,
+   ipx     = expand_ipx,
+   netbeui = expand_netbeui,
+}
+
+local function expand_ether_proto(expr)
+   return ether_protos[expr[2]](expr)
+end
 
 -- Net
 
@@ -509,16 +623,18 @@ local primitive_expanders = {
    ether_dst = expand_ether_dst_host,
    ether_dst_host = expand_ether_dst_host,
    ether_host = expand_ether_host,
-   ether_broadcast = unimplemented,
-   ether_multicast = unimplemented,
-   ether_proto = unimplemented,
+   ether_broadcast = expand_ether_broadcast,
+   broadcast = expand_ether_broadcast,
+   ether_multicast = expand_ether_multicast,
+   multicast = expand_ether_multicast,
+   ether_proto = expand_ether_proto,
    gateway = unimplemented,
    net = expand_net,
    port = expand_port,
    portrange = expand_portrange,
    less = unimplemented,
    greater = unimplemented,
-   ip = function(expr) return has_ether_protocol(PROTO_IPV4) end,
+   ip = expand_ip,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,
    ip_host = expand_ip_host,
@@ -528,7 +644,7 @@ local primitive_expanders = {
    ip_dst_host = expand_ip_dst_host,
    ip_broadcast = unimplemented,
    ip_multicast = unimplemented,
-   ip6 = function(expr) return has_ether_protocol(PROTO_IPV6) end,
+   ip6 = expand_ip6,
    ip6_proto = unimplemented,
    ip6_protochain = unimplemented,
    ip6_multicast = unimplemented,
@@ -549,30 +665,32 @@ local primitive_expanders = {
    udp_dst_portrange = expand_udp_dst_portrange,
    icmp = function(expr) return has_ip_protocol(PROTO_ICMP) end,
    protochain = unimplemented,
-   arp = function(expr) return has_ether_protocol(PROTO_ARP) end,
+   arp = expand_arp,
    arp_host = expand_arp_host,
    arp_src = expand_arp_src_host,
    arp_src_host = expand_arp_src_host,
    arp_dst = expand_arp_dst_host,
    arp_dst_host = expand_arp_dst_host,
-   rarp = function(expr) return has_ether_protocol(PROTO_RARP) end,
+   rarp = expand_rarp,
    rarp_host = expand_rarp_host,
    rarp_src = expand_rarp_src_host,
    rarp_src_host = expand_rarp_src_host,
    rarp_dst = expand_rarp_dst_host,
    rarp_dst_host = expand_rarp_dst_host,
-   atalk = unimplemented,
-   aarp = unimplemented,
+   atalk = expand_atalk,
+   aarp = expand_aarp,
+   decnet = expand_decnet,
    decnet_src = unimplemented,
    decnet_dst = unimplemented,
    decnet_host = unimplemented,
-   iso = unimplemented,
-   stp = unimplemented,
-   ipx = unimplemented,
-   netbeui = unimplemented,
-   lat = unimplemented,
-   moprc = unimplemented,
-   mopdl = unimplemented,
+   iso = expand_iso,
+   stp = expand_stp,
+   ipx = expand_ipx,
+   netbeui = expand_netbeui,
+   sca = expand_sca,
+   lat = expand_lat,
+   moprc = expand_moprc,
+   mopdl = expand_mopdl,
    llc = unimplemented,
    ifname = unimplemented,
    on = unimplemented,
