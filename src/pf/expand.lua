@@ -608,6 +608,15 @@ local function expand_net(expr)
    return expand_host(expr[2])
 end
 
+-- Packet length
+
+local function expand_less(expr)
+   return { '<=', 'len', expr[2] }
+end
+local function expand_greater(expr)
+   return { '>=', 'len', expr[2] }
+end
+
 local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
@@ -632,8 +641,8 @@ local primitive_expanders = {
    net = expand_net,
    port = expand_port,
    portrange = expand_portrange,
-   less = unimplemented,
-   greater = unimplemented,
+   less = expand_less,
+   greater = expand_greater,
    ip = expand_ip,
    ip_proto = unimplemented,
    ip_protochain = unimplemented,

@@ -624,6 +624,54 @@ local rarp_types = {
    host = unary(parse_host_arg),
 }
 
+local parse_arithmetic
+
+local function parse_primary_arithmetic(lexer, tok)
+   tok = tok or lexer.next({maybe_arithmetic=true})
+   if tok == '(' then
+      local expr = parse_arithmetic(lexer)
+      lexer.consume(')')
+      return expr
+   elseif tok == 'len' or type(tok) == 'number' then
+      return tok
+   elseif addressables[tok] then
+      lexer.consume('[')
+      local pos = parse_arithmetic(lexer)
+      local size = 1
+      if lexer.check(':') then
+         if lexer.check(1) then size = 1
+         elseif lexer.check(2) then size = 1
+         else lexer.consume(4); size = 1 end
+      end
+      lexer.consume(']')
+      return { '['..tok..']', pos, size}
+   else
+      lexer.error('bad token while parsing arithmetic expression %s', tok)
+   end
+end
+
+local arithmetic_precedence = {
+   ['*'] = 1, ['/'] = 1,
+   ['+'] = 2, ['-'] = 2,
+   ['<<'] = 3, ['>>'] = 3,
+   ['&'] = 4,
+   ['^'] = 5,
+   ['|'] = 6
+}
+
+function parse_arithmetic(lexer, tok, max_precedence, parsed_exp)
+   local exp = parsed_exp or parse_primary_arithmetic(lexer, tok)
+   max_precedence = max_precedence or math.huge
+   while true do
+      local op = lexer.peek()
+      local prec = arithmetic_precedence[op]
+      if not prec or prec > max_precedence then return exp end
+      lexer.consume(op)
+      local rhs = parse_arithmetic(lexer, nil, prec - 1)
+      exp = { op, exp, rhs }
+   end
+end
+
 local primitives = {
    dst = table_parser(src_or_dst_types),
    src = table_parser(src_or_dst_types),
@@ -635,8 +683,8 @@ local primitives = {
    net = unary(parse_net_arg),
    port = unary(parse_port_arg),
    portrange = unary(parse_portrange_arg),
-   less = unary(parse_int_arg),
-   greater = unary(parse_int_arg),
+   less = unary(parse_arithmetic),
+   greater = unary(parse_arithmetic),
    ip = table_parser(ip_types, nullary()),
    ip6 = table_parser(ip6_types, nullary()),
    proto = unary(parse_proto_arg),
@@ -701,54 +749,6 @@ local primitives = {
    connectmsg = nullary(),
    metaconnect = nullary()
 }
-
-local parse_arithmetic
-
-local function parse_primary_arithmetic(lexer, tok)
-   tok = tok or lexer.next({maybe_arithmetic=true})
-   if tok == '(' then
-      local expr = parse_arithmetic(lexer)
-      lexer.consume(')')
-      return expr
-   elseif tok == 'len' or type(tok) == 'number' then
-      return tok
-   elseif addressables[tok] then
-      lexer.consume('[')
-      local pos = parse_arithmetic(lexer)
-      local size = 1
-      if lexer.check(':') then
-         if lexer.check(1) then size = 1
-         elseif lexer.check(2) then size = 1
-         else lexer.consume(4); size = 1 end
-      end
-      lexer.consume(']')
-      return { '['..tok..']', pos, size}
-   else
-      lexer.error('bad token while parsing arithmetic expression %s', tok)
-   end
-end
-
-local arithmetic_precedence = {
-   ['*'] = 1, ['/'] = 1,
-   ['+'] = 2, ['-'] = 2,
-   ['<<'] = 3, ['>>'] = 3,
-   ['&'] = 4,
-   ['^'] = 5,
-   ['|'] = 6
-}
-
-function parse_arithmetic(lexer, tok, max_precedence, parsed_exp)
-   local exp = parsed_exp or parse_primary_arithmetic(lexer, tok)
-   max_precedence = max_precedence or math.huge
-   while true do
-      local op = lexer.peek()
-      local prec = arithmetic_precedence[op]
-      if not prec or prec > max_precedence then return exp end
-      lexer.consume(op)
-      local rhs = parse_arithmetic(lexer, nil, prec - 1)
-      exp = { op, exp, rhs }
-   end
-end
 
 local function parse_primitive_or_arithmetic(lexer)
    local tok = lexer.next({maybe_arithmetic=true})
@@ -949,5 +949,7 @@ function selftest ()
              { 'src_net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
    parse_test("src net 192.168.1.0 mask 255.255.255.0",
              { 'src_net', { 'ipv4/mask', { 'ipv4', 192, 168, 1, 0 }, { 'ipv4', 255, 255, 255, 0 } } })
+   parse_test("less 100", {"less", 100})
+   parse_test("greater 50 + 50", {"greater", {"+", 50, 50}})
    print("OK")
 end
