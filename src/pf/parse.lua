@@ -411,20 +411,24 @@ local function table_parser(table, default)
    end
 end
 
+local function parse_proto_arg(lexer, proto_type, protos)
+   lexer.check('\\')
+   local arg = lexer.next()
+   if type(arg) == 'number' then return arg end
+   if type(arg) == 'string' then
+      local proto = arg:match("^(%w+)")
+      if protos[proto] then return proto end
+   end
+   lexer.error('invalid %s proto %s', proto_type, arg)
+end
+
 local ether_protos = set(
    'ip', 'ip6', 'arp', 'rarp', 'atalk', 'aarp', 'decnet', 'sca', 'lat',
    'mopdl', 'moprc', 'iso', 'stp', 'ipx', 'netbeui'
 )
 
 local function parse_ether_proto_arg(lexer)
-   lexer.check('\\')
-   local arg = lexer.next()
-   if type(arg) == 'number' then return arg end
-   if type(arg) == 'string' then
-      local proto = arg:match("^(%w+)")
-      if ether_protos[proto] then return proto end
-   end
-   lexer.error('invalid ethernet proto %s', arg)
+   return parse_proto_arg(lexer, 'ethernet', ether_protos)
 end
 
 local ip_protos = set(
@@ -432,14 +436,7 @@ local ip_protos = set(
 )
 
 local function parse_ip_proto_arg(lexer)
-   lexer.check('\\')
-   local arg = lexer.next()
-   if type(arg) == 'number' then return arg end
-   if type(arg) == 'string' then
-      local proto = arg:match("^(%w+)")
-      if ip_protos[proto] then return proto end
-   end
-   lexer.error('invalid ip proto %s', arg)
+   return parse_proto_arg(lexer, 'ip', ip_protos)
 end
 
 local function simple_typed_arg_parser(expected)
@@ -570,14 +567,15 @@ local ip_types = {
    src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
    proto = unary(parse_ip_proto_arg),
-   protochain = unary(parse_proto_arg),
+   protochain = unary(parse_ip_proto_arg),
    broadcast = nullary(),
    multicast = nullary(),
 }
 
 local ip6_types = {
    proto = unary(parse_ip_proto_arg),
-   protochain = unary(parse_proto_arg),
+   protochain = unary(parse_ip_proto_arg),
+   broadcast = nullary(),
    multicast = nullary(),
 }
 
@@ -691,6 +689,12 @@ local primitives = {
    tcp = table_parser(tcp_or_udp_types, nullary()),
    udp = table_parser(tcp_or_udp_types, nullary()),
    icmp = nullary(),
+   igmp = nullary(),
+   igrp = nullary(),
+   pim = nullary(),
+   ah = nullary(),
+   esp = nullary(),
+   vrrp = nullary(),
    protochain = unary(parse_proto_arg),
    arp = table_parser(arp_types, nullary()),
    rarp = table_parser(rarp_types, nullary()),
@@ -892,6 +896,8 @@ function selftest ()
               { 'ether_proto', 'rarp' })
    parse_test("ether proto \\rarp",
               { 'ether_proto', 'rarp' })
+   parse_test("ether proto \\100",
+              { 'ether_proto', 100 })
    parse_test("ip proto tcp",
               { 'ip_proto', 'tcp' })
    parse_test("ip proto \\tcp",
@@ -902,6 +908,10 @@ function selftest ()
               { 'decnet_host', { 'decnet', 10, 23 } })
    parse_test("ip proto icmp",
               { 'ip_proto', 'icmp' })
+   parse_test("ip6 protochain icmp",
+              { 'ip6_protochain', 'icmp' })
+   parse_test("ip6 protochain 100",
+              { 'ip6_protochain', 100 })
    parse_test("ip",
               { 'ip' })
    parse_test("type mgt",
