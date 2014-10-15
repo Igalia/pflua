@@ -12,10 +12,10 @@ EXAMPLES = \
 	src-net-ffff.ffff.eeee.eeee.1.0.0.0-82.md \
 	src-net-ffff.ffff.eeee.eeee.0.0.0.0-72.md \
 	src-port-80.md \
-	dst-portrange-80-90.md
+	dst-portrange-80-90.md \
 	ether-multicast.md \
 	ether-broadcast.md \
-	ether-proto-decnet.md
+	ether-proto-decnet.md \
 	dst-portrange-80-90.md \
 	src-host-192.68.1.1-and-less-100.md \
 	dst-host-192.68.1.1-and-greater-100.md
