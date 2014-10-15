@@ -7,17 +7,20 @@ local pf = require("pf")
 local savefile = require("pf.savefile")
 
 local function filter(ptr, ptr_end, out, pred)
-   local seen, written = 0, 0
-   while ptr < ptr_end do
-      local record = ffi.cast("struct pcap_record *", ptr)
+   local seen, written, offset = 0, 0, 0
+   local max_offset = ptr_end - ptr
+   local pcap_record_size = ffi.sizeof("struct pcap_record")
+   while offset < max_offset do
+      local cur_ptr = ptr + offset
+      local record = ffi.cast("struct pcap_record *", cur_ptr)
       local packet = ffi.cast("unsigned char *", record + 1)
       local ptr_next = packet + record.incl_len
+      offset = offset + pcap_record_size + record.incl_len
       if pred(packet, record.incl_len) then
          out:write(ffi.string(ptr, ptr_next - ptr))
          written = written + 1
       end
       seen = seen + 1
-      ptr = ptr_next
    end
    out:flush()
    return seen, written
