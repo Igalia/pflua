@@ -306,7 +306,7 @@ local function Range(min, max)
    function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
    function ret.div(lhs, rhs)
-      let rhs_min, rhs_max = rhs:min(), rhs:max()
+      local rhs_min, rhs_max = rhs:min(), rhs:max()
       if rhs_min > 0 or rhs_max < 0 then return lhs:binary(rhs, '/') end
       -- 0 is prohibited by assertions, so we won't hit it at runtime,
       -- but we could still see { '/', 0, 0 } in the IR when it is
