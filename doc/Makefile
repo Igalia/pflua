@@ -16,9 +16,16 @@ EXAMPLES = \
 	ether-multicast.md \
 	ether-broadcast.md \
 	ether-proto-decnet.md \
+	ether-proto-1500.md \
+	ether-proto-1501.md \
+	ether-proto-255.md \
 	dst-portrange-80-90.md \
 	src-host-192.68.1.1-and-less-100.md \
-	dst-host-192.68.1.1-and-greater-100.md
+	dst-host-192.68.1.1-and-greater-100.md \
+	ip-multicast.md \
+	ip-proto-ah.md \
+	ip6-multicast.md \
+	ip6-proto-ah.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -78,8 +85,33 @@ ether-broadcast.md:
 ether-proto-decnet.md:
 	../tools/dump-markdown "ether proto \decnet" > $@.tmp && mv $@.tmp $@
 
+# The frame should be treated as an Ethernet frame.
+ether-proto-1501.md:
+	../tools/dump-markdown "ether proto 1501" > $@.tmp && mv $@.tmp $@
+
+# The frame should be treated as an 802.3 frame.
+ether-proto-1500.md:
+	../tools/dump-markdown "ether proto 1500" > $@.tmp && mv $@.tmp $@
+
+# The frame should be treated as an 802.3 frame and check SAP (Service Access
+# Point) at byte 14.
+ether-proto-255.md:
+	../tools/dump-markdown "ether proto 255" > $@.tmp && mv $@.tmp $@
+
 src-host-192.68.1.1-and-less-100.md: $(PFLUA)
 	../tools/dump-markdown "src host 192.68.1.1 and less 100" > $@.tmp && mv $@.tmp $@
 
 dst-host-192.68.1.1-and-greater-100.md: $(PFLUA)
-	../tools/dump-markdown "dst host 192.68.1.1 and greater 50 + 50" > $@.tmp && mv $@.tmp $@
+	../tools/dump-markdown "dst host 192.68.1.1 and greater 100" > $@.tmp && mv $@.tmp $@
+
+ip-multicast.md:
+	../tools/dump-markdown "ip multicast" > $@.tmp && mv $@.tmp $@
+
+ip-proto-ah.md:
+	../tools/dump-markdown "ip proto \ah" > $@.tmp && mv $@.tmp $@
+
+ip6-multicast.md:
+	../tools/dump-markdown "ip6 multicast" > $@.tmp && mv $@.tmp $@
+
+ip6-proto-ah.md:
+	../tools/dump-markdown "ip6 proto \ah" > $@.tmp && mv $@.tmp $@
