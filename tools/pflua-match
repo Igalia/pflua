@@ -22,9 +22,21 @@ local function filter(ptr, ptr_end, pred)
    return seen, matched
 end
 
-function main(in_file, filter_str)
+function get_predicate(filter_input)
+   -- If the filter seems to be a filename, read the filter from the file.
+   -- Otherwise, compile it as a filter string.
+   local filter_file_pred = loadfile(filter_input)
+   if filter_file_pred then
+      if not getfenv(0).ffi then getfenv(0).ffi = require('ffi') end
+      return filter_file_pred()
+   else
+      return  pf.compile_filter(filter_input)
+   end
+end
+
+function main(in_file, filter_input)
    local header, ptr, ptr_end = savefile.open_and_mmap(in_file)
-   local pred = pf.compile_filter(filter_str)
+   local pred = get_predicate(filter_input)
    -- Warm up.
    filter(ptr, ptr_end, pred)
    local start = utils.now()
@@ -34,7 +46,7 @@ function main(in_file, filter_str)
                        matched, seen, in_file, seen/elapsed*1e-6))
 end
 
-local in_file, filter_str = ...
-assert(filter_str, "usage: pflua-match IN.PCAP FILTER")
+local in_file, filter_input = ...
+assert(filter_input, "usage: pflua-match IN.PCAP FILTER (as a string or file)")
 
-main(in_file, filter_str)
+main(in_file, filter_input)
