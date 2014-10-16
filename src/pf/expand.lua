@@ -40,8 +40,6 @@ local wlan_frame_data_subtypes = set(
 
 local wlan_directions = set('nods', 'tods', 'fromds', 'dstods')
 
-local iso_proto_types = set('clnp', 'esis', 'isis')
-
 local function unimplemented(expr, dlt)
    error("not implemented: "..expr[1])
 end
@@ -62,6 +60,7 @@ local PROTO_ISO = 65278       -- 0xfefe
 local PROTO_STP = 66          -- 0x42
 local PROTO_IPX = 33079       -- 0X8137
 local PROTO_NETBEUI = 61680   -- 0xf0f0
+
 local ether_min_payloads = {
    [PROTO_IPV4] = 20,
    [PROTO_ARP] = 28,
@@ -86,6 +85,12 @@ local ip_min_payloads = {
    [PROTO_UDP] = 8,
    [PROTO_TCP] = 20
 }
+
+-- ISO protocols
+
+local PROTO_CLNP = 129        -- 0x81
+local PROTO_ESIS = 130        -- 0x82
+local PROTO_ISIS = 131        -- 0x83
 
 -- Minimum payload checks insert a byte access to the last byte of the
 -- minimum payload size.  Since the comparison should fold (because it
@@ -414,6 +419,26 @@ local function expand_ip_proto(expr, ip_type)
    assert(proto and (ip_type == 'ip' or ip_type == 'ip6'), "Invalid ip protocol")
    if ip_type == 'ip' then return has_ipv4_protocol(proto) end
    if ip_type == 'ip6' then return has_ipv6_protocol(proto) end
+end
+
+-- ISO
+
+local iso_protos = {
+   clnp = PROTO_CLNP,
+   esis = PROTO_ESIS,
+   isis = PROTO_ISIS,
+}
+
+local function has_iso_protocol(proto)
+  return { 'and',
+           { '<=', { '[ether]', 12, 2 }, 1500 },
+           { 'and',
+             { '=', { '[ether]', 14, 2 }, 65278 },
+             { '=', { '[ether]', 17, 1 }, proto } } }
+end
+
+local function expand_iso_proto(expr)
+   return has_iso_protocol(assert(iso_protos[expr[2]], "Invalid ISO protocol"))
 end
 
 -- ARP protocol
@@ -790,10 +815,10 @@ local primitive_expanders = {
    mpls = unimplemented,
    pppoed = unimplemented,
    pppoes = unimplemented,
-   iso_proto = unimplemented,
-   clnp = unimplemented,
-   esis = unimplemented,
-   isis = unimplemented,
+   iso_proto = expand_iso_proto,
+   clnp = function(expr) return has_iso_protocol(PROTO_CLNP) end,
+   esis = function(expr) return has_iso_protocol(PROTO_ESIS) end,
+   isis = function(expr) return has_iso_protocol(PROTO_ISIS) end,
    l1 = unimplemented,
    l2 = unimplemented,
    iih = unimplemented,
