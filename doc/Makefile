@@ -26,7 +26,8 @@ EXAMPLES = \
 	ip-proto-ah.md \
 	ip6-multicast.md \
 	ip6-proto-ah.md \
-	iso-proto-clnp.md
+	iso-proto-clnp.md \
+	proto-sctp.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -119,3 +120,6 @@ ip6-proto-ah.md:
 
 iso-proto-clnp.md:
 	../tools/dump-markdown "iso proto \clnp" > $@.tmp && mv $@.tmp $@
+
+proto-sctp.md:
+	../tools/dump-markdown "proto \sctp" > $@.tmp && mv $@.tmp $@
