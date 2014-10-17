@@ -2,8 +2,6 @@
 # http://thejacklawson.com/2012/09/lua-testing-with-busted-and-travis-ci/
 language: erlang
 
-env: LUA="luajit"
-
 before_install: git submodule update --init
 
 install: sudo apt-get install libpcap-dev
