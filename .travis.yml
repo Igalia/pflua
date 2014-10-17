@@ -6,4 +6,6 @@ env: LUA="luajit"
 
 before_install: git submodule update --init
 
+install: sudo apt-get install libpcap-dev
+
 script: make && make check
