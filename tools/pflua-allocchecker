@@ -13,10 +13,13 @@ function get_trace(...)
    return io.popen(cmdline):read("*all")
 end
 
+-- An 'interesting' start is currently one that's in a filter, not library code.
 function find_first_interesting_start(raw_traces)
    local i = 1
+   pf_files = {"bpf", "codegen", "expand", "libpcap", "optimize", "parse",
+       "savefile", "types", "utils"}
    boring = {}
-   for _, v in pairs({"utils", "expand", "optimize", "codegen"}) do
+   for _, v in pairs(pf_files) do
       boring[v] = true
    end
    while true do
