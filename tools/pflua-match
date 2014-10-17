@@ -18,17 +18,11 @@ Usage: pflua-match [--bpf] IN.PCAP FILTER
    os.exit(false)
 end
 
-local function filter(ptr, ptr_end, pred)
+local function filter(packets, pred)
    local seen, matched = 0, 0
-   while ptr < ptr_end do
-      local record = ffi.cast("struct pcap_record *", ptr)
-      local packet = ffi.cast("unsigned char *", record + 1)
-      local ptr_next = packet + record.incl_len
-      if pred(packet, record.incl_len) then
-         matched = matched + 1
-      end
+   for _,packet in ipairs(packets) do
       seen = seen + 1
-      ptr = ptr_next
+      if pred(packet.packet, packet.len) then matched = matched + 1 end
    end
    return seen, matched
 end
@@ -46,12 +40,12 @@ function get_predicate(filter_input, opts)
 end
 
 function main(in_file, filter_input, opts)
-   local header, ptr, ptr_end = savefile.open_and_mmap(in_file)
+   local packets = savefile.load_packets(in_file)
    local pred = get_predicate(filter_input, opts)
    -- Warm up.
-   filter(ptr, ptr_end, pred)
+   filter(packets, pred)
    local start = utils.now()
-   local seen, matched = filter(ptr, ptr_end, pred)
+   local seen, matched = filter(packets, pred)
    local elapsed = utils.now() - start
    print(string.format("Matched %d/%d packets from %s (%f MPPS).",
                        matched, seen, in_file, seen/elapsed*1e-6))

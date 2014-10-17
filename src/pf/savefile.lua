@@ -61,6 +61,22 @@ function open_and_mmap(filename)
    return header, ptr + ffi.sizeof("struct pcap_file"), ptr_end
 end
 
+function load_packets_from_mmap(ptr, ptr_end)
+   local ret = {}
+   while ptr < ptr_end do
+      local record = ffi.cast("struct pcap_record *", ptr)
+      local packet = ffi.cast("unsigned char *", record + 1)
+      table.insert(ret, { packet=packet, len=record.incl_len })
+      ptr = packet + record.incl_len
+   end
+   return ret
+end
+
+function load_packets(file)
+   local _, ptr, ptr_end = open_and_mmap(file)
+   return load_packets_from_mmap(ptr, ptr_end)
+end
+
 function records_mm(filename)
    local fd = open(filename, O_RDONLY)
    if fd == -1 then
@@ -98,6 +114,8 @@ function records_mm(filename)
    end
    return pcap_records_it, true, true
 end
+
+
 
 function write_file_header(file)
    local pcap_file = ffi.new("struct pcap_file")
