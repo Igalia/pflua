@@ -30,7 +30,7 @@ function get_predicate(filter_input)
       if not getfenv(0).ffi then getfenv(0).ffi = require('ffi') end
       return filter_file_pred()
    else
-      return  pf.compile_filter(filter_input)
+      return pf.compile_filter(filter_input)
    end
 end
 
