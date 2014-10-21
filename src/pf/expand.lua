@@ -950,7 +950,8 @@ function expand_arith(expr, dlt)
       local assertions = concat(lhs_assertions, rhs_assertions)
       -- RHS of division can't be 0.
       if op == '/' then
-         assertions = concat(assertions, { '!=', rhs, 0 })
+         local div_assert = { '!=', rhs, 0 }
+         assertions = concat(assertions, { div_assert })
       end
       return ret, assertions
    end
