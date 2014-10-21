@@ -247,7 +247,7 @@ function compile_lua(bpf)
          assert(src == BPF_K, "division by non-constant value is unsupported")
          assert(k ~= 0, "program contains division by constant zero")
          local bits = is_power_of_2(k)
-         if bits then rhs = shr(A(), bits) else rhs = div(A(), k) end
+         if bits then rhs = rsh(A(), bits) else rhs = div(A(), k) end
       elseif op == BPF_OR  then rhs = bor(A(), b)
       elseif op == BPF_AND then rhs = band(A(), b)
       elseif op == BPF_LSH then rhs = lsh(A(), b)
