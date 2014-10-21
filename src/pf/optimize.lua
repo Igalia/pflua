@@ -708,6 +708,8 @@ function selftest ()
       opt("1 = 2"))
    assert_equals({ '=', "len", 1 },
       opt("1 = len"))
+   assert_equals({ 'true' },
+      opt("1 = 2/2"))
    assert_equals({ 'if', { '>=', 'len', 1},
                    { '=', { '[]', 0, 1 }, 2 },
                    { 'fail' }},

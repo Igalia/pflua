@@ -1026,6 +1026,11 @@ function selftest ()
    assert_equals({ '=', 1, "len" },
       expand(parse("1 = len"), 'EN10MB'))
    assert_equals({ 'if',
+                   { '!=', 2, 0},
+                   { '=', 1, { 'uint32', { '/', 2, 2} } },
+                   { 'fail'} },
+      expand(parse("1 = 2/2"), 'EN10MB'))
+   assert_equals({ 'if',
                    { '<=', { '+', { '+', 0, 0 }, 1 }, 'len'},
                    { '=', { '[]', { '+', 0, 0 }, 1 }, 2 },
                    { 'fail' } },
