@@ -950,7 +950,8 @@ function expand_arith(expr, dlt)
       local assertions = concat(lhs_assertions, rhs_assertions)
       -- RHS of division can't be 0.
       if op == '/' then
-         assertions = concat(assertions, { '!=', rhs, 0 })
+         local div_assert = { '!=', rhs, 0 }
+         assertions = concat(assertions, { div_assert })
       end
       return ret, assertions
    end
@@ -1025,6 +1026,11 @@ function selftest ()
       expand(parse("1 = 2"), 'EN10MB'))
    assert_equals({ '=', 1, "len" },
       expand(parse("1 = len"), 'EN10MB'))
+   assert_equals({ 'if',
+                   { '!=', 2, 0},
+                   { '=', 1, { 'uint32', { '/', 2, 2} } },
+                   { 'fail'} },
+      expand(parse("1 = 2/2"), 'EN10MB'))
    assert_equals({ 'if',
                    { '<=', { '+', { '+', 0, 0 }, 1 }, 'len'},
                    { '=', { '[]', { '+', 0, 0 }, 1 }, 2 },
