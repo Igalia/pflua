@@ -834,7 +834,7 @@ local function parse_logical_or_arithmetic(lexer, max_precedence)
 end
 
 function parse_logical(lexer, max_precedence)
-   local expr = parse_logical_or_arithmetic(lexer)
+   local expr = parse_logical_or_arithmetic(lexer, max_precedence)
    assert(not is_arithmetic(expr), "expected a logical expression")
    return expr
 end
