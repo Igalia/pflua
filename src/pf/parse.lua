@@ -930,8 +930,12 @@ function selftest ()
               { '=', { '+', { '+', 1, { '*', 2, 3 } }, 4 }, 5 })
    parse_test("1+1=2 and tcp",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
+   parse_test("tcp port 80 and 1+1=2",
+              { 'and', { 'tcp_port', 80 }, { '=', { '+', 1, 1 }, 2 } })
    parse_test("1+1=2 and tcp or tcp",
               { 'or', { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
+   parse_test("1+1=2 or tcp and tcp",
+              { 'and', { 'or', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    parse_test("tcp src portrange 80-90", 
