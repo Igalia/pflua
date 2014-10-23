@@ -105,21 +105,16 @@ local function lex_ipv6(str, pos)
 end
 
 local function lex_ehost(str, pos)
-   local function normalize(digits)
-      local result = tonumber(digits, 16)
-      if (result < 16) then result = result * 2^4 end
-      return result
-   end
    local start = pos
    local addr = { 'ehost' }
    local digits, dot = str:match("^(%x%x?)()%:", pos)
    assert(digits, "failed to parse ethernet host address at "..pos)
-   table.insert(addr, normalize(digits))
+   table.insert(addr, tonumber(digits, 16))
    pos = dot
    for i=1,5 do
       local digits, dot = str:match("^%:(%x%x?)()", pos)
       assert(digits, "failed to parse ethernet host address at "..pos)
-      table.insert(addr, normalize(digits))
+      table.insert(addr, tonumber(digits, 16))
       pos = dot
    end
    local terminators = " \t\r\n)/"
@@ -948,7 +943,7 @@ function selftest ()
    parse_test("ether host ff:ff:ff:33:33:33",
              { 'ether_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
    parse_test("ether host f:f:f:3:3:3",
-             { 'ether_host', { 'ehost', 240, 240, 240, 48, 48, 48 } })
+             { 'ether_host', { 'ehost', 15, 15, 15, 3, 3, 3 } })
    parse_test("src net 192.168.1.0/24",
              { 'src_net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
    parse_test("src net 192.168.1.0 mask 255.255.255.0",
