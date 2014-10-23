@@ -834,7 +834,7 @@ local function parse_logical_or_arithmetic(lexer, max_precedence)
 end
 
 function parse_logical(lexer, max_precedence)
-   local expr = parse_logical_or_arithmetic(lexer)
+   local expr = parse_logical_or_arithmetic(lexer, max_precedence)
    assert(not is_arithmetic(expr), "expected a logical expression")
    return expr
 end
@@ -930,6 +930,8 @@ function selftest ()
               { '=', { '+', { '+', 1, { '*', 2, 3 } }, 4 }, 5 })
    parse_test("1+1=2 and tcp",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
+   parse_test("1+1=2 and tcp or tcp",
+              { 'or', { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    parse_test("tcp src portrange 80-90", 
