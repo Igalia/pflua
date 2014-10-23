@@ -593,6 +593,14 @@ local wlan_types = {
    addr2 = unary(parse_ehost_arg),
    addr3 = unary(parse_ehost_arg),
    addr4 = unary(parse_ehost_arg),
+
+   -- As an alias of 'ether'
+   dst = table_parser(ether_host_type, unary(parse_ehost_arg)),
+   src = table_parser(ether_host_type, unary(parse_ehost_arg)),
+   host = unary(parse_ehost_arg),
+   broadcast = nullary(),
+   multicast = nullary(),
+   proto = unary(parse_ether_proto_arg),
 }
 
 local iso_types = {
@@ -676,6 +684,9 @@ local primitives = {
    src = table_parser(src_or_dst_types),
    host = unary(parse_host_arg),
    ether = table_parser(ether_types),
+   fddi = table_parser(ether_types),
+   tr = table_parser(ether_types),
+   wlan = table_parser(wlan_types),
    broadcast = nullary(),
    multicast = nullary(),
    gateway = unary(parse_string_arg),
@@ -721,7 +732,6 @@ local primitives = {
    srnr = unary(parse_int_arg),
    subrulenum = unary(parse_int_arg),
    action = unary(enum_arg_parser(pf_actions)),
-   wlan = table_parser(wlan_types),
    type = parse_wlan_type,
    subtype = parse_wlan_subtype,
    dir = unary(enum_arg_parser(wlan_directions)),
@@ -942,6 +952,12 @@ function selftest ()
                     { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } })
    parse_test("ether host ff:ff:ff:33:33:33",
              { 'ether_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
+   parse_test("fddi host ff:ff:ff:33:33:33",
+             { 'fddi_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
+   parse_test("tr host ff:ff:ff:33:33:33",
+             { 'tr_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
+   parse_test("wlan host ff:ff:ff:33:33:33",
+             { 'wlan_host', { 'ehost', 255, 255, 255, 51, 51, 51 } })
    parse_test("ether host f:f:f:3:3:3",
              { 'ether_host', { 'ehost', 15, 15, 15, 3, 3, 3 } })
    parse_test("src net 192.168.1.0/24",
