@@ -580,9 +580,13 @@ local ip6_types = {
    multicast = nullary(),
 }
 
+local decnet_host_type = {
+   host = unary(parse_decnet_host_arg),
+}
+
 local decnet_types = {
-   src = unary(parse_decnet_host_arg),
-   dst = unary(parse_decnet_host_arg),
+   src = table_parser(decnet_host_type, unary(parse_decnet_host_arg)),
+   dst = table_parser(decnet_host_type, unary(parse_decnet_host_arg)),
    host = unary(parse_decnet_host_arg),
 }
 

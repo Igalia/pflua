@@ -708,6 +708,38 @@ local function expand_greater(expr)
    return { '>=', 'len', expr[2] }
 end
 
+-- DECNET
+
+local function expand_decnet_src(expr)
+   local addr = expr[2]
+   local addr_int = uint16(addr[2], addr[3])
+   return { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 2 },
+            { '=', { '[ether]', 19, 2}, addr_int },
+            { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33026 },
+              { '=', { '[ether]', 20, 2}, addr_int },
+              { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 6 },
+                { '=', { '[ether]', 31, 2}, addr_int },
+                { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33030 },
+                  { '=', { '[ether]', 32, 2}, addr_int },
+                  { 'fail' } } } } }
+end
+local function expand_decnet_dst(expr)
+   local addr = expr[2]
+   local addr_int = uint16(addr[2], addr[3])
+   return { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 2 },
+            { '=', { '[ether]', 17, 2}, addr_int },
+            { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33026 },
+              { '=', { '[ether]', 18, 2}, addr_int },
+              { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 6 },
+                { '=', { '[ether]', 23, 2}, addr_int },
+                { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33030 },
+                  { '=', { '[ether]', 24, 2}, addr_int },
+                  { 'fail' } } } } }
+end
+local function expand_decnet_host(expr)
+   return { 'or', expand_decnet_src(expr), expand_decnet_dst(expr) }
+end
+
 local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
@@ -805,9 +837,11 @@ local primitive_expanders = {
    atalk = expand_atalk,
    aarp = expand_aarp,
    decnet = expand_decnet,
-   decnet_src = unimplemented,
-   decnet_dst = unimplemented,
-   decnet_host = unimplemented,
+   decnet_src = expand_decnet_src,
+   decnet_src_host = expand_decnet_src,
+   decnet_dst = expand_decnet_dst,
+   decnet_dst_host = expand_decnet_dst,
+   decnet_host = expand_decnet_host,
    iso = expand_iso,
    stp = expand_stp,
    ipx = expand_ipx,
