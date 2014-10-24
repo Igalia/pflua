@@ -740,6 +740,50 @@ local function expand_decnet_host(expr)
    return { 'or', expand_decnet_src(expr), expand_decnet_dst(expr) }
 end
 
+-- IS-IS
+
+local L1_IIH   = 15  -- 0x0F
+local L2_IIH   = 16  -- 0x10
+local PTP_IIH  = 17  -- 0x11
+local L1_LSP   = 18  -- 0x12
+local L2_LSP   = 20  -- 0x14
+local L1_CSNP  = 24  -- 0x18
+local L2_CSNP  = 25  -- 0x19
+local L1_PSNP  = 26  -- 0x1A
+local L2_PSNP  = 27  -- 0x1B
+
+local function expand_isis_protocol(...)
+   local function concat(lop, reg, values, i)
+      i = i or 1
+      if i == #values then return { '=', reg, values[i] } end
+      return { lop, { '=', reg, values[i] }, concat(lop, reg, values, i+1) }
+   end
+   return { 'if', has_iso_protocol(131),
+            concat('or', { '[ether]', 21, 1 }, {...} ),
+            { 'fail' } }
+end
+local function expand_l1(expr)
+   return expand_isis_protocol(L1_IIH, L1_LSP, L1_CSNP, L1_PSNP, PTP_IIH)
+end
+local function expand_l2(expr)
+   return expand_isis_protocol(L2_IIH, L2_LSP, L2_CSNP, L2_PSNP, PTP_IIH)
+end
+local function expand_iih(expr)
+   return expand_isis_protocol(L1_IIH, L2_IIH, PTP_IIH)
+end
+local function expand_lsp(expr)
+   return expand_isis_protocol(L1_LSP, L2_LSP)
+end
+local function expand_snp(expr)
+   return expand_isis_protocol(L1_CSNP, L2_CSNP, L1_PSNP, L2_PSNP)
+end
+local function expand_csnp(expr)
+   return expand_isis_protocol(L1_CSNP, L2_CSNP)
+end
+local function expand_psnp(expr)
+   return expand_isis_protocol(L1_PSNP, L2_PSNP)
+end
+
 local primitive_expanders = {
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
@@ -879,13 +923,13 @@ local primitive_expanders = {
    clnp = function(expr) return has_iso_protocol(PROTO_CLNP) end,
    esis = function(expr) return has_iso_protocol(PROTO_ESIS) end,
    isis = function(expr) return has_iso_protocol(PROTO_ISIS) end,
-   l1 = unimplemented,
-   l2 = unimplemented,
-   iih = unimplemented,
-   lsp = unimplemented,
-   snp = unimplemented,
-   csnp = unimplemented,
-   psnp = unimplemented,
+   l1 = expand_l1,
+   l2 = expand_l2,
+   iih = expand_iih,
+   lsp = expand_lsp,
+   snp = expand_snp,
+   csnp = expand_csnp,
+   psnp = expand_psnp,
    vpi = unimplemented,
    vci = unimplemented,
    lane = unimplemented,
