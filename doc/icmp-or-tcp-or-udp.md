@@ -67,9 +67,9 @@ return function(P,length)
          if v2 == 1 then do return true end end
          do
             if v2 == 6 then do return true end end
-            do
-               do return v2 == 17 end
-            end
+         end
+         do
+            do return v2 == 17 end
          end
       end
 ::L3::
@@ -83,37 +83,37 @@ return function(P,length)
                do
                   if not (length >= 55) then do return false end end
                   do
-                     if not (v3 == 44) then goto L8 end
+                     if not (v3 == 44) then goto L9 end
                      do
                         local v4 = P[54]
                         if v4 == 1 then do return true end end
                      end
                   end
                end
-::L8::
+::L9::
                do
                   if v3 == 6 then do return true end end
                   do
                      if not (length >= 55) then do return false end end
                      do
-                        if not (v3 == 44) then goto L12 end
+                        if not (v3 == 44) then goto L8 end
                         do
                            local v5 = P[54]
                            if v5 == 6 then do return true end end
                         end
                      end
                   end
-::L12::
+               end
+::L8::
+               do
+                  if v3 == 17 then do return true end end
                   do
-                     if v3 == 17 then do return true end end
+                     if not (length >= 55) then do return false end end
                      do
-                        if not (length >= 55) then do return false end end
+                        if not (v3 == 44) then do return false end end
                         do
-                           if not (v3 == 44) then do return false end end
-                           do
-                              local v6 = P[54]
-                              do return v6 == 17 end
-                           end
+                           local v6 = P[54]
+                           do return v6 == 17 end
                         end
                      end
                   end
