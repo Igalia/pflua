@@ -27,7 +27,7 @@ EXAMPLES = \
 	ip6-multicast.md \
 	ip6-proto-ah.md \
 	iso-proto-clnp.md \
-	proto-sctp.md \
+	ip-proto-sctp.md \
 	decnet-src-10.15.md \
 	decnet-host-10.15.md
 
@@ -123,8 +123,8 @@ ip6-proto-ah.md:
 iso-proto-clnp.md:
 	../tools/dump-markdown "iso proto \clnp" > $@.tmp && mv $@.tmp $@
 
-proto-sctp.md:
-	../tools/dump-markdown "proto \sctp" > $@.tmp && mv $@.tmp $@
+ip-proto-sctp.md:
+	../tools/dump-markdown "ip proto \sctp" > $@.tmp && mv $@.tmp $@
 
 decnet-src-10.15.md:
 	../tools/dump-markdown "decnet src 10.15" > $@.tmp && mv $@.tmp $@
