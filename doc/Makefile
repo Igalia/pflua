@@ -29,7 +29,8 @@ EXAMPLES = \
 	iso-proto-clnp.md \
 	ip-proto-sctp.md \
 	decnet-src-10.15.md \
-	decnet-host-10.15.md
+	decnet-host-10.15.md \
+	l1.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -131,3 +132,6 @@ decnet-src-10.15.md:
 
 decnet-host-10.15.md:
 	../tools/dump-markdown "decnet host 10.15" > $@.tmp && mv $@.tmp $@
+
+l1.md:
+	../tools/dump-markdown "l1" > $@.tmp && mv $@.tmp $@
