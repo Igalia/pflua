@@ -788,10 +788,7 @@ local function parse_primitive_or_arithmetic(lexer)
    lexer.error('keyword elision not implemented %s', tok)
 end
 
-local logical_precedence = {
-   ['&&'] = 1, ['and'] = 1,
-   ['||'] = 2, ['or'] = 2
-}
+local logical_ops = set('&&', 'and', '||', 'or')
 
 local function is_arithmetic(exp)
    return (exp == 'len' or type(exp) == 'number' or
@@ -800,7 +797,7 @@ end
 
 local parse_logical
 
-local function parse_logical_or_arithmetic(lexer, max_precedence)
+local function parse_logical_or_arithmetic(lexer, pick_first)
    if lexer.check('not') then
       return { 'not', parse_logical(lexer) }
    else
@@ -821,29 +818,27 @@ local function parse_logical_or_arithmetic(lexer, max_precedence)
                 "expected a comparison operator, got "..op)
          exp = { op, exp, parse_arithmetic(lexer) }
       end
-      max_precedence = max_precedence or math.huge
       while true do
          local op = lexer.peek()
          if not op or op == ')' then return exp end
-         local prec = logical_precedence[op]
-         if prec then
-            if prec > max_precedence then return exp end
+         local is_logical = logical_ops[op]
+         if is_logical then
+            if pick_first then return exp end
             lexer.consume(op)
          else
             -- The grammar is such that "tcp port 80" should actually
             -- parse as "tcp and port 80".
             op = 'and'
-            prec = 1
-            if prec > max_precedence then return exp end
+            if pick_first then return exp end
          end
-         local rhs = parse_logical(lexer, prec - 1)
+         local rhs = parse_logical(lexer, true)
          exp = { op, exp, rhs }
       end
    end
 end
 
-function parse_logical(lexer, max_precedence)
-   local expr = parse_logical_or_arithmetic(lexer, max_precedence)
+function parse_logical(lexer, pick_first)
+   local expr = parse_logical_or_arithmetic(lexer, pick_first)
    assert(not is_arithmetic(expr), "expected a logical expression")
    return expr
 end
@@ -939,8 +934,12 @@ function selftest ()
               { '=', { '+', { '+', 1, { '*', 2, 3 } }, 4 }, 5 })
    parse_test("1+1=2 and tcp",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
+   parse_test("tcp port 80 and 1+1=2",
+              { 'and', { 'tcp_port', 80 }, { '=', { '+', 1, 1 }, 2 } })
    parse_test("1+1=2 and tcp or tcp",
               { 'or', { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
+   parse_test("1+1=2 or tcp and tcp",
+              { 'and', { 'or', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
    parse_test("tcp src portrange 80-90", 
