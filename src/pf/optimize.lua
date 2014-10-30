@@ -307,7 +307,6 @@ local function Range(min, max)
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
    function ret.div(lhs, rhs)
       local rhs_min, rhs_max = rhs:min(), rhs:max()
-      if rhs_min > 0 or rhs_max < 0 then return lhs:binary(rhs, '/') end
       -- 0 is prohibited by assertions, so we won't hit it at runtime,
       -- but we could still see { '/', 0, 0 } in the IR when it is
       -- dominated by an assertion that { '!=', 0, 0 }.  The resulting
@@ -320,9 +319,13 @@ local function Range(min, max)
       elseif rhs_max == 0 then
          rhs_max = -1
       end
-      -- Now that we have removed 0 from the limits, we can use binary()
-      -- on the two semi-ranges.
-      local low, high = Range(rhs:min(), -1), Range(1, rhs:max())
+      -- Now that we have removed 0 from the limits,
+      -- if the RHS can't change sign, we can use binary() on its range.
+      if rhs_min > 0 or rhs_max < 0 then
+         return lhs:binary(Range(rhs_min, rhs_max), '/')
+      end
+      -- Otherwise we can use binary() on the two semi-ranges.
+      local low, high = Range(rhs_min, -1), Range(1, rhs_max)
       return lhs:binary(low, '/'):union(lhs:binary(high, '/'))
    end
    function ret.band(lhs, rhs)
