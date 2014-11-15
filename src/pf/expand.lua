@@ -2,7 +2,7 @@ module(...,package.seeall)
 
 local utils = require('pf.utils')
 
-verbose = os.getenv("PF_VERBOSE");
+local verbose = os.getenv("PF_VERBOSE");
 
 local expand_arith, expand_relop, expand_bool
 
