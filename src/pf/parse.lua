@@ -705,6 +705,7 @@ local primitives = {
    tcp = table_parser(tcp_or_udp_types, nullary()),
    udp = table_parser(tcp_or_udp_types, nullary()),
    icmp = nullary(),
+   icmp6 = nullary(),
    igmp = nullary(),
    igrp = nullary(),
    pim = nullary(),
