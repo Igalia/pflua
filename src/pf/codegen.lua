@@ -1,6 +1,6 @@
 module(...,package.seeall)
 
-verbose = os.getenv("PF_VERBOSE");
+local verbose = os.getenv("PF_VERBOSE");
 
 local function dup(db)
    local ret = {}

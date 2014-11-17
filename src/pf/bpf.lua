@@ -4,7 +4,10 @@ local ffi = require("ffi")
 local bit = require("bit")
 local band = bit.band
 
-verbose = os.getenv("PF_VERBOSE");
+_G.runtime_u32, _G.runtime_add, _G.runtime_sub, _G.runtime_mul,
+_G.runtime_div = nil
+
+local verbose = os.getenv("PF_VERBOSE");
 
 local function BPF_CLASS(code) return band(code, 0x07) end
 local BPF_LD   = 0x00
