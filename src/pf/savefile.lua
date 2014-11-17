@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local C = ffi.C
 local types = require("pf.types")
 
 ffi.cdef[[
@@ -13,13 +14,13 @@ int munmap(void *addr, size_t length);
 ]]
 
 function open(filename)
-   return ffi.C.open(filename, 0)
+   return C.open(filename, 0)
 end
 
 function mmap(fd, size)
    local PROT_READ = 1
    local MAP_PRIVATE = 2
-   local ptr = ffi.C.mmap(ffi.cast("void *", 0), size, PROT_READ, MAP_PRIVATE, fd, 0)
+   local ptr = C.mmap(ffi.cast("void *", 0), size, PROT_READ, MAP_PRIVATE, fd, 0)
    if ptr == ffi.cast("void *", -1) then
       error("Error mmapping")
    end
@@ -29,8 +30,8 @@ end
 function size(fd)
    local SEEK_SET = 0
    local SEEK_END = 2
-   local size = ffi.C.lseek(fd, 0, SEEK_END)
-   ffi.C.lseek(fd, 0, SEEK_SET)
+   local size = C.lseek(fd, 0, SEEK_END)
+   C.lseek(fd, 0, SEEK_SET)
    return size
 end
 
@@ -42,7 +43,7 @@ function open_and_mmap(filename)
 
    local sz = size(fd)
    local ptr = mmap(fd, sz)
-   ffi.C.close(fd)
+   C.close(fd)
 
    if ptr == ffi.cast("void *", -1) then
       error("Error mmapping " .. filename)
@@ -70,7 +71,7 @@ function records_mm(filename)
    if ptr == ffi.cast("void *", -1) then
       error("Error mmapping " .. filename)
    end
-   if (-1 == ffi.C.close(fd)) then
+   if (-1 == C.close(fd)) then
       error("Error closing fd")
    end
    local start = ptr
@@ -85,7 +86,7 @@ function records_mm(filename)
    ptr = ptr + ffi.sizeof("struct pcap_file")
    local function pcap_records_it()
       if ptr >= ptr_end then
-         if (-1 == ffi.C.munmap(start, size)) then
+         if (-1 == C.munmap(start, size)) then
             error("Error munmapping")
          end
          return nil
