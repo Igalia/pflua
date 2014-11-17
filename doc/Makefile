@@ -30,7 +30,8 @@ EXAMPLES = \
 	ip-proto-sctp.md \
 	decnet-src-10.15.md \
 	decnet-host-10.15.md \
-	l1.md
+	l1.md \
+	icmp6.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -135,3 +136,6 @@ decnet-host-10.15.md:
 
 l1.md:
 	../tools/dump-markdown "l1" > $@.tmp && mv $@.tmp $@
+
+icmp6.md:
+	../tools/dump-markdown "icmp6" > $@.tmp && mv $@.tmp $@

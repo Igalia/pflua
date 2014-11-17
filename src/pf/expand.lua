@@ -70,6 +70,7 @@ local ether_min_payloads = {
 
 -- IP protocols
 local PROTO_ICMP = 1          -- 0x1
+local PROTO_ICMP6 = 58        -- 0x3a
 local PROTO_TCP = 6           -- 0x6
 local PROTO_UDP = 17          -- 0x11
 local PROTO_SCTP = 132        -- 0x84
@@ -405,16 +406,17 @@ local function expand_ip_protochain(expr)
 end
 
 local ip_protos = {
-   icmp = PROTO_ICMP,
-   igmp = PROTO_IGMP,
-   igrp = PROTO_IGRP,
-   pim  = PROTO_PIM,
-   ah   = PROTO_AH,
-   esp  = PROTO_ESP,
-   vrrp = PROTO_VRRP,
-   udp  = PROTO_UDP,
-   tcp  = PROTO_TCP,
-   sctp = PROTO_SCTP,
+   icmp  = PROTO_ICMP,
+   icmp6 = PROTO_ICMP6,
+   igmp  = PROTO_IGMP,
+   igrp  = PROTO_IGRP,
+   pim   = PROTO_PIM,
+   ah    = PROTO_AH,
+   esp   = PROTO_ESP,
+   vrrp  = PROTO_VRRP,
+   udp   = PROTO_UDP,
+   tcp   = PROTO_TCP,
+   sctp  = PROTO_SCTP,
 }
 
 local function expand_ip4_proto(expr)
@@ -859,6 +861,7 @@ local primitive_expanders = {
    udp_src_portrange = expand_udp_src_portrange,
    udp_dst_portrange = expand_udp_dst_portrange,
    icmp = function(expr) return has_ip_protocol(PROTO_ICMP) end,
+   icmp6 = function(expr) return has_ipv6_protocol(PROTO_ICMP6) end,
    igmp = function(expr) return has_ip_protocol(PROTO_IGMP) end,
    igrp = function(expr) return has_ip_protocol(PROTO_IGRP) end,
    pim = function(expr) return has_ip_protocol(PROTO_PIM) end,
