@@ -50,7 +50,6 @@ function open_and_mmap(filename)
    end
 
    ptr = ffi.cast("unsigned char *", ptr)
-   local ptr_end = ptr + sz
    local header = ffi.cast("struct pcap_file *", ptr)
    if header.magic_number == 0xD4C3B2A1 then
       error("Endian mismatch in " .. filename)
@@ -58,7 +57,7 @@ function open_and_mmap(filename)
       error("Bad PCAP magic number in " .. filename)
    end
 
-   return header, ptr + ffi.sizeof("struct pcap_file"), ptr_end
+   return header, ptr + ffi.sizeof("struct pcap_file"), sz
 end
 
 function records_mm(filename)
