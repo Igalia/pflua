@@ -101,10 +101,10 @@ return function(P,length)
                local v5 = P[14]
                local v6 = bit.band(v5,15)
                local v7 = bit.lshift(v6,2)
-               local v8 = v7 + 16
+               local v8 = v7 + 18
                if not (v8 <= length) then do return false end end
                do
-                  local v9 = v7 + 14
+                  local v9 = v7 + 16
                   local v10 = ffi.cast("uint16_t*", P+v9)[0]
                   local v11 = bit.rshift(bit.bswap(v10), 16)
                   if not (v11 >= 80) then do return false end end

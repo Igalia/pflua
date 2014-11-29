@@ -111,41 +111,45 @@ return function(P,length)
       end
 ::L3::
       do
-         if not (length >= 55) then do return false end end
+         if not (length >= 56) then do return false end end
          do
             if not (v1 == 56710) then do return false end end
             do
                local v11 = P[20]
-               if v11 == 6 then do return false end end
+               if v11 == 6 then goto L11 end
                do
-                  if not (v11 == 44) then goto L11 end
+                  if not (v11 == 44) then goto L12 end
                   do
                      local v12 = P[54]
-                     if v12 == 6 then do return false end end
+                     if v12 == 6 then goto L11 end
                   end
                end
-::L11::
+::L12::
                do
-                  if v11 == 17 then do return false end end
+                  if v11 == 17 then goto L11 end
                   do
-                     if not (v11 == 44) then goto L14 end
+                     if not (v11 == 44) then goto L15 end
                      do
                         local v13 = P[54]
-                        if v13 == 17 then do return false end end
+                        if v13 == 17 then goto L11 end
                      end
                   end
-::L14::
+::L15::
                   do
-                     if v11 == 132 then do return false end end
+                     if v11 == 132 then goto L11 end
                      do
                         if not (v11 == 44) then do return false end end
                         do
                            local v14 = P[54]
-                           if v14 == 132 then do return false end end
-                           do do return false end end
+                           if not (v14 == 132) then do return false end end
                         end
                      end
                   end
+               end
+::L11::
+               do
+                  local v15 = ffi.cast("uint16_t*", P+54)[0]
+                  do return v15 == 20480 end
                end
             end
          end

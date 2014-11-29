@@ -192,7 +192,7 @@ local function expand_port(expr)
    return expand_dir_port(expr, has_ipv4_port, has_ipv6_port)
 end
 local function expand_src_port(expr)
-   return expand_dir_port(expr, has_ipv4_src_port, has_ipv4_dst_port)
+   return expand_dir_port(expr, has_ipv4_src_port, has_ipv6_src_port)
 end
 local function expand_dst_port(expr)
    return expand_dir_port(expr, has_ipv4_dst_port, has_ipv6_dst_port)
@@ -295,10 +295,10 @@ local function expand_portrange(expr)
    return expand_dir_portrange(expr, has_ipv4_portrange, has_ipv6_portrange)
 end
 local function expand_src_portrange(expr)
-   return expand_dir_portrange(expr, has_ipv4_src_portrange, has_ipv6_dst_portrange)
+   return expand_dir_portrange(expr, has_ipv4_src_portrange, has_ipv6_src_portrange)
 end
 local function expand_dst_portrange(expr)
-   return expand_dir_portrange(expr, has_ipv4_src_portrange, has_ipv6_dst_portrange)
+   return expand_dir_portrange(expr, has_ipv4_dst_portrange, has_ipv6_dst_portrange)
 end
 
 local function expand_proto_portrange(expr, proto)
