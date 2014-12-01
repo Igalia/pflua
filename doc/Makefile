@@ -24,10 +24,14 @@ EXAMPLES = \
 	dst-host-192.68.1.1-and-greater-100.md \
 	ip-multicast.md \
 	ip-proto-ah.md \
+	ip-proto-47.md \
 	ip6-multicast.md \
 	ip6-proto-ah.md \
+	ip6-proto-47.md \
 	iso-proto-clnp.md \
+	iso-proto-47.md \
 	ip-proto-sctp.md \
+	proto-47.md \
 	decnet-src-10.15.md \
 	decnet-host-10.15.md \
 	l1.md \
@@ -116,17 +120,29 @@ ip-multicast.md:
 ip-proto-ah.md:
 	../tools/dump-markdown "ip proto \ah" > $@.tmp && mv $@.tmp $@
 
+ip-proto-47.md:
+	../tools/dump-markdown "ip proto 47" > $@.tmp && mv $@.tmp $@
+
 ip6-multicast.md:
 	../tools/dump-markdown "ip6 multicast" > $@.tmp && mv $@.tmp $@
 
 ip6-proto-ah.md:
 	../tools/dump-markdown "ip6 proto \ah" > $@.tmp && mv $@.tmp $@
 
+ip6-proto-47.md:
+	../tools/dump-markdown "ip6 proto 47" > $@.tmp && mv $@.tmp $@
+
 iso-proto-clnp.md:
 	../tools/dump-markdown "iso proto \clnp" > $@.tmp && mv $@.tmp $@
 
+iso-proto-47.md:
+	../tools/dump-markdown "iso proto 47" > $@.tmp && mv $@.tmp $@
+
 ip-proto-sctp.md:
 	../tools/dump-markdown "ip proto \sctp" > $@.tmp && mv $@.tmp $@
+
+proto-47.md:
+	../tools/dump-markdown "proto 47" > $@.tmp && mv $@.tmp $@
 
 decnet-src-10.15.md:
 	../tools/dump-markdown "decnet src 10.15" > $@.tmp && mv $@.tmp $@
