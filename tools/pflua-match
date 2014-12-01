@@ -7,6 +7,17 @@ local pf = require("pf")
 local utils = require("pf.utils")
 local savefile = require("pf.savefile")
 
+local function usage()
+   print([[
+Usage: pflua-match [--bpf] IN.PCAP FILTER
+   IN.PCAP     Input file in .pcap format.
+   FILTER      Filter to apply, as a string or file.
+
+   --bpf       Compile expression using libpcap.
+   ]])
+   os.exit(false)
+end
+
 local function filter(ptr, ptr_end, pred)
    local seen, matched = 0, 0
    while ptr < ptr_end do
@@ -22,7 +33,7 @@ local function filter(ptr, ptr_end, pred)
    return seen, matched
 end
 
-function get_predicate(filter_input)
+function get_predicate(filter_input, opts)
    -- If the filter seems to be a filename, read the filter from the file.
    -- Otherwise, compile it as a filter string.
    local filter_file_pred = loadfile(filter_input)
@@ -30,13 +41,13 @@ function get_predicate(filter_input)
       if not getfenv(0).ffi then getfenv(0).ffi = require('ffi') end
       return filter_file_pred()
    else
-      return pf.compile_filter(filter_input)
+      return pf.compile_filter(filter_input, opts)
    end
 end
 
-function main(in_file, filter_input)
+function main(in_file, filter_input, opts)
    local header, ptr, ptr_end = savefile.open_and_mmap(in_file)
-   local pred = get_predicate(filter_input)
+   local pred = get_predicate(filter_input, opts)
    -- Warm up.
    filter(ptr, ptr_end, pred)
    local start = utils.now()
@@ -46,7 +57,16 @@ function main(in_file, filter_input)
                        matched, seen, in_file, seen/elapsed*1e-6))
 end
 
-local in_file, filter_input = ...
-assert(filter_input, "usage: pflua-match IN.PCAP FILTER (as a string or file)")
+-- Parse args
+local opts = { }
+for i=1, #arg do
+   if arg[i] == "--bpf" then
+      opts = { bpf = true }
+      table.remove(arg, i)
+   end
+end
 
-main(in_file, filter_input)
+local in_file, filter_input = arg[1], arg[2]
+if not filter_input then usage() end
+
+main(in_file, filter_input, opts)
