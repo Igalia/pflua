@@ -420,15 +420,19 @@ local ip_protos = {
 }
 
 local function expand_ip4_proto(expr)
-   return has_ipv4_protocol(assert(ip_protos[expr[2]], "Invalid IP protocol"))
+   local proto = expr[2]
+   if type(proto) == 'string' then proto = ip_protos[proto] end
+   return has_ipv4_protocol(assert(proto, "Invalid IP protocol"))
 end
 
 local function expand_ip6_proto(expr)
-   return has_ipv6_protocol(assert(ip_protos[expr[2]], "Invalid IP protocol"))
+   local proto = expr[2]
+   if type(proto) == 'string' then proto = ip_protos[proto] end
+   return has_ipv6_protocol(assert(proto, "Invalid IP protocol"))
 end
 
 local function expand_ip_proto(expr)
-   return { 'if', 'ip', has_ipv4_protocol(proto), has_ipv6_protocol(proto) }
+   return { 'or', has_ipv4_protocol(expr[2]), has_ipv6_protocol(expr[2]) }
 end
 
 -- ISO
@@ -448,7 +452,9 @@ local function has_iso_protocol(proto)
 end
 
 local function expand_iso_proto(expr)
-   return has_iso_protocol(assert(iso_protos[expr[2]], "Invalid ISO protocol"))
+   local proto = expr[2]
+   if type(proto) == 'string' then proto = iso_protos[proto] end
+   return has_iso_protocol(assert(proto, "Invalid ISO protocol"))
 end
 
 -- ARP protocol
