@@ -273,6 +273,7 @@ local function Range(min, max)
    function ret:range() return self:min(), self:max() end
    function ret:fold()
       if self:min() == self:max() then
+         local Inf = 1/0
          assert(self:min() ~= Inf)
          return self:min()
       end
