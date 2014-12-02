@@ -2,6 +2,12 @@ module(...,package.seeall)
 
 local verbose = os.getenv("PF_VERBOSE");
 
+local env = {
+   bit = require('bit'),
+   ffi = require('ffi'),
+   math = require('math'),
+}
+
 local function dup(db)
    local ret = {}
    for k, v in pairs(db) do ret[k] = v end
@@ -190,8 +196,9 @@ function compile_lua(parsed)
 end
 
 function compile(parsed, name)
-   if not getfenv(0).ffi then getfenv(0).ffi = require('ffi') end
-   return assert(loadstring(compile_lua(parsed), name))()
+   local func = assert(loadstring(compile_lua(parsed), name))
+   setfenv(func, env)
+   return func()
 end
 
 function selftest ()
