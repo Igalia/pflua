@@ -5,6 +5,7 @@ all:
 clean:
 
 check:
+	luajit -l pf.backend -e 'pf.backend.selftest()'
 	luajit -l pf.types -e 'pf.types.selftest()'
 	luajit -l pf.utils -e 'pf.utils.selftest()'
 	luajit -l pf.libpcap -e 'pf.libpcap.selftest()'
@@ -23,3 +24,6 @@ test_jit_off:
 
 trace:
 	luajit -jdump -l bpf_pflua_ts -e 'bpf_pflua_ts.run()'
+
+backend:
+	luajit -l pf.backend -e 'pf.backend.selftest()'
