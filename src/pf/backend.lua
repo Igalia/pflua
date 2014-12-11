@@ -280,32 +280,75 @@ local function codegen(expr)
          end
       end
    end
-   local function simplify(expr, is_last)
-      local op = expr[1]
-      if op == 'do' then
-         if #expr == 2 and (expr[2][1] ~= 'return' or is_last) then
-            return simplify(expr[2], is_last)
-         end
-         local result = { 'do' }
-         for i=2,#expr do
-            table.insert(result, simplify(expr[i], i==#expr))
-         end
-         return result
-      elseif op == 'goto' then
-         return expr
-      elseif op == 'label' then
-         return { 'label', expr[2], simplify(expr[3], is_last) }
-      elseif op == 'if' then
-         return { 'if', expr[2], simplify(expr[3], true) }
-      elseif op == 'return' then
-         return expr
-      else
-         assert(op == 'bind')
-         return expr
-      end
-   end
-   return simplify(compile(expr, 'ACCEPT', 'REJECT'), true)
+   return compile(expr, 'ACCEPT', 'REJECT')
 end
+
+local function reduce(expr, is_last)
+   local op = expr[1]
+   if op == 'do' then
+      if #expr == 2 then
+         local first_op = expr[2][1]
+         assert(first_op ~= 'bind')
+         if first_op ~= 'return' or is_last then
+            return reduce(expr[2], is_last)
+         end
+      end
+      local result = { 'do' }
+      for i=2,#expr do
+         local is_last = i==#expr
+         local subexpr = reduce(expr[i], is_last)
+         local function can_inline_do(subexpr, is_last)
+            for j=2,#subexpr do
+               if subexpr[j][1] == 'bind' then return false end
+            end
+            return is_last or subexpr[#subexpr][1] ~= 'return'
+         end
+         if subexpr[1] == 'do' and can_inline_do(subexpr, is_last) then
+            for j=2,#subexpr do table.insert(result, subexpr[j]) end
+         else
+            table.insert(result, subexpr)
+         end
+      end
+      return result
+   elseif op == 'goto' then
+      return expr
+   elseif op == 'label' then
+      return { 'label', expr[2], reduce(expr[3], is_last) }
+   elseif op == 'if' then
+      return { 'if', expr[2], reduce(expr[3], is_last) }
+   elseif op == 'return' then
+      return expr
+   else
+      assert(op == 'bind')
+      return expr
+   end
+end
+
+-- do expressions are necessary when they can be jumped over or through, or for return.
+--
+-- if foo then goto L1; var v2 = bar; return v2 < 34; L1: qux
+--
+
+-- Transformations on the codegen-level language:
+--
+-- 1. Removal of useless do expressions:
+--    do goto foo end
+--
+-- 2. Removal of useless do for returns:
+--    if foo then do return true end end
+--
+-- 3. Removal of useless nested do blocks:
+--    do qux; do foo; bar end; baz; end
+--
+-- 4. Removal of useless goto immediately followed by label:
+--    goto L1; L1: foo
+--
+-- 5. Removal of labels that are never used:
+--    L1: foo
+--
+-- 6. Label forwarding:
+--    goto L1; ...; L1: goto L2
+
 
 function selftest()
    local expr = { 'if', { '<', { '+', 3, 4 }, { '+', 7, 8 } },
@@ -321,4 +364,15 @@ function selftest()
    pp(inline_single_use_variables(cse(lower(expr2))))
    pp(codegen(inline_single_use_variables(cse(lower(expr)))))
    pp(codegen(inline_single_use_variables(cse(lower(expr2)))))
+   pp(reduce(codegen(inline_single_use_variables(cse(lower(expr))))))
+   pp(reduce(codegen(inline_single_use_variables(cse(lower(expr2))))))
+   local parse = require('pf.parse').parse
+   local expand = require('pf.expand').expand
+   local optimize = require('pf.optimize').optimize
+
+   local function test_codegen(expr)
+      return reduce(codegen(inline_single_use_variables(cse(lower(optimize(expand(parse(expr), "EN10MB")))))))
+   end
+
+   pp(test_codegen("ip"))
 end
