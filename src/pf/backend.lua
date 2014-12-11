@@ -214,9 +214,102 @@ local function inline_single_use_variables(expr)
    return subst(expr)
 end
 
+local function codegen(expr)
+   local function do_return(stmt) return { 'do', { 'return', stmt } } end
+   local k_values = { ACCEPT='true', REJECT='false' }
+   local label_counter = 0
+   local function fresh_label()
+      label_counter = label_counter + 1
+      return 'L'..label_counter
+   end
+   local function compile(expr, kt, kf)
+      assert(type(expr) == 'table')
+      local op = expr[1]
+      if op == 'if' then
+         local function eta_reduce(expr)
+            if expr[1] == 'false' then return kf, false
+            elseif expr[1] == 'true' then return kt, false
+            elseif expr[1] == 'fail' then return 'REJECT', false
+            else return fresh_label(), true end
+         end
+         local test, t, f = expr[2], expr[3], expr[4]
+         local test_kt, fresh_kt = eta_reduce(t)
+         local test_kf, fresh_kf = eta_reduce(f)
+
+         local result = { 'do', compile(test, test_kt, test_kf) }
+         if fresh_kt then
+            table.insert(result, { 'label', test_kt, compile(t, kt, kf) })
+         end
+         if fresh_kf then
+            table.insert(result, { 'label', test_kf, compile(f, kt, kf) })
+         end
+         return result
+      elseif op == 'let' then
+         local var, val, body = expr[2], expr[3], expr[4]
+         return { 'do', { 'bind', var, val }, compile(body, kt, kf) }
+      elseif op == 'true' then
+         if (kt == 'ACCEPT') then return do_return({ 'true' }) end
+         if (kt == 'REJECT') then return do_return({ 'false' }) end
+         return { 'goto', kt }
+      elseif op == 'false' then
+         if (kf == 'ACCEPT') then return do_return({ 'true' }) end
+         if (kf == 'REJECT') then return do_return({ 'false' }) end
+         return { 'goto', kf }
+      elseif op == 'fail' then
+         return do_return({ 'false' })
+      else
+         assert(relops[op])
+         local kt_value, kf_value = k_values[kt], k_values[kf]
+         if kt_value == 'true' and kf_value == 'false' then
+            return do_return(expr)
+         elseif kt_value == 'false' and kf_value == 'true' then
+            return do_return({ 'not', expr })
+         elseif kt_value then
+            assert(kt_value ~= kf_value) -- can we get here?
+            return { 'do',
+                     { 'if', expr, { 'return', kt_value } },
+                     { 'goto', kf } }
+         elseif kf_value then
+            return { 'do',
+                     { 'if', { 'not', expr }, { 'return', kf_value } },
+                     { 'goto', kt } }
+         else
+            return { 'do',
+                     { 'if', expr, { 'goto', kt } },
+                     { 'goto', kf } }
+         end
+      end
+   end
+   local function simplify(expr, is_last)
+      local op = expr[1]
+      if op == 'do' then
+         if #expr == 2 and (expr[2][1] ~= 'return' or is_last) then
+            return simplify(expr[2], is_last)
+         end
+         local result = { 'do' }
+         for i=2,#expr do
+            table.insert(result, simplify(expr[i], i==#expr))
+         end
+         return result
+      elseif op == 'goto' then
+         return expr
+      elseif op == 'label' then
+         return { 'label', expr[2], simplify(expr[3], is_last) }
+      elseif op == 'if' then
+         return { 'if', expr[2], simplify(expr[3], true) }
+      elseif op == 'return' then
+         return expr
+      else
+         assert(op == 'bind')
+         return expr
+      end
+   end
+   return simplify(compile(expr, 'ACCEPT', 'REJECT'), true)
+end
+
 function selftest()
    local expr = { 'if', { '<', { '+', 3, 4 }, { '+', 7, 8 } },
-                  { 'true' },
+                  { '<', 'len', 42 },
                   { 'false' } }
    local expr2 = { 'if', { '<', { '+', 3, 4 }, { '+', 3, 4 } },
                   { 'true' },
@@ -226,4 +319,6 @@ function selftest()
    pp(cse(lower(expr2)))
    pp(inline_single_use_variables(cse(lower(expr))))
    pp(inline_single_use_variables(cse(lower(expr2))))
+   pp(codegen(inline_single_use_variables(cse(lower(expr)))))
+   pp(codegen(inline_single_use_variables(cse(lower(expr2)))))
 end
