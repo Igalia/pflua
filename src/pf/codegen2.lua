@@ -184,11 +184,30 @@ local function delabel(expr)
       end
    end
    local counts = {}
+   local subst_labels = {}
+   local function has_fallthrough(expr)
+      local op = expr[1]
+      if op == 'goto' or op == 'return' then return false end
+      if op == 'if' or op == 'bind' then return true end
+      if op == 'do' then return has_fallthrough(expr[#expr]) end
+      assert(op == 'label')
+      return has_fallthrough(expr[3])
+   end
    local function count_label_uses(expr)
       local op = expr[1]
       if op == 'do' then
          for i=#expr,2,-1 do
-            count_label_uses(expr[i])
+            local subexpr = expr[i]
+            if subexpr[1] == 'label' then
+               assert(i>2)
+               if not has_fallthrough(expr[i-1]) then
+                  -- A label that has no fallthrough and which is only
+                  -- referenced once can be substituted directly into
+                  -- its predecessor.
+                  subst_labels[subexpr[2]] = subexpr[3]
+               end
+            end
+            count_label_uses(subexpr)
          end
       elseif op == 'goto' then
          counts[expr[2]] = counts[expr[2]] + 1
@@ -205,16 +224,28 @@ local function delabel(expr)
          assert(op == 'bind')
       end
    end
+   local function should_inline_label(label)
+      return counts[label] == 1 and subst_labels[label]
+   end
    local function remove_unreferenced_labels(expr)
       local op = expr[1]
       if op == 'do' then
          local result = { 'do' }
          for i=2,#expr do
-            table.insert(result, remove_unreferenced_labels(expr[i]))
+            if expr[i][1] == 'label' and should_inline_label(expr[i][2]) then
+               -- Skip; it will be inlined in the goto.
+            else
+               table.insert(result, remove_unreferenced_labels(expr[i]))
+            end
          end
          return result
       elseif op == 'goto' then
-         return expr
+         -- Inline the label.
+         if counts[expr[2]] == 1 and subst_labels[expr[2]] then
+            return remove_unreferenced_labels(subst_labels[expr[2]])
+         else
+            return expr
+         end
       elseif op == 'label' then
          local body = remove_unreferenced_labels(expr[3])
          if counts[expr[2]] == 0 then return body end
