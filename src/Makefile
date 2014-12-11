@@ -14,6 +14,7 @@ check:
 	luajit -l pf.expand -e 'pf.expand.selftest()'
 	luajit -l pf.optimize -e 'pf.optimize.selftest()'
 	luajit -l pf.codegen -e 'pf.codegen.selftest()'
+	luajit -l pf.ssa -e 'pf.ssa.selftest()'
 	luajit -l pf -e 'pf.selftest()'
 
 test:

@@ -681,12 +681,6 @@ local function lhoist(expr, db)
    return reduce(annotate(expr, 'ACCEPT', 'REJECT'), 0)
 end
 
-function fixpoint(f, expr)
-   local prev
-   repeat expr, prev = f(expr), expr until utils.equals(expr, prev)
-   return expr
-end
-
 function optimize_inner(expr)
    expr = simplify(expr)
    expr = simplify(cfold(expr, {}))
@@ -697,7 +691,7 @@ function optimize_inner(expr)
 end
 
 function optimize(expr)
-   expr = fixpoint(optimize_inner, expr)
+   expr = utils.fixpoint(optimize_inner, expr)
    if verbose then pp(expr) end
    return expr
 end
