@@ -61,11 +61,11 @@ local function lower(expr)
          elseif kt_value then
             assert(kt_value ~= kf_value) -- can we get here?
             return { 'do',
-                     { 'if', expr, { 'return', kt_value } },
+                     { 'if', expr, { 'return', { kt_value } } },
                      { 'goto', kf } }
          elseif kf_value then
             return { 'do',
-                     { 'if', { 'not', expr }, { 'return', kf_value } },
+                     { 'if', { 'not', expr }, { 'return', { kf_value } } },
                      { 'goto', kt } }
          else
             return { 'do',
@@ -264,14 +264,167 @@ local function delabel(expr)
    return remove_unreferenced_labels(expr)
 end
 
-local function optimize_code(expr)
+local function optimize_code_inner(expr)
    return delabel(reduce(expr))
 end
 
-function codegen(expr)
-   expr = utils.fixpoint(optimize_code, lower(expr))
+local function optimize_code(expr)
+   expr = utils.fixpoint(optimize_code_inner, expr)
    if verbose then pp(expr) end
    return expr
+end
+
+local function filter_builder(...)
+   local written = 'return function('
+   local vcount = 0
+   local lcount = 0
+   local indent = ''
+   local jumps = {}
+   local builder = {}
+   local db_stack = {}
+   local db = {}
+   function builder.write(str)
+      written = written .. str
+   end
+   function builder.writeln(str)
+      builder.write(indent .. str .. '\n')
+   end
+   function builder.bind(var, val)
+      builder.writeln('local '..var..' = '..val)
+   end
+   function builder.push()
+      indent = indent .. '   '
+   end
+   function builder.pop()
+      indent = indent:sub(4)
+      builder.writeln('end')
+   end
+   function builder.jump(label)
+      builder.writeln('goto '..label)
+   end
+   function builder.writelabel(label)
+      builder.write('::'..label..'::\n')
+   end
+   function builder.finish(str)
+      builder.pop()
+      if verbose then print(written) end
+      return written
+   end
+   local needs_comma = false
+   for _, v in ipairs({...}) do
+      if needs_comma then builder.write(',') end
+      builder.write(v)
+      needs_comma = true
+   end
+   builder.write(')\n')
+   builder.push()
+   return builder
+end
+
+local function read_buffer_word_by_type(buffer, offset, size)
+   if size == 1 then
+      return buffer..'['..offset..']'
+   elseif size == 2 then
+      return ('ffi.cast("uint16_t*", '..buffer..'+'..offset..')[0]')
+   elseif size == 4 then
+      return ('ffi.cast("uint32_t*", '..buffer..'+'..offset..')[0]')
+   else
+      error("bad [] size: "..size)
+   end
+end
+
+local function serialize(builder, expr)
+   local function serialize_value(expr)
+      if expr == 'len' then return 'length' end
+      if type(expr) == 'number' then return expr end
+      if type(expr) == 'string' then return expr end
+      assert(type(expr) == 'table', 'unexpected type '..type(expr))
+      local op, lhs = expr[1], serialize_value(expr[2])
+      if op == 'ntohs' then
+         return 'bit.rshift(bit.bswap('..lhs..'), 16)'
+      elseif op == 'ntohl' then
+         return 'bit.bswap('..lhs..')'
+      elseif op == 'int32' then
+         return 'bit.tobit('..lhs..')'
+      elseif op == 'uint32' then
+         return '('..lhs..' % '.. 2^32 ..')'
+      end
+      local rhs = serialize_value(expr[3])
+      if op == '[]' then
+         return read_buffer_word_by_type('P', lhs, rhs)
+      elseif op == '+' then return '('..lhs..' + '..rhs..')'
+      elseif op == '-' then return '('..lhs..' - '..rhs..')'
+      elseif op == '*' then return '('..lhs..' * '..rhs..')'
+      elseif op == '/' then return 'math.floor('..lhs..' / '..rhs..')'
+      elseif op == '&' then return 'bit.band('..lhs..','..rhs..')'
+      elseif op == '^' then return 'bit.bxor('..lhs..','..rhs..')'
+      elseif op == '|' then return 'bit.bor('..lhs..','..rhs..')'
+      elseif op == '<<' then return 'bit.lshift('..lhs..','..rhs..')'
+      elseif op == '>>' then return 'bit.rshift('..lhs..','..rhs..')'
+      else error('unexpected op', op) end
+   end
+
+   local relop_map = {
+      ['<']='<', ['<=']='<=', ['=']='==', ['!=']='~=', ['>=']='>=', ['>']='>'
+   }
+
+   local function serialize_bool(expr)
+      local op = expr[1]
+      if op == 'not' then
+         return 'not '..serialize_bool(expr[2])
+      elseif op == 'true' then
+         return 'true'
+      elseif op == 'false' then
+         return 'false'
+      elseif relop_map[op] then
+         -- An arithmetic relop.
+         local op = relop_map[op]
+         local lhs, rhs = serialize_value(expr[2]), serialize_value(expr[3])
+         return lhs..' '..op..' '..rhs
+      else
+         error('unhandled primitive'..op)
+      end
+   end
+
+   local function serialize_stmt(expr)
+      assert(type(expr) == 'table', 'logical expression must be a table')
+      local op = expr[1]
+      if op == 'if' then
+         builder.writeln('if '..serialize_bool(expr[2])..' then')
+         builder.push()
+         serialize_stmt(expr[3])
+         builder.pop()
+      elseif op == 'bind' then
+         builder.bind(expr[2], serialize_value(expr[3]))
+      elseif op == 'goto' then
+         builder.jump(expr[2])
+      elseif op == 'label' then
+         builder.writelabel(expr[2])
+         serialize_stmt(expr[3])
+      elseif op == 'do' then
+         builder.writeln('do')
+         builder.push()
+         for i=2,#expr do
+            serialize_stmt(expr[i])
+         end
+         builder.pop()
+      elseif op == 'return' then
+         builder.writeln('return '..serialize_bool(expr[2]))
+      else
+         error('unhandled primitive'..op)
+      end
+   end
+   serialize_stmt(expr)
+end
+
+function codegen(expr)
+   expr = optimize_code(lower(expr))
+   pp(expr)
+   local builder = filter_builder('P', 'length')
+   serialize(builder, expr)
+   local str = builder.finish()
+   if verbose then pp(str) end
+   return str
 end
 
 function selftest()
