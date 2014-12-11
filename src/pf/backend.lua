@@ -350,6 +350,96 @@ end
 --    goto L1; ...; L1: goto L2
 
 
+local function delabel(expr)
+   local function remove_trivial_gotos(expr, knext)
+      -- Sweep expression from bottom to top, keeping track of what the
+      -- fall-through label is.  If we get to a "goto" to a fall-through
+      -- label, remove it.
+      local op = expr[1]
+      if op == 'do' then
+         local reversed_result = {}
+         for i=#expr,2,-1 do
+            local subexpr = remove_trivial_gotos(expr[i], knext)
+            if subexpr[1] == 'goto' and subexpr[2] == knext then
+               -- Useless goto; skip.
+            else
+               table.insert(reversed_result, subexpr)
+               if subexpr[1] == 'label' then
+                  knext = subexpr[2]
+               else
+                  knext = nil
+               end
+            end
+         end
+         local result = { 'do' }
+         for i=#reversed_result,1,-1 do
+            table.insert(result, reversed_result[i])
+         end
+         return result
+      elseif op == 'goto' then
+         return expr
+      elseif op == 'label' then
+         return { 'label', expr[2], remove_trivial_gotos(expr[3], knext) }
+      elseif op == 'if' then
+         return { 'if', expr[2], remove_trivial_gotos(expr[3], knext) }
+      elseif op == 'return' then
+         return expr
+      else
+         assert(op == 'bind')
+         return expr
+      end
+   end
+   local counts = {}
+   local function count_label_uses(expr)
+      local op = expr[1]
+      if op == 'do' then
+         for i=#expr,2,-1 do
+            count_label_uses(expr[i])
+         end
+      elseif op == 'goto' then
+         counts[expr[2]] = counts[expr[2]] + 1
+      elseif op == 'label' then
+         counts[expr[2]] = 0
+         -- We shouldn't generate code like "L1: goto L2".
+         assert(expr[3][1] ~= 'goto')
+         count_label_uses(expr[3])
+      elseif op == 'if' then
+         count_label_uses(expr[3])
+      elseif op == 'return' then
+         -- nop
+      else
+         assert(op == 'bind')
+      end
+   end
+   local function remove_unreferenced_labels(expr)
+      local op = expr[1]
+      if op == 'do' then
+         local result = { 'do' }
+         for i=2,#expr do
+            table.insert(result, remove_unreferenced_labels(expr[i]))
+         end
+         return result
+      elseif op == 'goto' then
+         return expr
+      elseif op == 'label' then
+         local body = remove_unreferenced_labels(expr[3])
+         if counts[expr[2]] == 0 then return body end
+         return { 'label', expr[2], body }
+      elseif op == 'if' then
+         return { 'if', expr[2], remove_unreferenced_labels(expr[3]) }
+      elseif op == 'return' then
+         return expr
+      else
+         assert(op == 'bind')
+         return expr
+      end
+   end
+   expr = remove_trivial_gotos(expr, nil)
+   count_label_uses(expr)
+   return remove_unreferenced_labels(expr)
+end
+
+
 function selftest()
    local expr = { 'if', { '<', { '+', 3, 4 }, { '+', 7, 8 } },
                   { '<', 'len', 42 },
@@ -371,8 +461,8 @@ function selftest()
    local optimize = require('pf.optimize').optimize
 
    local function test_codegen(expr)
-      return reduce(codegen(inline_single_use_variables(cse(lower(optimize(expand(parse(expr), "EN10MB")))))))
+      return delabel(reduce(codegen(inline_single_use_variables(cse(lower(optimize(expand(parse(expr), "EN10MB"))))))))
    end
 
-   pp(test_codegen("ip"))
+   pp(test_codegen("tcp port 80"))
 end
