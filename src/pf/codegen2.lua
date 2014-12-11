@@ -2,6 +2,8 @@ module(...,package.seeall)
 
 local utils = require('pf.utils')
 
+local verbose = os.getenv("PF_VERBOSE");
+
 local set, pp, dup = utils.set, utils.pp, utils.dup
 
 local relops = set('<', '<=', '=', '!=', '>=', '>')
@@ -231,6 +233,16 @@ local function delabel(expr)
    return remove_unreferenced_labels(expr)
 end
 
+local function optimize_code(expr)
+   return delabel(reduce(expr))
+end
+
+function codegen(expr)
+   expr = utils.fixpoint(optimize_code, lower(expr))
+   if verbose then pp(expr) end
+   return expr
+end
+
 function selftest()
    local parse = require('pf.parse').parse
    local expand = require('pf.expand').expand
@@ -238,7 +250,7 @@ function selftest()
    local convert_anf = require('pf.anf').convert_anf
 
    local function test(expr)
-      return delabel(reduce(lower(convert_anf(optimize(expand(parse(expr), "EN10MB"))))))
+      return codegen(convert_anf(optimize(expand(parse(expr), "EN10MB"))))
    end
 
    pp(test("tcp port 80"))
