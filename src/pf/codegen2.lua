@@ -386,14 +386,25 @@ local function serialize(builder, expr)
       end
    end
 
-   local function serialize_stmt(expr)
+   local serialize_sequence
+
+   function serialize_stmt(expr)
       assert(type(expr) == 'table', 'logical expression must be a table')
       local op = expr[1]
       if op == 'if' then
-         builder.writeln('if '..serialize_bool(expr[2])..' then')
-         builder.push()
-         serialize_stmt(expr[3])
-         builder.pop()
+         local test, t = expr[2], expr[3]
+         local out = 'if '..serialize_bool(expr[2])..' then'
+         if expr[3][1] == 'goto' then
+            builder.writeln(out..' goto '..expr[3][2]..' end')
+         elseif (expr[3][1] == 'return' and
+                 expr[3][2][1] == 'true' or expr[3][2][1] == 'false') then
+            builder.writeln(out..' return '..expr[3][2][1]..' end')
+         else
+            builder.writeln(out)
+            builder.push()
+            serialize_sequence(expr[3])
+            builder.pop()
+         end
       elseif op == 'bind' then
          builder.bind(expr[2], serialize_value(expr[3]))
       elseif op == 'goto' then
@@ -414,7 +425,14 @@ local function serialize(builder, expr)
          error('unhandled primitive'..op)
       end
    end
-   serialize_stmt(expr)
+   function serialize_sequence(expr)
+      if (expr[1] == 'do') then
+         for i=2,#expr do serialize_stmt(expr[i]) end
+      else
+         serialize_stmt(expr)
+      end
+   end
+   serialize_sequence(expr)
 end
 
 function codegen(expr)
