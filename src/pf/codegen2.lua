@@ -77,28 +77,69 @@ local function lower(expr)
    return compile(expr, 'ACCEPT', 'REJECT')
 end
 
-local function reduce(expr, is_last)
+local function simplify_do(expr, is_last)
+   local function can_lift_head(expr, is_last)
+      if expr[1] == 'do' then return true end
+      if expr[1] == 'if' then return can_lift_head(expr[3], true) end
+      if expr[1] == 'label' then
+         return can_lift_head(expr[3], is_last)
+      end
+      if expr[1] == 'goto' then return false end
+      if expr[1] == 'return' then return is_last end
+      assert(expr[1] == 'bind', expr[1])
+      return true
+   end
+   local function can_lift_do(expr, k, is_last)
+      local function can_lift_control(expr, is_last)
+         if expr[1] == 'return' then return is_last end
+         if expr[1] == 'label' then
+            return can_lift_control(expr[3], is_last)
+         end
+         return expr[1] ~= 'bind'
+      end
+      for j=k,#expr do
+         if not can_lift_control(expr[j], is_last and j==#expr) then
+            return false
+         end
+      end
+      return true
+   end
    local op = expr[1]
    if op == 'do' then
+      -- "do return X end" -> "return X" if we are at end of block
+      -- "do FOO end" -> "FOO" if FOO is not return
       if #expr == 2 then
          local first_op = expr[2][1]
          assert(first_op ~= 'bind')
          if first_op ~= 'return' or is_last then
-            return reduce(expr[2], is_last)
+            return simplify_do(expr[2], is_last)
          end
       end
       local result = { 'do' }
       for i=2,#expr do
          local is_last = i==#expr
-         local subexpr = reduce(expr[i], is_last)
-         local function can_inline_do(subexpr, is_last)
+         local subexpr = simplify_do(expr[i], is_last)
+         -- do do expr end do -> do expr end
+         if subexpr[1] == 'do' then
+            -- Move as many expressions as we can from the inner do to
+            -- the outer do.
             for j=2,#subexpr do
-               if subexpr[j][1] == 'bind' then return false end
+               if can_lift_head(subexpr[j], i==#expr and j==#subexpr) then
+                  -- The head of the do can be lifted.
+                  table.insert(result, subexpr[j])
+               elseif can_lift_do(subexpr, j, i==#expr) then
+                  -- The rest of the do is just control statements.
+                  for k=j,#subexpr do table.insert(result, subexpr[k]) end
+                  break
+               else
+                  -- Otherwise collect the rest into a new do and add
+                  -- it.
+                  local tail = { 'do' }
+                  for k=j,#subexpr do table.insert(tail, subexpr[k]) end
+                  table.insert(result, tail)
+                  break
+               end
             end
-            return is_last or subexpr[#subexpr][1] ~= 'return'
-         end
-         if subexpr[1] == 'do' and can_inline_do(subexpr, is_last) then
-            for j=2,#subexpr do table.insert(result, subexpr[j]) end
          else
             table.insert(result, subexpr)
          end
@@ -107,9 +148,9 @@ local function reduce(expr, is_last)
    elseif op == 'goto' then
       return expr
    elseif op == 'label' then
-      return { 'label', expr[2], reduce(expr[3], is_last) }
+      return { 'label', expr[2], simplify_do(expr[3], is_last) }
    elseif op == 'if' then
-      return { 'if', expr[2], reduce(expr[3], is_last) }
+      return { 'if', expr[2], simplify_do(expr[3], is_last) }
    elseif op == 'return' then
       return expr
    else
@@ -156,6 +197,8 @@ local function delabel(expr)
             local subexpr = remove_trivial_gotos(expr[i], knext)
             if subexpr[1] == 'goto' and subexpr[2] == knext then
                -- Useless goto; skip.
+            elseif subexpr[1] == 'do' and #subexpr == 1 then
+               -- "do goto L1 end" produced "do end"; skip.
             else
                table.insert(reversed_result, subexpr)
                if subexpr[1] == 'label' then
@@ -265,7 +308,7 @@ local function delabel(expr)
 end
 
 local function optimize_code_inner(expr)
-   return delabel(reduce(expr))
+   return delabel(simplify_do(expr))
 end
 
 local function optimize_code(expr)
@@ -455,5 +498,5 @@ function selftest()
       return codegen(convert_anf(optimize(expand(parse(expr), "EN10MB"))))
    end
 
-   pp(test("tcp port 80"))
+   pp(test("tcp port 80 or udp port 34"))
 end
