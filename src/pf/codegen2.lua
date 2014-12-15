@@ -8,6 +8,21 @@ local set, pp, dup, concat = utils.set, utils.pp, utils.dup, utils.concat
 
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
+local env = {
+   floor=require('math').floor,
+
+   band=require('bit').band,
+   bxor=require('bit').bxor,
+   bor=require('bit').bor,
+   bswap=require('bit').bswap,
+   tobit=require('bit').tobit,
+   lshift=require('bit').lshift,
+   rshift=require('bit').rshift,
+   bswap=require('bit').bswap,
+
+   cast=require('ffi').cast
+}
+
 local function is_simple_expr(expr)
    -- Simple := return true | return false | goto Label
    if expr[1] == 'return' then
@@ -165,9 +180,9 @@ local function read_buffer_word_by_type(buffer, offset, size)
    if size == 1 then
       return buffer..'['..offset..']'
    elseif size == 2 then
-      return ('ffi.cast("uint16_t*", '..buffer..'+'..offset..')[0]')
+      return ('cast("uint16_t*", '..buffer..'+'..offset..')[0]')
    elseif size == 4 then
-      return ('ffi.cast("uint32_t*", '..buffer..'+'..offset..')[0]')
+      return ('cast("uint32_t*", '..buffer..'+'..offset..')[0]')
    else
       error("bad [] size: "..size)
    end
@@ -180,14 +195,10 @@ local function serialize(builder, stmt)
       if type(expr) == 'string' then return expr end
       assert(type(expr) == 'table', 'unexpected type '..type(expr))
       local op, lhs = expr[1], serialize_value(expr[2])
-      if op == 'ntohs' then
-         return 'bit.rshift(bit.bswap('..lhs..'), 16)'
-      elseif op == 'ntohl' then
-         return 'bit.bswap('..lhs..')'
-      elseif op == 'int32' then
-         return 'bit.tobit('..lhs..')'
-      elseif op == 'uint32' then
-         return '('..lhs..' % '.. 2^32 ..')'
+      if op == 'ntohs' then return 'rshift(bswap('..lhs..'), 16)'
+      elseif op == 'ntohl' then return 'bswap('..lhs..')'
+      elseif op == 'int32' then return 'tobit('..lhs..')'
+      elseif op == 'uint32' then return '('..lhs..' % '.. 2^32 ..')'
       end
       local rhs = serialize_value(expr[3])
       if op == '[]' then
@@ -195,12 +206,12 @@ local function serialize(builder, stmt)
       elseif op == '+' then return '('..lhs..' + '..rhs..')'
       elseif op == '-' then return '('..lhs..' - '..rhs..')'
       elseif op == '*' then return '('..lhs..' * '..rhs..')'
-      elseif op == '/' then return 'math.floor('..lhs..' / '..rhs..')'
-      elseif op == '&' then return 'bit.band('..lhs..','..rhs..')'
-      elseif op == '^' then return 'bit.bxor('..lhs..','..rhs..')'
-      elseif op == '|' then return 'bit.bor('..lhs..','..rhs..')'
-      elseif op == '<<' then return 'bit.lshift('..lhs..','..rhs..')'
-      elseif op == '>>' then return 'bit.rshift('..lhs..','..rhs..')'
+      elseif op == '/' then return 'floor('..lhs..' / '..rhs..')'
+      elseif op == '&' then return 'band('..lhs..','..rhs..')'
+      elseif op == '^' then return 'bxor('..lhs..','..rhs..')'
+      elseif op == '|' then return 'bor('..lhs..','..rhs..')'
+      elseif op == '<<' then return 'lshift('..lhs..','..rhs..')'
+      elseif op == '>>' then return 'rshift('..lhs..','..rhs..')'
       else error('unexpected op', op) end
    end
 
@@ -230,13 +241,13 @@ local function serialize(builder, stmt)
 
    local function serialize_sequence(stmts)
       if stmts[1] == 'do' then
-         for i=2,#stmts do serialize_statement(stmts[i]) end
+         for i=2,#stmts do serialize_statement(stmts[i], i==#stmts) end
       else
-         serialize_statement(stmts)
+         serialize_statement(stmts, true)
       end
    end
 
-   function serialize_statement(stmt)
+   function serialize_statement(stmt, is_last)
       local op = stmt[1]
       if op == 'do' then
          builder.writeln('do')
@@ -244,6 +255,9 @@ local function serialize(builder, stmt)
          serialize_sequence(stmt)
          builder.pop()
       elseif op == 'return' then
+         if not is_last then
+            return serialize_statement({ 'do', stmt }, false)
+         end
          builder.writeln('return '..serialize_bool(stmt[2]))
       elseif op == 'goto' then
          builder.jump(stmt[2])
@@ -257,7 +271,7 @@ local function serialize(builder, stmt)
                assert(t[1] == 'goto')
                builder.writeln(test_str..' goto '..t[2]..' end')
             end
-            serialize_statement(f)
+            serialize_statement(f, is_last)
          else
             builder.writeln(test_str)
             builder.push()
@@ -269,22 +283,27 @@ local function serialize(builder, stmt)
       elseif op == 'bind' then
          builder.bind(stmt[2], serialize_value(stmt[3]))
       else
-         assert (op == 'label')
+         assert(op == 'label')
          builder.writelabel(stmt[2])
-         serialize_statement(stmt[3])
+         serialize_statement(stmt[3], is_last)
       end
    end
-
-   pp(stmt)
    serialize_sequence(stmt)
 end
 
-function codegen(ssa)
+function codegen_lua(ssa)
    local builder = filter_builder('P', 'length')
    serialize(builder, cleanup(residualize_lua(ssa)))
    local str = builder.finish()
    if verbose then pp(str) end
+   print(str)
    return str
+end
+
+function codegen(ssa, name)
+   local func = assert(loadstring(codegen_lua(ssa), name))
+   setfenv(func, env)
+   return func()
 end
 
 function selftest()
@@ -298,5 +317,5 @@ function selftest()
       return codegen(convert_ssa(convert_anf(optimize(expand(parse(expr), "EN10MB")))))
    end
 
-   pp(test("tcp port 80 or udp port 34"))
+   test("tcp port 80 or udp port 34")
 end
