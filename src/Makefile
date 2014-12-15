@@ -5,6 +5,7 @@ all:
 clean:
 
 check:
+	luajit -l pf.anf -e 'pf.anf.selftest()'
 	luajit -l pf.types -e 'pf.types.selftest()'
 	luajit -l pf.utils -e 'pf.utils.selftest()'
 	luajit -l pf.libpcap -e 'pf.libpcap.selftest()'
