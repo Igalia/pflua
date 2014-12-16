@@ -351,7 +351,6 @@ function codegen_lua(ssa)
    serialize(builder, cleanup(residualize_lua(ssa), true))
    local str = builder.finish()
    if verbose then pp(str) end
-   print(str)
    return str
 end
 

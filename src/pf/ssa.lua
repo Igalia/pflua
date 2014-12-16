@@ -41,8 +41,6 @@ local function print_ssa(ssa)
 end
 
 local function lower(expr)
-   local function do_return(stmt) return { 'do', { 'return', stmt } } end
-   local k_values = { ACCEPT='true', REJECT='false' }
    local label_counter = 0
    local ssa = { blocks = {} }
    local function add_block()
@@ -226,7 +224,6 @@ local function order_blocks(ssa)
       tail = label
    end
    visit(ssa.start)
-   local result = {}
    local order = 1
    ssa.order = {}
    while tail do
@@ -271,7 +268,7 @@ local function compute_idoms(ssa)
          return dom(ssa.blocks[d1].idom, d2)
       end
    end
-   for i,label in ipairs(ssa.order) do
+   for order,label in ipairs(ssa.order) do
       local preds = ssa.blocks[label].preds
       if #preds == 0 then
          assert(label == ssa.start)
