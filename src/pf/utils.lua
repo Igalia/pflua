@@ -123,6 +123,12 @@ function ipv6_as_4x32(addr)
    return { c(2,3), c(4,5), c(6,7), c(8,9) }
 end
 
+function fixpoint(f, expr)
+   local prev
+   repeat expr, prev = f(expr), expr until equals(expr, prev)
+   return expr
+end
+
 function selftest ()
    print("selftest: pf.utils")
    local tab = { 1, 2, 3 }
