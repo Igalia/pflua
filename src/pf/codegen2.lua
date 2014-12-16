@@ -4,9 +4,7 @@ local utils = require('pf.utils')
 
 local verbose = os.getenv("PF_VERBOSE");
 
-local set, pp, dup, concat = utils.set, utils.pp, utils.dup, utils.concat
-
-local relops = set('<', '<=', '=', '!=', '>=', '>')
+local set, pp = utils.set, utils.pp
 
 local env = {
    floor=require('math').floor,
@@ -21,6 +19,10 @@ local env = {
    bswap=require('bit').bswap,
 
    cast=require('ffi').cast
+}
+
+local relop_map = {
+   ['<']='<', ['<=']='<=', ['=']='==', ['!=']='~=', ['>=']='>=', ['>']='>'
 }
 
 local relop_inversions = {
@@ -183,13 +185,8 @@ end
 
 local function filter_builder(...)
    local written = 'return function('
-   local vcount = 0
-   local lcount = 0
    local indent = ''
-   local jumps = {}
    local builder = {}
-   local db_stack = {}
-   local db = {}
    function builder.write(str)
       written = written .. str
    end
@@ -269,10 +266,6 @@ local function serialize(builder, stmt)
       elseif op == '>>' then return 'rshift('..lhs..','..rhs..')'
       else error('unexpected op', op) end
    end
-
-   local relop_map = {
-      ['<']='<', ['<=']='<=', ['=']='==', ['!=']='~=', ['>=']='>=', ['>']='>'
-   }
 
    local function serialize_bool(expr)
       local op = expr[1]
