@@ -51,7 +51,7 @@ end
 -- Label := 'label' Lua
 local function residualize_lua(program)
    -- write blocks, scope is dominator tree
-   local function nest(block, result)
+   local function nest(block, result, knext)
       for _, binding in ipairs(block.bindings) do
          table.insert(result, { 'bind', binding.name, binding.value })
       end
@@ -101,7 +101,7 @@ local function residualize_lua(program)
       end
    end
    local result = { 'do' }
-   nest(program.blocks[program.start], result)
+   nest(program.blocks[program.start], result, nil)
    return result
 end
 
@@ -112,28 +112,72 @@ end
 -- If := 'if' Bool Lua Lua?
 -- Bind := 'bind' Name Expr
 -- Label := 'label' Lua
-local function cleanup(expr)
+local function cleanup(expr, is_last)
+   local function splice_tail(result, expr)
+      if expr[1] == 'do' then
+         -- Splice a tail "do" into the parent do.
+         for j=2,#expr do
+            if j==#expr then
+               splice_tail(result, expr[j])
+            else
+               table.insert(result, expr[j])
+            end
+         end
+         return
+      elseif expr[1] == 'if' then
+         if expr[3][1] == 'return' or expr[3][1] == 'goto' then
+            -- Splice the consequent of a tail "if" into the parent do.
+            table.insert(result, { 'if', expr[2], expr[3] })
+            if expr[4] then splice_tail(result, expr[4]) end
+            return
+         end
+      elseif expr[1] == 'label' then
+         -- Likewise, try to splice the body of a tail labelled
+         -- statement.
+         local tail = { 'do' }
+         splice_tail(tail, expr[3])
+         if #tail > 2 then
+            table.insert(result, { 'label', expr[2], tail[2] })
+            for i=3,#tail do table.insert(result, tail[i]) end
+            return
+         end
+      end
+      table.insert(result, expr)
+   end
    local op = expr[1]
    if op == 'do' then
-      if #expr == 2 then return cleanup(expr[2]) end
+      if #expr == 2 then return cleanup(expr[2], is_last) end
       local result = { 'do' }
-      for i=2,#expr do table.insert(result, cleanup(expr[i])) end
+      for i=2,#expr do
+         local subexpr = cleanup(expr[i], i==#expr)
+         if i==#expr then
+            splice_tail(result, subexpr)
+         else
+            table.insert(result, subexpr)
+         end
+      end
       return result
    elseif op == 'return' then
       return expr
    elseif op == 'goto' then
       return expr
    elseif op == 'if' then
-      local test, t, f = expr[2], cleanup(expr[3]), cleanup(expr[4])
+      local test, t, f = expr[2], cleanup(expr[3], true), cleanup(expr[4], true)
       if not is_simple_expr(t) and is_simple_expr(f) then
-         return { 'if', invert_bool(test), f, t }
+         test, t, f = invert_bool(test), f, t
       end
-      return { 'if', test, t, f }
+      if is_simple_expr(t) and is_last then
+         local result = { 'do', { 'if', test, t } }
+         splice_tail(result, f)
+         return result
+      else
+         return { 'if', test, t, f }
+      end
    elseif op == 'bind' then
       return expr
    else
       assert (op == 'label')
-      return { 'label', expr[2], cleanup(expr[3]) }
+      return { 'label', expr[2], cleanup(expr[3], is_last) }
    end
 end
 
@@ -280,13 +324,15 @@ local function serialize(builder, stmt)
                assert(t[1] == 'goto')
                builder.writeln(test_str..' goto '..t[2]..' end')
             end
-            serialize_statement(f, is_last)
+            if f then serialize_statement(f, is_last) end
          else
             builder.writeln(test_str)
             builder.push()
             serialize_sequence(t)
-            builder.else_()
-            serialize_sequence(f)
+            if f then
+               builder.else_()
+               serialize_sequence(f)
+            end
             builder.pop()
          end
       elseif op == 'bind' then
@@ -302,7 +348,7 @@ end
 
 function codegen_lua(ssa)
    local builder = filter_builder('P', 'length')
-   serialize(builder, cleanup(residualize_lua(ssa)))
+   serialize(builder, cleanup(residualize_lua(ssa), true))
    local str = builder.finish()
    if verbose then pp(str) end
    print(str)
