@@ -116,6 +116,17 @@ local function compute_use_counts(ssa)
    return result
 end
 
+local relop_inversions = {
+   ['<']='>=', ['<=']='>', ['=']='!=', ['!=']='=', ['>=']='<', ['>']='<='
+}
+
+local function invert_bool(expr)
+   if expr[1] == 'true' then return { 'false' } end
+   if expr[1] == 'false' then return { 'true' } end
+   assert(relop_inversions[expr[1]])
+   return { relop_inversions[expr[1]], expr[2], expr[3] }
+end
+
 local function is_simple_expr(expr)
    -- Simple := return true | return false | goto Label
    if expr[1] == 'return' then
@@ -153,7 +164,7 @@ local function simplify(ssa)
             else
                assert(t_val == 'false' and f_val == 'true')
                -- if EXP then return false else return true -> return not EXP
-               block.control = { 'return', { 'not', block.control[2] } }
+               block.control = { 'return', invert_bool(block.control[2]) }
             end
          else
             local control = { 'if', block.control[2], t.label, f.label }

@@ -23,6 +23,17 @@ local env = {
    cast=require('ffi').cast
 }
 
+local relop_inversions = {
+   ['<']='>=', ['<=']='>', ['=']='!=', ['!=']='=', ['>=']='<', ['>']='<='
+}
+
+local function invert_bool(expr)
+   if expr[1] == 'true' then return { 'false' } end
+   if expr[1] == 'false' then return { 'true' } end
+   assert(relop_inversions[expr[1]])
+   return { relop_inversions[expr[1]], expr[2], expr[3] }
+end
+
 local function is_simple_expr(expr)
    -- Simple := return true | return false | goto Label
    if expr[1] == 'return' then
@@ -115,7 +126,7 @@ local function cleanup(expr)
    elseif op == 'if' then
       local test, t, f = expr[2], cleanup(expr[3]), cleanup(expr[4])
       if not is_simple_expr(t) and is_simple_expr(f) then
-         return { 'if', { 'not', test }, f, t }
+         return { 'if', invert_bool(test), f, t }
       end
       return { 'if', test, t, f }
    elseif op == 'bind' then
@@ -221,9 +232,7 @@ local function serialize(builder, stmt)
 
    local function serialize_bool(expr)
       local op = expr[1]
-      if op == 'not' then
-         return 'not '..serialize_bool(expr[2])
-      elseif op == 'true' then
+      if op == 'true' then
          return 'true'
       elseif op == 'false' then
          return 'false'
