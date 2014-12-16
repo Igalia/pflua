@@ -20,7 +20,8 @@ end
 
 local function filter(packets, pred)
    local seen, matched = 0, 0
-   for _,packet in ipairs(packets) do
+   for i = 1,#packets do
+      packet = packets[i]
       seen = seen + 1
       if pred(packet.packet, packet.len) then matched = matched + 1 end
    end
