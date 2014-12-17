@@ -61,7 +61,7 @@ function main(in_file, filter_input, opts)
    elapsed = utils.now() - start
    print(string.format("Matched %d/%d packets in %s iterations: %s (%f MPPS).",
                        matched, seen, iterations, in_file,
-                       seen/elapsed*1e-6 * iterations))
+                       (seen * iterations / elapsed) / 1e6))
 
 end
 
