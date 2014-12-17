@@ -45,11 +45,24 @@ function main(in_file, filter_input, opts)
    local pred = get_predicate(filter_input, opts)
    -- Warm up.
    filter(packets, pred)
+   -- Time one warm run
    local start = utils.now()
    local seen, matched = filter(packets, pred)
    local elapsed = utils.now() - start
-   print(string.format("Matched %d/%d packets from %s (%f MPPS).",
-                       matched, seen, in_file, seen/elapsed*1e-6))
+   -- Very short timing runs are highly inaccurate.
+   -- Calculate iterations to take at least around 1s.
+   local iterations = utils.ceiling_power2(1 / elapsed)
+   -- Do the actual benchmarking on that many iterations
+   start = utils.now()
+   for i=1,iterations do
+      -- Seen and matched are the same for every run.
+      seen, matched = filter(packets, pred)
+   end
+   elapsed = utils.now() - start
+   print(string.format("Matched %d/%d packets in %s iterations: %s (%f MPPS).",
+                       matched, seen, iterations, in_file,
+                       seen/elapsed*1e-6 * iterations))
+
 end
 
 -- Parse args
