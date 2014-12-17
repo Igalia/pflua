@@ -307,6 +307,7 @@ function convert_ssa(anf)
 end
 
 function selftest()
+   print("selftest: pf.ssa")
    local parse = require('pf.parse').parse
    local expand = require('pf.expand').expand
    local optimize = require('pf.optimize').optimize
@@ -316,5 +317,7 @@ function selftest()
       return convert_ssa(convert_anf(optimize(expand(parse(expr), "EN10MB"))))
    end
 
-   print_ssa(test("tcp port 80 or udp port 34"))
+   test("tcp port 80 or udp port 34")
+
+   print("OK")
 end

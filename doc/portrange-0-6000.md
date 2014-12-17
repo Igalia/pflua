@@ -97,103 +97,54 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 34) then do return false end end
-   do
-      local v1 = ffi.cast("uint16_t*", P+12)[0]
-      if not (v1 == 8) then goto L3 end
+   if length < 34 then return false end
+   local var1 = cast("uint16_t*", P+12)[0]
+   if var1 == 8 then
+      local var2 = P[23]
+      if var2 == 6 then goto L8 end
       do
-         local v2 = P[23]
-         if v2 == 6 then goto L4 end
-         do
-            if v2 == 17 then goto L4 end
-            do
-               if not (v2 == 132) then do return false end end
-            end
-         end
-::L4::
-         do
-            local v3 = ffi.cast("uint16_t*", P+20)[0]
-            local v4 = bit.band(v3,65311)
-            if not (v4 == 0) then do return false end end
-            do
-               local v5 = P[14]
-               local v6 = bit.band(v5,15)
-               local v7 = bit.lshift(v6,2)
-               local v8 = v7 + 16
-               if not (v8 <= length) then do return false end end
-               do
-                  local v9 = v7 + 14
-                  local v10 = ffi.cast("uint16_t*", P+v9)[0]
-                  local v11 = bit.rshift(bit.bswap(v10), 16)
-                  if v11 <= 6000 then do return true end end
-                  do
-                     local v12 = v7 + 18
-                     if not (v12 <= length) then do return false end end
-                     do
-                        local v13 = ffi.cast("uint16_t*", P+v8)[0]
-                        local v14 = bit.rshift(bit.bswap(v13), 16)
-                        do return v14 <= 6000 end
-                     end
-                  end
-               end
-            end
-         end
+         if var2 == 17 then goto L8 end
+         if var2 == 132 then goto L8 end
+         return false
       end
-::L3::
+::L8::
+      if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
+      local var9 = lshift(band(P[14],15),2)
+      local var10 = (var9 + 16)
+      if var10 > length then return false end
+      if rshift(bswap(cast("uint16_t*", P+(var9 + 14))[0]), 16) <= 6000 then return true end
+      if (var9 + 18) > length then return false end
+      return rshift(bswap(cast("uint16_t*", P+var10)[0]), 16) <= 6000
+   else
+      if length < 56 then return false end
+      if var1 ~= 56710 then return false end
+      local var28 = P[20]
+      if var28 == 6 then goto L26 end
       do
-         if not (length >= 56) then do return false end end
+         if var28 ~= 44 then goto L29 end
          do
-            if not (v1 == 56710) then do return false end end
-            do
-               local v15 = P[20]
-               if v15 == 6 then goto L13 end
-               do
-                  if not (v15 == 44) then goto L14 end
-                  do
-                     local v16 = P[54]
-                     if v16 == 6 then goto L13 end
-                  end
-               end
-::L14::
-               do
-                  if v15 == 17 then goto L13 end
-                  do
-                     if not (v15 == 44) then goto L17 end
-                     do
-                        local v17 = P[54]
-                        if v17 == 17 then goto L13 end
-                     end
-                  end
-::L17::
-                  do
-                     if v15 == 132 then goto L13 end
-                     do
-                        if not (v15 == 44) then do return false end end
-                        do
-                           local v18 = P[54]
-                           if not (v18 == 132) then do return false end end
-                        end
-                     end
-                  end
-               end
-::L13::
-               do
-                  local v19 = ffi.cast("uint16_t*", P+54)[0]
-                  local v20 = bit.rshift(bit.bswap(v19), 16)
-                  if v20 <= 6000 then do return true end end
-                  do
-                     if not (length >= 58) then do return false end end
-                     do
-                        local v21 = ffi.cast("uint16_t*", P+56)[0]
-                        local v22 = bit.rshift(bit.bswap(v21), 16)
-                        do return v22 <= 6000 end
-                     end
-                  end
-               end
-            end
+            if P[54] == 6 then goto L26 end
+            goto L29
          end
+::L29::
+         if var28 == 17 then goto L26 end
+         if var28 ~= 44 then goto L35 end
+         do
+            if P[54] == 17 then goto L26 end
+            goto L35
+         end
+::L35::
+         if var28 == 132 then goto L26 end
+         if var28 ~= 44 then return false end
+         if P[54] == 132 then goto L26 end
+         return false
       end
+::L26::
+      if rshift(bswap(cast("uint16_t*", P+54)[0]), 16) <= 6000 then return true end
+      if length < 58 then return false end
+      return rshift(bswap(cast("uint16_t*", P+56)[0]), 16) <= 6000
    end
 end
+
 ```
 

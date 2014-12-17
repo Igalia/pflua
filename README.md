@@ -62,9 +62,16 @@ they can be combined.  This representation is then exhaustively
 [optimized](https://github.com/Igalia/pflua/blob/master/src/pf/optimize.lua),
 folding constants and tests, inferring ranges of expressions and packet
 offset values, hoisting assertions that post-dominate success
-continuations, etc.  Finally, we
-[residualize](https://github.com/Igalia/pflua/blob/master/src/pf/codegen.lua)
-Lua source code, performing common subexpression elimination as we go.
+continuations, etc.  We then lower to [A-normal
+form](https://github.com/Igalia/pflua/blob/master/src/pf/anf.lua) to
+give names to all intermediate values, perform common subexpression
+elimination, then inline named values that are only used once.  We lower
+further to [Static single
+assignment](https://github.com/Igalia/pflua/blob/master/src/pf/ssa.lua)
+to give names to all blocks, which allows us to perform control-flow
+optimizations.  Finally, we
+[residualize](https://github.com/Igalia/pflua/blob/master/src/pf/backend.lua)
+Lua source code, using the control flow analysis from the SSA phase.
 
 The resulting Lua function is a predicate of two parameters: the packet
 as a `uint8_t*` pointer, and its length.  If the predicate is called

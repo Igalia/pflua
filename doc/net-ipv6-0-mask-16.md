@@ -42,21 +42,11 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 54) then do return false end end
-   do
-      local v1 = ffi.cast("uint16_t*", P+12)[0]
-      if not (v1 == 56710) then do return false end end
-      do
-         local v2 = ffi.cast("uint32_t*", P+22)[0]
-         local v3 = bit.band(v2,65535)
-         if v3 == 0 then do return true end end
-         do
-            local v4 = ffi.cast("uint32_t*", P+38)[0]
-            local v5 = bit.band(v4,65535)
-            do return v5 == 0 end
-         end
-      end
-   end
+   if length < 54 then return false end
+   if cast("uint16_t*", P+12)[0] ~= 56710 then return false end
+   if band(cast("uint32_t*", P+22)[0],65535) == 0 then return true end
+   return band(cast("uint32_t*", P+38)[0],65535) == 0
 end
+
 ```
 

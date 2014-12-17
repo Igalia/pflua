@@ -339,7 +339,7 @@ local function serialize(builder, stmt)
    serialize_sequence(stmt)
 end
 
-function codegen_lua(ssa)
+function emit_lua(ssa)
    local builder = filter_builder('P', 'length')
    serialize(builder, cleanup(residualize_lua(ssa), true))
    local str = builder.finish()
@@ -347,13 +347,14 @@ function codegen_lua(ssa)
    return str
 end
 
-function codegen(ssa, name)
-   local func = assert(loadstring(codegen_lua(ssa), name))
+function emit_and_load(ssa, name)
+   local func = assert(loadstring(emit_lua(ssa), name))
    setfenv(func, env)
    return func()
 end
 
 function selftest()
+   print("selftest: pf.backend")
    local parse = require('pf.parse').parse
    local expand = require('pf.expand').expand
    local optimize = require('pf.optimize').optimize
@@ -361,8 +362,10 @@ function selftest()
    local convert_ssa = require('pf.ssa').convert_ssa
 
    local function test(expr)
-      return codegen(convert_ssa(convert_anf(optimize(expand(parse(expr), "EN10MB")))))
+      local ast = optimize(expand(parse(expr), "EN10MB"))
+      return emit_and_load(convert_ssa(convert_anf(ast)))
    end
 
    test("tcp port 80 or udp port 34")
+   print("OK")
 end

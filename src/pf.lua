@@ -7,10 +7,9 @@ local bpf = require("pf.bpf")
 local parse = require('pf.parse')
 local expand = require('pf.expand')
 local optimize = require('pf.optimize')
-local codegen = require('pf.codegen')
 local anf = require('pf.anf')
 local ssa = require('pf.ssa')
-local codegen2 = require('pf.codegen2')
+local backend = require('pf.backend')
 
 function compile_filter(filter_str, opts)
    local opts = opts or {}
@@ -29,20 +28,14 @@ function compile_filter(filter_str, opts)
       if opts.source then return bpf.compile_lua(bytecode) end
       local bpf_prog = bpf.compile(bytecode)
       return function(P, len) return bpf_prog(P, len) ~= 0 end
-   elseif opts.codegen2 then
+   else
       local expr = parse.parse(filter_str)
       expr = expand.expand(expr, dlt)
       expr = optimize.optimize(expr)
       expr = anf.convert_anf(expr)
       expr = ssa.convert_ssa(expr)
-      if opts.source then return codegen2.codegen_lua(expr) end
-      return codegen2.codegen(expr, filter_str)
-   else
-      local expr = parse.parse(filter_str)
-      expr = expand.expand(expr, dlt)
-      expr = optimize.optimize(expr)
-      if opts.source then return codegen.compile_lua(expr) end
-      return codegen.compile(expr, filter_str)
+      if opts.source then return backend.emit_lua(expr) end
+      return backend.emit_and_load(expr, filter_str)
    end
 end
 
@@ -53,11 +46,9 @@ function selftest ()
       local f1 = compile_filter(str, { libpcap = true })
       local f2 = compile_filter(str, { bpf = true })
       local f3 = compile_filter(str, { bpf = false })
-      local f4 = compile_filter(str, { codegen2 = true })
       assert(f1(str, 0) == false, "null packet should be rejected (libpcap)")
       assert(f2(str, 0) == false, "null packet should be rejected (bpf)")
       assert(f3(str, 0) == false, "null packet should be rejected (pflua)")
-      assert(f4(str, 0) == false, "null packet should be rejected (codegen2)")
    end
    test_null("icmp")
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
@@ -76,7 +67,6 @@ function selftest ()
       local f1 = compile_filter(filter, { libpcap = true })
       local f2 = compile_filter(filter, { bpf = true })
       local f3 = compile_filter(filter, { bpf = false })
-      local f4 = compile_filter(filter, { codegen2 = true })
       local actual
       actual = count_matched(f1)
       assert(actual == expected,
@@ -85,9 +75,6 @@ function selftest ()
       assert(actual == expected,
              'bpf: got ' .. actual .. ', expected ' .. expected)
       actual = count_matched(f3)
-      assert(actual == expected,
-             'pflua: got ' .. actual .. ', expected ' .. expected)
-      actual = count_matched(f4)
       assert(actual == expected,
              'pflua: got ' .. actual .. ', expected ' .. expected)
    end
