@@ -2,7 +2,6 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local bor, rshift = bit.bor, bit.rshift
 
 ffi.cdef[[
 typedef long time_t;
@@ -128,17 +127,6 @@ function fixpoint(f, expr)
    local prev
    repeat expr, prev = f(expr), expr until equals(expr, prev)
    return expr
-end
-
--- Algorithm from "Hacker's delight"
-function ceiling_power2(x)
-   x = x - 1
-   x = bor(x, rshift(x, 1))
-   x = bor(x, rshift(x, 2))
-   x = bor(x, rshift(x, 4))
-   x = bor(x, rshift(x, 8))
-   x = bor(x, rshift(x, 16))
-   return x + 1
 end
 
 function selftest ()
