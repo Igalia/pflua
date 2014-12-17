@@ -61,82 +61,16 @@ function open_and_mmap(filename)
    return header, ptr + ffi.sizeof("struct pcap_file"), ptr_end
 end
 
-function load_packets_from_mmap(ptr, ptr_end)
+function load_packets(filename)
+   local _, ptr, ptr_end = open_and_mmap(filename)
    local ret = {}
+   local i = 1
    while ptr < ptr_end do
       local record = ffi.cast("struct pcap_record *", ptr)
       local packet = ffi.cast("unsigned char *", record + 1)
-      table.insert(ret, { packet=packet, len=record.incl_len })
+      ret[i] = { packet=packet, len=record.incl_len }
+      i = i + 1
       ptr = packet + record.incl_len
    end
    return ret
-end
-
-function load_packets(file)
-   local _, ptr, ptr_end = open_and_mmap(file)
-   return load_packets_from_mmap(ptr, ptr_end)
-end
-
-function records_mm(filename)
-   local fd = open(filename, O_RDONLY)
-   if fd == -1 then
-      error("Error opening " .. filename)
-   end
-   local size = size(fd)
-   local ptr = mmap(fd, size)
-   if ptr == ffi.cast("void *", -1) then
-      error("Error mmapping " .. filename)
-   end
-   if (-1 == C.close(fd)) then
-      error("Error closing fd")
-   end
-   local start = ptr
-   ptr = ffi.cast("unsigned char *", ptr)
-   local ptr_end = ptr + size
-   local header = ffi.cast("struct pcap_file *", ptr)
-   if header.magic_number == 0xD4C3B2A1 then
-      error("Endian mismatch in " .. filename)
-   elseif header.magic_number ~= 0xA1B2C3D4 then
-      error("Bad PCAP magic number in " .. filename)
-   end
-   ptr = ptr + ffi.sizeof("struct pcap_file")
-   local function pcap_records_it()
-      if ptr >= ptr_end then
-         if (-1 == C.munmap(start, size)) then
-            error("Error munmapping")
-         end
-         return nil
-      end
-      local record = ffi.cast("struct pcap_record *", ptr)
-      local packet = ffi.cast("unsigned char *", record + 1)
-      ptr = packet + record.incl_len
-      return packet, record
-   end
-   return pcap_records_it, true, true
-end
-
-
-
-function write_file_header(file)
-   local pcap_file = ffi.new("struct pcap_file")
-   pcap_file.magic_number = 0xa1b2c3d4
-   pcap_file.version_major = 2
-   pcap_file.version_minor = 4
-   pcap_file.snaplen = 65535
-   pcap_file.network = 1
-   file:write(ffi.string(pcap_file, ffi.sizeof(pcap_file)))
-   file:flush()
-end
-
-function write_record (file, ffi_buffer, length)
-   write_record_header(file, length)
-   file:write(ffi.string(ffi_buffer, length))
-   file:flush()
-end
-
-function write_record_header (file, length)
-   local pcap_record = types.pcap_record(0, 0, length, length)
-   pcap_record.incl_len = length
-   pcap_record.orig_len = length
-   file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
 end
