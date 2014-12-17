@@ -49,21 +49,24 @@ local folders = {
    ['>'] = function(a, b) return a > b end
 }
 
+local cfkey_cache, cfkey = {}, nil
+
 local function memoize(f)
-   local cache = { }
-   return cache, function (arg)
-      local result = cache[arg]
+   return function (arg)
+      local result = cfkey_cache[arg]
       if result == nil then
          result = f(arg)
-         cache[arg] = result
+         cfkey_cache[arg] = result
       end
       return result
    end
 end
 
-local cfkey_cache, cfkey
+local function clear_cache()
+   cfkey_cache = {}
+end
 
-cfkey_cache, cfkey = memoize(function (expr)
+cfkey = memoize(function (expr)
    if type(expr) == 'table' then
       local ret = 'table('..cfkey(expr[1])
       for i=2,#expr do ret = ret..' '..cfkey(expr[i]) end
@@ -686,7 +689,7 @@ function optimize_inner(expr)
    expr = simplify(cfold(expr, {}))
    expr = simplify(infer_ranges(expr))
    expr = simplify(lhoist(expr))
-   cfkey_cache = { }
+   clear_cache()
    return expr
 end
 
