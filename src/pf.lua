@@ -46,22 +46,6 @@ function compile_filter(filter_str, opts)
    end
 end
 
-function filter_count(pred, file)
-   local total_pkt = 0
-   local count = 0
-   local records = savefile.records_mm(file)
-   while true do
-      local pkt, hdr = records()
-      if not pkt then break end
-      total_pkt = total_pkt + 1
-      local length = hdr.incl_len
-      if pred(pkt, length) then
-         count = count + 1
-      end
-   end
-   return count, total_pkt
-end
-
 function selftest ()
    print("selftest: pf")
    
@@ -78,29 +62,40 @@ function selftest ()
    test_null("icmp")
    test_null("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
 
-   local function assert_count(filter, file, expected)
+   local function assert_count(filter, packets, expected)
+      function count_matched(pred)
+         local matched = 0
+         for i=1,#packets do
+            if pred(packets[i].packet, packets[i].len) then
+               matched = matched + 1
+            end
+         end
+         return matched
+      end
+
       local f1 = compile_filter(filter, { libpcap = true })
       local f2 = compile_filter(filter, { bpf = true })
       local f3 = compile_filter(filter, { bpf = false })
       local f4 = compile_filter(filter, { codegen2 = true })
       local actual
-      actual = filter_count(f1, file)
+      actual = count_matched(f1)
       assert(actual == expected,
              'libpcap: got ' .. actual .. ', expected ' .. expected)
-      actual = filter_count(f2, file)
+      actual = count_matched(f2)
       assert(actual == expected,
              'bpf: got ' .. actual .. ', expected ' .. expected)
-      actual = filter_count(f3, file)
+      actual = count_matched(f3)
       assert(actual == expected,
              'pflua: got ' .. actual .. ', expected ' .. expected)
-      actual = filter_count(f4, file)
+      actual = count_matched(f4)
       assert(actual == expected,
              'pflua: got ' .. actual .. ', expected ' .. expected)
    end
-   assert_count('', "ts/pcaps/ws/v4.pcap", 43)
-   assert_count('ip', "ts/pcaps/ws/v4.pcap", 43)
-   assert_count('tcp', "ts/pcaps/ws/v4.pcap", 41)
-   assert_count('tcp port 80', "ts/pcaps/ws/v4.pcap", 41)
+   local v4 = savefile.load_packets("ts/pcaps/ws/v4.pcap")
+   assert_count('', v4, 43)
+   assert_count('ip', v4, 43)
+   assert_count('tcp', v4, 41)
+   assert_count('tcp port 80', v4, 41)
 
    print("OK")
 end
