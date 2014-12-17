@@ -40,16 +40,33 @@ function get_predicate(filter_input, opts)
    end
 end
 
+local function run_filter(min_time, packets, pred)
+   local start = utils.now()
+   local finish = start
+   local seen, matched = 0
+   local iterations = 0
+   while finish - start < min_time do
+      seen, matched = filter(packets, pred)
+      finish = utils.now()
+      iterations = iterations + 1
+   end
+   return seen, matched, (finish - start), iterations
+end
+
 function main(in_file, filter_input, opts)
    local packets = savefile.load_packets(in_file)
    local pred = get_predicate(filter_input, opts)
-   -- Warm up.
+   -- Untimed warm up - this may involve disk access, etc.
    filter(packets, pred)
-   local start = utils.now()
-   local seen, matched = filter(packets, pred)
-   local elapsed = utils.now() - start
-   print(string.format("Matched %d/%d packets from %s (%f MPPS).",
-                       matched, seen, in_file, seen/elapsed*1e-6))
+   -- Full warm-up, hopefully. 0.5s is a guess; most JIT will(?) occur.
+   local seen, matched = run_filter(0.5, packets, pred)
+   -- Very short timing runs are highly inaccurate. 0.002s is not ok.
+   -- By 1s, results are more consistent.
+   -- Seen and matched are the same for every run.
+   seen, matched, elapsed, iterations = run_filter(1, packets, pred)
+   print(string.format("Matched %d/%d packets in %s iterations: %s (%f MPPS).",
+                       matched, seen, iterations, in_file,
+                       (seen * iterations / elapsed) / 1e6))
 end
 
 -- Parse args
