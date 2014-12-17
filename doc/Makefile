@@ -43,7 +43,9 @@ PFLUA = \
 	../src/pf/parse.lua \
 	../src/pf/expand.lua \
 	../src/pf/optimize.lua \
-	../src/pf/codegen.lua
+	../src/pf/anf.lua \
+	../src/pf/ssa.lua \
+	../src/pf/backend.lua
 
 all: $(EXAMPLES)
 
