@@ -60,46 +60,52 @@ local function lex_ipv4_or_host(str, pos)
 end
 
 local function lex_ipv6(str, pos)
-   local function expand_zeros_into(addr, number_of_zeros)
-      for i=1, number_of_zeros do table.insert(addr, 0) end
+   local function expand_zeros_into(addr, n)
+      for i=1,n do table.insert(addr, 0) end
    end
    local function expand_ipv6(addr)
-      local result = { addr[1] }
-      local i = 2
-      while (i <= #addr) do
-         if type(addr[i]) == 'string' then
-            if type(addr[i+1]) == 'string' then
-               expand_zeros_into(result, 7)
-               i = i + 1
-            else
-               expand_zeros_into(result, 10 - #addr)
-            end
+      local result = { 'ipv6' }
+      for _, chunk in ipairs(addr) do
+         if chunk == "" then
+            expand_zeros_into(result, 9 - #addr)
          else
-            table.insert(result, addr[i])
+            table.insert(result, tonumber(chunk, 16))
          end
-         i = i + 1
       end
       return result
    end
 
-   local addr = { 'ipv6' }
-   local digits, dot = str:match("^(%x?%x?%x?%x?)()%:", pos)
-   if not digits then digits = "" end
-   table.insert(addr, #digits == 0 and digits or tonumber(digits, 16))
-   pos = dot
-   local hole = 0
+   local addr, holes = {}, 0
+
+   -- First chunk
+   local digits, colon = str:match("^(%x?%x?%x?%x)%:?()", pos)
+   if not digits then
+      digits, colon = str:match("^(%:%:)()", pos)
+      if not digits then error("wrong IPv6 address") end
+      digits = ""
+      holes = 1
+   end
+   table.insert(addr, digits)
+   pos = colon
+   -- Rest of the chunks
    while (true) do
-      local digits, dot = str:match("^%:(%x?%x?%x?%x?)()", pos)
-      if not dot then break end
-      if not digits then digits = "" end
-      if pos <= #str and dot - pos == 1 then hole = hole + 1 end
-      assert(hole <= 2, "wrong IPv6 address")
-      table.insert(addr, #digits == 0 and digits or tonumber(digits, 16))
-      pos = dot
+      digits, colon = str:match("^(%x?%x?%x?%x)%:?()", pos)
+      if not digits then
+         if str:sub(pos, pos) ~= ':' then break end
+         holes = holes + 1
+         assert(holes <= 1, "wrong IPv6 address")
+         digits = ""
+         pos = pos + 1
+      else
+         pos = colon
+      end
+      table.insert(addr, digits)
+      if pos > #str then break end
    end
    local terminators = " \t\r\n)/"
    assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
           "unexpected terminator for ipv6 address")
+   -- Expand address
    addr = expand_ipv6(addr)
    assert(#addr == 9, "wrong IPv6 address")
    return addr, pos
@@ -1029,6 +1035,8 @@ function selftest ()
              { 'host', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 0 } })
    parse_test("src net eee:eee::0/96",
              { 'src_net', { 'ipv6/len', { 'ipv6', 3822, 3822, 0, 0, 0, 0, 0, 0 }, 96 } })
+   parse_test("src net 3ffe:500::/28",
+             { 'src_net', { 'ipv6/len', { 'ipv6', 16382, 1280, 0, 0, 0, 0, 0, 0 }, 28 } })
    parse_test("src net 192.168.1.0/24",
              { 'src_net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
    parse_test("src net 192.168.1.0 mask 255.255.255.0",
