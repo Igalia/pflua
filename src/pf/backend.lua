@@ -353,17 +353,30 @@ function emit_and_load(ssa, name)
    return func()
 end
 
+local function ast_to_ssa(ast)
+   local convert_anf = require('pf.anf').convert_anf
+   local convert_ssa = require('pf.ssa').convert_ssa
+   return convert_ssa(convert_anf(ast))
+end
+
+-- Compile and compile_lua are a stable API for tests
+function compile_lua(ast)
+   return emit_lua(ast_to_ssa(ast))
+end
+
+function compile(ast, name)
+   return emit_and_load(ast_to_ssa(ast, name))
+end
+
 function selftest()
    print("selftest: pf.backend")
    local parse = require('pf.parse').parse
    local expand = require('pf.expand').expand
    local optimize = require('pf.optimize').optimize
-   local convert_anf = require('pf.anf').convert_anf
-   local convert_ssa = require('pf.ssa').convert_ssa
 
    local function test(expr)
       local ast = optimize(expand(parse(expr), "EN10MB"))
-      return emit_and_load(convert_ssa(convert_anf(ast)))
+      return compile(ast, "selftest")
    end
 
    test("tcp port 80 or udp port 34")
