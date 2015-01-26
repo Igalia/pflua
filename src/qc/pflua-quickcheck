@@ -1,0 +1,78 @@
+#!/usr/bin/env luajit
+-- -*- lua -*-
+package.path = package.path .. ";../?.lua"
+
+local pfutils = require('pf.utils')
+local gmtime = pfutils.gmtime
+local utils = require("utils")
+
+local function rerun_usage(seed, i, prop, prop_args)
+   print(("Rerun as: pflua-quickcheck --seed=%s --iterations=%s %s %s"):
+         format(seed, i + 1, prop, table.concat(prop_args, " ")))
+end
+
+function main(...)
+   local args = { ... }
+   local seed, iterations
+   while #args >= 1 and args[1]:match("^%-%-") do
+      local arg, _, val = table.remove(args, 1):match("^%-%-([^=]*)(=(.*))$")
+      assert(arg)
+      if arg == 'seed' then seed = assert(tonumber(val))
+      elseif arg == 'iterations' then iterations = assert(tonumber(val))
+      else error("Unknown argument: " .. arg) end
+   end
+   if #args < 1 then
+      print("Usage: pflua-quickcheck [--seed=SEED] [--iterations=ITERATIONS]" ..
+            " property_file [property_specific_args]")
+      os.exit(1)
+   end
+   if seed then
+      math.randomseed(seed)
+   else
+      seed = math.floor(gmtime() * 1e6) % 10^9
+      print("Using time as seed: "..seed)
+      math.randomseed(tonumber(seed))
+   end
+   if not iterations then iterations = 1000 end
+
+   local prop = require(args[1]) -- The property file
+   local prop_name = table.remove(args, 1)
+   -- If the property can take extra arguments, handle them
+   local extra_property_info = {}
+   if prop.handle_prop_args then
+      extra_property_info = prop.handle_prop_args(args)
+   end
+
+   for i = 1,iterations do
+      -- Wrap property and its arguments in a 0-arity function for xpcall
+      local wrap_prop = function() return prop.property(extra_property_info) end
+      local propgen_ok, expected, got = xpcall(wrap_prop, debug.traceback)
+      if not propgen_ok then
+          print(("Crashed generating properties on run %s."):format(i))
+          if prop.print_extra_information then
+             print("Attempting to print extra information; it may be wrong.")
+             if not pcall(prop.print_extra_information)
+                then print("Something went wrong printing extra info.")
+             end
+          end
+          print("Traceback (this is reliable):")
+          print(expected) -- This is an error code and traceback in this case
+          rerun_usage(seed, i, prop_name, args)
+          os.exit(1)
+      end
+      if expected ~= got then
+          print("The property was falsified.")
+          -- If the property file has extra info available, show it
+          if prop.print_extra_information then
+             prop.print_extra_information()
+          else
+             print(("Expected: %s\nGot:      %s"):format(expected, got))
+          end
+          rerun_usage(seed, i, prop_name, args)
+          os.exit(1)
+      end
+   end
+   print(iterations.." iterations succeeded.")
+end
+
+main(...)
