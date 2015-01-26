@@ -115,11 +115,11 @@ function run_test_plan(p)
    print("enabled tests: " .. count .. " of " .. #plan)
 
    -- works in tandem with pflua-bench
-   local path_pcaps = "../../../../src/"
+   local path_pcaps = "../../../../"
    if not dir_exist(path_pcaps) then
       path_pcaps = ""
    end
-   path_pcaps = path_pcaps .. "ts/pcaps/"
+   path_pcaps = path_pcaps .. "tests/pcaps/"
 
    -- execute test case
    for i, t in pairs(plan) do

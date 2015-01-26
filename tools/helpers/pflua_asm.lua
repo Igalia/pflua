@@ -9,9 +9,9 @@
 --  $ git clone https://github.com/Igalia/pflua-bench.git
 --  $ pflua-bench=<path-to-pflua-bench>
 --  $ pflua=<path-to-pflua>
---  $ unxz $pflua-bench/src/ts/pcaps/igalia/one-gigabyte.xz
---  $ ln -fs $pflua-bench/src/ts/pcaps/igalia/one-gigabyte.xz
---      $pflua/src/ts/pcaps/igalia/one-gigabyte.pcap
+--  $ unxz $pflua-bench/savefiles/one-gigabyte.pcap.xz
+--  $ ln -fs $pflua-bench/savefiles/one-gigabyte.pcap \
+--      $pflua/tests/pcaps/igalia/one-gigabyte.pcap
 --
 --]]
 
@@ -57,7 +57,7 @@ end
 function selftest(filter)
    print("selftest: pflua_asm")
 
-   local file = "../src/ts/pcaps/igalia/one-gigabyte.pcap"
+   local file = "../tests/pcaps/igalia/one-gigabyte.pcap"
    if (filter == nil or filter == '') then
       filter = "tcp port 80"
    end
