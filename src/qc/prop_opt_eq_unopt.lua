@@ -14,6 +14,7 @@ local pp = pfutils.pp
 
 local pflua_ir = require('pflua_ir')
 local utils = require('utils')
+local pfcompile = require('pfcompile')
 
 local function load_packets(file)
    local header, ptr, ptr_end = savefile.open_and_mmap(file)
@@ -50,8 +51,8 @@ function property(packets, filter_list)
    end
    optimized = optimize.optimize(expanded)
 
-   unoptimized_pred = codegen.compile(expanded, F)
-   optimized_pred = codegen.compile(optimized, F)
+   unoptimized_pred = pfcompile.compile_ast(expanded, F)
+   optimized_pred = pfcompile.compile_ast(optimized, F)
    return unoptimized_pred(P, packet_len), optimized_pred(P, packet_len)
 end
 

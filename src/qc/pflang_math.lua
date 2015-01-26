@@ -6,6 +6,7 @@ local io = require("io")
 local codegen = require("pf.backend")
 local expand = require("pf.expand")
 local parse = require("pf.parse")
+local pfcompile = require("pfcompile")
 
 -- Generate pflang arithmetic
 local PflangNumber, PflangSmallNumber, PflangOp
@@ -51,7 +52,7 @@ end
 function pflua_eval(str_expr)
    local expr = "len < " .. str_expr
    local ir = expand.expand(parse.parse(expr))
-   local filter = codegen.compile_lua(ir, "Arithmetic check")
+   local filter = pfcompile.compile_lua_ast(ir, "Arithmetic check")
    print("filter...")
    print(filter)
    -- Old style:
