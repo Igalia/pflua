@@ -17,7 +17,7 @@
 
 module("pflua_asm", package.seeall)
 
-package.path = package.path .. ";../src/?.lua"
+package.path = package.path .. ";../../src/?.lua"
 
 local savefile = require("pf.savefile")
 local libpcap = require("pf.libpcap")

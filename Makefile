@@ -21,6 +21,8 @@ check_luajit:
 check:
 	$(MAKE) -C src check
 	$(MAKE) -C tools check
+	$(MAKE) -C doc
+	$(MAKE) -C tests check
 
 clean:
 	$(MAKE) -C deps/luajit clean
