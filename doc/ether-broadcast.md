@@ -5,7 +5,7 @@
 
 ```
 000: A = P[2:4]
-001: if (A == -1) goto 2 else goto 5
+001: if (A == 4294967295) goto 2 else goto 5
 002: A = P[0:2]
 003: if (A == 65535) goto 4 else goto 5
 004: return 65535
@@ -36,15 +36,10 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 6) then do return false end end
-   do
-      local v1 = ffi.cast("uint16_t*", P+0)[0]
-      if not (v1 == 65535) then do return false end end
-      do
-         local v2 = ffi.cast("uint32_t*", P+2)[0]
-         do return v2 == 4294967295 end
-      end
-   end
+   if length < 6 then return false end
+   if cast("uint16_t*", P+0)[0] ~= 65535 then return false end
+   return cast("uint32_t*", P+2)[0] == 4294967295
 end
+
 ```
 

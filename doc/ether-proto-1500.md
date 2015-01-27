@@ -36,13 +36,8 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 14) then do return false end end
-   do
-      local v1 = ffi.cast("uint16_t*", P+12)[0]
-      local v2 = bit.rshift(bit.bswap(v1), 16)
-      if v2 <= 1500 then do return false end end
-      do do return false end end
-   end
+   return false
 end
+
 ```
 

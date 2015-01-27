@@ -82,32 +82,32 @@ src-net-ffff.ffff.eeee.eeee.1.0.0.0-82.md: $(PFLUA)
 src-net-ffff.ffff.eeee.eeee.0.0.0.0-72.md: $(PFLUA)
 	../tools/dump-markdown "src net ffff:ffff:eeee:eeee:0:0:0:0/72" > $@.tmp && mv $@.tmp $@
 
-src-port-80.md:
+src-port-80.md: $(PFLUA)
 	../tools/dump-markdown "src port 80" > $@.tmp && mv $@.tmp $@
 
-dst-portrange-80-90.md:
+dst-portrange-80-90.md: $(PFLUA)
 	../tools/dump-markdown "dst portrange 80-90" > $@.tmp && mv $@.tmp $@
 
-ether-multicast.md:
+ether-multicast.md: $(PFLUA)
 	../tools/dump-markdown "ether multicast" > $@.tmp && mv $@.tmp $@
 
-ether-broadcast.md:
+ether-broadcast.md: $(PFLUA)
 	../tools/dump-markdown "ether broadcast" > $@.tmp && mv $@.tmp $@
 
-ether-proto-decnet.md:
+ether-proto-decnet.md: $(PFLUA)
 	../tools/dump-markdown "ether proto \decnet" > $@.tmp && mv $@.tmp $@
 
 # The frame should be treated as an Ethernet frame.
-ether-proto-1501.md:
+ether-proto-1501.md: $(PFLUA)
 	../tools/dump-markdown "ether proto 1501" > $@.tmp && mv $@.tmp $@
 
 # The frame should be treated as an 802.3 frame.
-ether-proto-1500.md:
+ether-proto-1500.md: $(PFLUA)
 	../tools/dump-markdown "ether proto 1500" > $@.tmp && mv $@.tmp $@
 
 # The frame should be treated as an 802.3 frame and check SAP (Service Access
 # Point) at byte 14.
-ether-proto-255.md:
+ether-proto-255.md: $(PFLUA)
 	../tools/dump-markdown "ether proto 255" > $@.tmp && mv $@.tmp $@
 
 src-host-192.68.1.1-and-less-100.md: $(PFLUA)
@@ -116,44 +116,44 @@ src-host-192.68.1.1-and-less-100.md: $(PFLUA)
 dst-host-192.68.1.1-and-greater-100.md: $(PFLUA)
 	../tools/dump-markdown "dst host 192.68.1.1 and greater 100" > $@.tmp && mv $@.tmp $@
 
-ip-multicast.md:
+ip-multicast.md: $(PFLUA)
 	../tools/dump-markdown "ip multicast" > $@.tmp && mv $@.tmp $@
 
-ip-proto-ah.md:
+ip-proto-ah.md: $(PFLUA)
 	../tools/dump-markdown "ip proto \ah" > $@.tmp && mv $@.tmp $@
 
-ip-proto-47.md:
+ip-proto-47.md: $(PFLUA)
 	../tools/dump-markdown "ip proto 47" > $@.tmp && mv $@.tmp $@
 
-ip6-multicast.md:
+ip6-multicast.md: $(PFLUA)
 	../tools/dump-markdown "ip6 multicast" > $@.tmp && mv $@.tmp $@
 
-ip6-proto-ah.md:
+ip6-proto-ah.md: $(PFLUA)
 	../tools/dump-markdown "ip6 proto \ah" > $@.tmp && mv $@.tmp $@
 
-ip6-proto-47.md:
+ip6-proto-47.md: $(PFLUA)
 	../tools/dump-markdown "ip6 proto 47" > $@.tmp && mv $@.tmp $@
 
-iso-proto-clnp.md:
+iso-proto-clnp.md: $(PFLUA)
 	../tools/dump-markdown "iso proto \clnp" > $@.tmp && mv $@.tmp $@
 
-iso-proto-47.md:
+iso-proto-47.md: $(PFLUA)
 	../tools/dump-markdown "iso proto 47" > $@.tmp && mv $@.tmp $@
 
-ip-proto-sctp.md:
+ip-proto-sctp.md: $(PFLUA)
 	../tools/dump-markdown "ip proto \sctp" > $@.tmp && mv $@.tmp $@
 
-proto-47.md:
+proto-47.md: $(PFLUA)
 	../tools/dump-markdown "proto 47" > $@.tmp && mv $@.tmp $@
 
-decnet-src-10.15.md:
+decnet-src-10.15.md: $(PFLUA)
 	../tools/dump-markdown "decnet src 10.15" > $@.tmp && mv $@.tmp $@
 
-decnet-host-10.15.md:
+decnet-host-10.15.md: $(PFLUA)
 	../tools/dump-markdown "decnet host 10.15" > $@.tmp && mv $@.tmp $@
 
-l1.md:
+l1.md: $(PFLUA)
 	../tools/dump-markdown "l1" > $@.tmp && mv $@.tmp $@
 
-icmp6.md:
+icmp6.md: $(PFLUA)
 	../tools/dump-markdown "icmp6" > $@.tmp && mv $@.tmp $@

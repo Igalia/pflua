@@ -36,15 +36,10 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 54) then do return false end end
-   do
-      local v1 = ffi.cast("uint16_t*", P+12)[0]
-      if not (v1 == 56710) then do return false end end
-      do
-         local v2 = P[38]
-         do return v2 == 255 end
-      end
-   end
+   if length < 54 then return false end
+   if cast("uint16_t*", P+12)[0] ~= 56710 then return false end
+   return P[38] == 255
 end
+
 ```
 

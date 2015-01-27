@@ -44,25 +44,14 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 54) then do return false end end
-   do
-      local v1 = ffi.cast("uint16_t*", P+12)[0]
-      if not (v1 == 56710) then do return false end end
-      do
-         local v2 = P[20]
-         if v2 == 47 then do return true end end
-         do
-            if not (length >= 55) then do return false end end
-            do
-               if not (v2 == 44) then do return false end end
-               do
-                  local v3 = P[54]
-                  do return v3 == 47 end
-               end
-            end
-         end
-      end
-   end
+   if length < 54 then return false end
+   if cast("uint16_t*", P+12)[0] ~= 56710 then return false end
+   local var2 = P[20]
+   if var2 == 47 then return true end
+   if length < 55 then return false end
+   if var2 ~= 44 then return false end
+   return P[54] == 47
 end
+
 ```
 

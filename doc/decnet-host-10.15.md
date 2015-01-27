@@ -135,67 +135,31 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 21) then do return false end end
-   do
-      local v1 = P[16]
-      local v2 = bit.band(v1,7)
-      if not (v2 == 2) then goto L3 end
-      do
-         local v3 = ffi.cast("uint16_t*", P+19)[0]
-         if v3 == 3850 then do return true end end
-         do
-            local v4 = ffi.cast("uint16_t*", P+17)[0]
-            do return v4 == 3850 end
-         end
-      end
-::L3::
-      do
-         if not (length >= 22) then do return false end end
-         do
-            local v5 = ffi.cast("uint16_t*", P+16)[0]
-            local v6 = bit.band(v5,2047)
-            if not (v6 == 641) then goto L7 end
-            do
-               local v7 = ffi.cast("uint16_t*", P+20)[0]
-               if v7 == 3850 then do return true end end
-               do
-                  local v8 = ffi.cast("uint16_t*", P+18)[0]
-                  do return v8 == 3850 end
-               end
-            end
-::L7::
-            do
-               if not (length >= 33) then do return false end end
-               do
-                  if not (v2 == 6) then goto L11 end
-                  do
-                     local v9 = ffi.cast("uint16_t*", P+31)[0]
-                     if v9 == 3850 then do return true end end
-                     do
-                        local v10 = ffi.cast("uint16_t*", P+23)[0]
-                        do return v10 == 3850 end
-                     end
-                  end
-::L11::
-                  do
-                     if not (length >= 34) then do return false end end
-                     do
-                        if not (v6 == 1665) then do return false end end
-                        do
-                           local v11 = ffi.cast("uint16_t*", P+32)[0]
-                           if v11 == 3850 then do return true end end
-                           do
-                              local v12 = ffi.cast("uint16_t*", P+24)[0]
-                              do return v12 == 3850 end
-                           end
-                        end
-                     end
-                  end
-               end
-            end
+   if length < 21 then return false end
+   local var2 = band(P[16],7)
+   if var2 == 2 then
+      if cast("uint16_t*", P+19)[0] == 3850 then return true end
+      return cast("uint16_t*", P+17)[0] == 3850
+   else
+      if length < 22 then return false end
+      local var6 = band(cast("uint16_t*", P+16)[0],2047)
+      if var6 == 641 then
+         if cast("uint16_t*", P+20)[0] == 3850 then return true end
+         return cast("uint16_t*", P+18)[0] == 3850
+      else
+         if length < 33 then return false end
+         if var2 == 6 then
+            if cast("uint16_t*", P+31)[0] == 3850 then return true end
+            return cast("uint16_t*", P+23)[0] == 3850
+         else
+            if length < 34 then return false end
+            if var6 ~= 1665 then return false end
+            if cast("uint16_t*", P+32)[0] == 3850 then return true end
+            return cast("uint16_t*", P+24)[0] == 3850
          end
       end
    end
 end
+
 ```
 
