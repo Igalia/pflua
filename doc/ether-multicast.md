@@ -31,12 +31,9 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 1) then do return false end end
-   do
-      local v1 = P[0]
-      local v2 = bit.band(v1,1)
-      do return v2 ~= 0 end
-   end
+   if length < 1 then return false end
+   return band(P[0],1) ~= 0
 end
+
 ```
 

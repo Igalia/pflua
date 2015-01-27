@@ -83,51 +83,24 @@ end
 
 ```
 return function(P,length)
-   if not (length >= 21) then do return false end end
-   do
-      local v1 = P[16]
-      local v2 = bit.band(v1,7)
-      if not (v2 == 2) then goto L3 end
-      do
-         local v3 = ffi.cast("uint16_t*", P+19)[0]
-         do return v3 == 3850 end
-      end
-::L3::
-      do
-         if not (length >= 22) then do return false end end
-         do
-            local v4 = ffi.cast("uint16_t*", P+16)[0]
-            local v5 = bit.band(v4,2047)
-            if not (v5 == 641) then goto L6 end
-            do
-               local v6 = ffi.cast("uint16_t*", P+20)[0]
-               do return v6 == 3850 end
-            end
-::L6::
-            do
-               if not (length >= 33) then do return false end end
-               do
-                  if not (v2 == 6) then goto L9 end
-                  do
-                     local v7 = ffi.cast("uint16_t*", P+31)[0]
-                     do return v7 == 3850 end
-                  end
-::L9::
-                  do
-                     if not (length >= 34) then do return false end end
-                     do
-                        if not (v5 == 1665) then do return false end end
-                        do
-                           local v8 = ffi.cast("uint16_t*", P+32)[0]
-                           do return v8 == 3850 end
-                        end
-                     end
-                  end
-               end
-            end
-         end
-      end
+   if length < 21 then return false end
+   local var2 = band(P[16],7)
+   if var2 == 2 then
+      return cast("uint16_t*", P+19)[0] == 3850
    end
+   if length < 22 then return false end
+   local var5 = band(cast("uint16_t*", P+16)[0],2047)
+   if var5 == 641 then
+      return cast("uint16_t*", P+20)[0] == 3850
+   end
+   if length < 33 then return false end
+   if var2 == 6 then
+      return cast("uint16_t*", P+31)[0] == 3850
+   end
+   if length < 34 then return false end
+   if var5 ~= 1665 then return false end
+   return cast("uint16_t*", P+32)[0] == 3850
 end
+
 ```
 
