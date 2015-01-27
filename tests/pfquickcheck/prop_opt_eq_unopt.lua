@@ -9,11 +9,10 @@ local savefile = require("pf.savefile")
 local expand = require("pf.expand")
 local optimize = require("pf.optimize")
 local codegen = require('pf.backend')
-local pfutils = require('pf.utils')
-local pp = pfutils.pp
+local utils = require('pf.utils')
+local pp = utils.pp
 
 local pflua_ir = require('pflua_ir')
-local utils = require('utils')
 local pfcompile = require('pfcompile')
 
 local function load_packets(file)

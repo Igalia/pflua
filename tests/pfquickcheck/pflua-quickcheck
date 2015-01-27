@@ -2,9 +2,7 @@
 -- -*- lua -*-
 package.path = package.path .. ";../../src/?.lua"
 
-local pfutils = require('pf.utils')
-local gmtime = pfutils.gmtime
-local utils = require("utils")
+local gmtime = require('pf.utils').gmtime
 
 local function rerun_usage(seed, i, prop, prop_args)
    print(("Rerun as: pflua-quickcheck --seed=%s --iterations=%s %s %s"):
