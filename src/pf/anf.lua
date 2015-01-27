@@ -7,7 +7,7 @@ local set, pp, dup = utils.set, utils.pp, utils.dup
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
 local binops = set(
-   '+', '-', '*', '/', '&', '|', '^', '<<', '>>'
+   '+', '-', '*', '*64', '/', '&', '|', '^', '<<', '>>'
 )
 local unops = set('ntohs', 'ntohl', 'uint32', 'int32')
 
