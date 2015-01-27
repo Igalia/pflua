@@ -40,8 +40,6 @@ function PacketAccess(db)
    return { '[]', position, pkt_access_size }
 end
 function Arithmetic(db)
-   -- Only return the chosen value, not the index too
-   -- (expr) is standard Lua; use only the first value of a multi-value expr
    return choose({ Unary, Binary, Number, Len, PacketAccess })(db)
 end
 function Comparison()
