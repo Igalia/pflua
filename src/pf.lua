@@ -78,7 +78,7 @@ function selftest ()
       assert(actual == expected,
              'pflua: got ' .. actual .. ', expected ' .. expected)
    end
-   local v4 = savefile.load_packets("ts/pcaps/ws/v4.pcap")
+   local v4 = savefile.load_packets("../tests/data/v4.pcap")
    assert_count('', v4, 43)
    assert_count('ip', v4, 43)
    assert_count('tcp', v4, 41)

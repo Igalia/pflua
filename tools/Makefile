@@ -6,6 +6,6 @@ clean:
 	rm -f tmp.pcap
 
 check:
-	./pflua-filter ../src/ts/pcaps/ws/v4.pcap ./tmp.pcap "ip"
-	cmp ../src/ts/pcaps/ws/v4.pcap tmp.pcap
+	./pflua-filter ../tests/data/v4.pcap ./tmp.pcap "ip"
+	cmp ../tests/data/v4.pcap tmp.pcap
 	rm tmp.pcap
