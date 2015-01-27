@@ -5,9 +5,9 @@ local pflang_math = require("pflang_math")
 
 function property()
    arithmetic_expr = table.concat(pflang_math.PflangArithmetic(), ' ')
-   local tcpdump_result = pflang_math.tcpdump_eval(arithmetic_expr)
+   local libpcap_result = pflang_math.libpcap_eval(arithmetic_expr)
    local pflua_result = pflang_math.pflua_eval(arithmetic_expr)
-   return tcpdump_result, pflua_result
+   return libpcap_result, pflua_result
 end
 
 function print_extra_information()

@@ -423,15 +423,16 @@ function disassemble(bpf)
       local inst = bpf[i]
       local code = inst.code
       local class = BPF_CLASS(code)
+      local k = runtime_u32(inst.k)
       write(string.format('%03d: ', i))
-      if     class == BPF_LD  then ld(BPF_SIZE(code), BPF_MODE(code), inst.k)
-      elseif class == BPF_LDX then ldx(BPF_SIZE(code), BPF_MODE(code), inst.k)
-      elseif class == BPF_ST  then st(inst.k)
-      elseif class == BPF_STX then stx(inst.k)
-      elseif class == BPF_ALU then alu(BPF_OP(code), BPF_SRC(code), inst.k)
-      elseif class == BPF_JMP then jmp(i, BPF_OP(code), BPF_SRC(code), inst.k,
+      if     class == BPF_LD  then ld(BPF_SIZE(code), BPF_MODE(code), k)
+      elseif class == BPF_LDX then ldx(BPF_SIZE(code), BPF_MODE(code), k)
+      elseif class == BPF_ST  then st(k)
+      elseif class == BPF_STX then stx(k)
+      elseif class == BPF_ALU then alu(BPF_OP(code), BPF_SRC(code), k)
+      elseif class == BPF_JMP then jmp(i, BPF_OP(code), BPF_SRC(code), k,
                                        inst.jt, inst.jf)
-      elseif class == BPF_RET then ret(BPF_SRC(code), inst.k)
+      elseif class == BPF_RET then ret(BPF_SRC(code), k)
       elseif class == BPF_MISC then misc(BPF_MISCOP(code))
       else error('bad class ' .. class) end
    end

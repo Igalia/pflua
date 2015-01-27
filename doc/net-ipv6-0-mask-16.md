@@ -7,9 +7,9 @@
 000: A = P[12:2]
 001: if (A == 34525) goto 2 else goto 7
 002: A = P[22:4]
-003: if (A & -65536 != 0) goto 4 else goto 6
+003: if (A & 4294901760 != 0) goto 4 else goto 6
 004: A = P[38:4]
-005: if (A & -65536 != 0) goto 7 else goto 6
+005: if (A & 4294901760 != 0) goto 7 else goto 6
 006: return 65535
 007: return 0
 ```
