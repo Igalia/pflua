@@ -7,6 +7,8 @@ local codegen = require("pf.backend")
 local expand = require("pf.expand")
 local parse = require("pf.parse")
 local pfcompile = require("pfcompile")
+local libpcap = require("pf.libpcap")
+local bpf = require("pf.bpf")
 local utils = require("pf.utils")
 
 -- Generate pflang arithmetic
@@ -20,22 +22,24 @@ function PflangArithmetic()
    return { PflangNumber(), PflangOp(), PflangSmallNumber() }
 end
 
--- Evaluate math expressions with tcpdump and pflang's IR
+-- Evaluate math expressions with libpcap and pflang's IR
 
 -- Pflang allows arithmetic as part of larger expressions.
 -- This tool uses len < arbitrary_arithmetic_here as a scaffold
-
--- Here is a truncated example of the tcpdump output that is parsed
---tcpdump -d "len < -4 / 2"
---(000) ld       #pktlen
---(001) jge      #0x7ffffffe      jt 2    jf 3
-
-function tcpdump_eval(str_expr)
+function libpcap_eval(str_expr)
    local expr = "len < " .. str_expr
-   local cmdline = ('tcpdump -d "%s"'):format(expr)
-   local bpf = io.popen(cmdline):read("*all")
-   local res = string.match(bpf, "#(0x%x+)")
-   return tonumber(res)
+   local asm = libpcap.compile(expr, 'RAW')
+   local asm_str = bpf.disassemble(asm)
+   local template = "^000: A = length\
+001: if %(A >= (%d+)%) goto 2 else goto 3\
+002: return 0\
+003: return 65535\
+$"
+   local constant_str = asm_str:match(template)
+   if not constant_str then error ("unexpected bpf: "..asm_str) end
+   local constant = assert(tonumber(constant_str), constant_str)
+   assert(0 <= constant and constant < 2^32, constant)
+   return constant
 end
 
 -- Here is an example of the pflua output that is parsed
