@@ -1,6 +1,6 @@
 #!/usr/bin/env luajit
 module(..., package.seeall)
-package.path = package.path .. ";deps/pflua/src/?.lua"
+package.path = package.path .. ";../../src/?.lua"
 
 local io = require("io")
 local codegen = require("pf.backend")
@@ -53,18 +53,17 @@ function pflua_eval(str_expr)
    local expr = "len < " .. str_expr
    local ir = expand.expand(parse.parse(expr))
    local filter = pfcompile.compile_lua_ast(ir, "Arithmetic check")
-   print("filter...")
-   print(filter)
    -- Old style:
    --  local math_string = string.match(filter, "v1 = [%d-+/*()%a. ]*")
    local math_str = string.match(filter, "return length < ([%d%a %%-+/*()]*)")
    math_str = "v1 = " .. math_str
    -- Loadstring has a different env, so floor doesn't resolve; use math.floor
    math_str = math_str:gsub('floor', 'math.floor')
-   print(math_str)
    v1 = nil
    loadstring(math_str)() -- v1 must not be local, or this approach will fail
    -- v1 should always be within [0..2^32-1]
-   --v1 = v1 % 2^32 -- TODO: it would be better to do this iff the filter does
+   assert(v1 >= 0)
+   assert (v1 < 2^32)
+   assert(v1 == math.floor(v1))
    return v1
 end

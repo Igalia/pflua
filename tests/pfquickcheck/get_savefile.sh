@@ -2,7 +2,7 @@
 
 URL="https://github.com/Igalia/pflua-test/blob/master/savefiles/wingolog.org.pcap?raw=true"
 if [ -f savefiles/wingolog.org.pcap ]; then
-    echo "savefile exists"
+    echo "Savefile already exists, not fetching again."
 else
     if [ ! -d savefiles ]; then
         mkdir savefiles

@@ -26,8 +26,8 @@ captured by `tcpdump`.  For example:
 ```
 $ cd tools
 $ ../deps/luajit/usr/local/bin/luajit pflua-filter \
-    ../src/ts/pcaps/ws/v4.pcap /tmp/foo.pcap "ip"
-Filtered 43/43 packets from ../src/ts/pcaps/ws/v4.pcap to /tmp/foo.pcap.
+    ../tests/pcaps/ws/v4.pcap /tmp/foo.pcap "ip"
+Filtered 43/43 packets from ../tests/pcaps/ws/v4.pcap to /tmp/foo.pcap.
 ```
 
 See the source of

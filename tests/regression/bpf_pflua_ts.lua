@@ -1,3 +1,7 @@
+#!/usr/bin/env luajit
+-- -*- lua -*-
+package.path = package.path .. ";../../src/?.lua"
+
 module("bpf_pflua_ts",package.seeall)
 
 local pf = require("pf")
@@ -37,11 +41,11 @@ end
 -- retrieve all .ts files under ts/test directory
 -- TODO: ts/tests should be some kind of conf var
 function get_all_plans()
-   local path_tests = "../../../../src/"
+   local path_tests = ""
    if not dir_exist(path_tests) then
       path_tests = ""
    end
-   path_tests = path_tests .. "ts/tests/"
+   path_tests = path_tests .. ""
    local filetab = scandir(path_tests)
    local plantab = {}
    for _, v in ipairs(filetab) do
@@ -115,11 +119,11 @@ function run_test_plan(p)
    print("enabled tests: " .. count .. " of " .. #plan)
 
    -- works in tandem with pflua-bench
-   local path_pcaps = "../../../../src/"
+   local path_pcaps = "../"
    if not dir_exist(path_pcaps) then
       path_pcaps = ""
    end
-   path_pcaps = path_pcaps .. "ts/pcaps/"
+   path_pcaps = path_pcaps .. "pcaps/"
 
    -- execute test case
    for i, t in pairs(plan) do

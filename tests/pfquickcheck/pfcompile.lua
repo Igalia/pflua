@@ -1,6 +1,6 @@
 #!/usr/bin/env luajit
 module(..., package.seeall)
-package.path = package.path .. ";deps/pflua/src/?.lua"
+package.path = package.path .. ";../../src/?.lua"
 
 local backend = require("pf.backend")
 

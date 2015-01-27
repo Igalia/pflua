@@ -1,6 +1,6 @@
 #!/usr/bin/env luajit
 -- -*- lua -*-
-package.path = package.path .. ";../?.lua"
+package.path = package.path .. ";../../src/?.lua"
 
 local pfutils = require('pf.utils')
 local gmtime = pfutils.gmtime

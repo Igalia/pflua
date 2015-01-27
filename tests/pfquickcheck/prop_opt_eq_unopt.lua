@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
 -- -*- lua -*-
 module(..., package.seeall)
-package.path = package.path .. ";deps/pflua/src/?.lua"
+package.path = package.path .. ";../../src/?.lua"
 
 local ffi = require("ffi")
 local parse = require("pf.parse")
