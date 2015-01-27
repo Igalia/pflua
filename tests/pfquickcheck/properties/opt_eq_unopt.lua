@@ -76,7 +76,7 @@ end
 
 function handle_prop_args(prop_args)
    if #prop_args < 1 or #prop_args > 2 then
-      print("Usage: (pflua-quickcheck [args] prop_opt_eq_unopt) " ..
+      print("Usage: (pflua-quickcheck [args] properties/opt_eq_unopt) " ..
             "PATH/TO/CAPTURE.PCAP [FILTER-LIST]")
       os.exit(1)
    end
