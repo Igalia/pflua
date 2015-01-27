@@ -129,6 +129,16 @@ function fixpoint(f, expr)
    return expr
 end
 
+function choose(choices)
+   local idx = math.random(#choices)
+   return choices[idx]
+end
+
+function choose_with_index(choices)
+   local idx = math.random(#choices)
+   return choices[idx], idx
+end
+
 function selftest ()
    print("selftest: pf.utils")
    local tab = { 1, 2, 3 }

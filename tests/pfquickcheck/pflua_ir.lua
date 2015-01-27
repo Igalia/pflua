@@ -4,7 +4,7 @@
 -- for property-based tests of pflua internals.
 
 module(..., package.seeall)
-local utils = require("utils")
+local choose = require("pf.utils").choose
 
 local True, False, Fail, ComparisonOp, BinaryOp, UnaryOp, Number, Len
 local Unary, Binary, Arithmetic, Comparison, Conditional
@@ -13,17 +13,17 @@ local Unary, Binary, Arithmetic, Comparison, Conditional
 function True() return { 'true' } end
 function False() return { 'false' } end
 function Fail() return { 'fail' } end
-function ComparisonOp() return utils.choose({ '<', '>' }) end
-function BinaryOp() return utils.choose({ '+', '-', '/' }) end
+function ComparisonOp() return choose({ '<', '>' }) end
+function BinaryOp() return choose({ '+', '-', '/' }) end
 function UnaryOp()
-   return utils.choose({ 'uint32', 'int32', 'ntohs', 'ntohl' })
+   return choose({ 'uint32', 'int32', 'ntohs', 'ntohl' })
 end
 -- Boundary numbers are often particularly interesting; test them often
 function Number()
    if math.random() < 0.2
       then return math.random(-2^31, 2^32 - 1)
    else
-      return utils.choose({ 0, 1, -2^31, 2^32-1, 2^31-1 })
+      return choose({ 0, 1, -2^31, 2^32-1, 2^31-1 })
    end
 end
 function Len() return 'len' end
@@ -34,7 +34,7 @@ function Binary(db)
    return { op, lhs, rhs }
 end
 function PacketAccess(db)
-   local pkt_access_size = utils.choose({1, 2, 4})
+   local pkt_access_size = choose({1, 2, 4})
    local position = {'uint32', Arithmetic(db) }
    table.insert(db, {'>=', 'len', {'+', position, pkt_access_size}})
    return { '[]', position, pkt_access_size }
@@ -42,7 +42,7 @@ end
 function Arithmetic(db)
    -- Only return the chosen value, not the index too
    -- (expr) is standard Lua; use only the first value of a multi-value expr
-   return utils.choose({ Unary, Binary, Number, Len, PacketAccess })(db)
+   return choose({ Unary, Binary, Number, Len, PacketAccess })(db)
 end
 function Comparison()
    local asserts = {}
@@ -54,5 +54,5 @@ function Comparison()
 end
 function Conditional() return { 'if', Logical(), Logical(), Logical() } end
 function Logical()
-   return utils.choose({ Conditional, Comparison, True, False, Fail })()
+   return choose({ Conditional, Comparison, True, False, Fail })()
 end

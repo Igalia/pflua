@@ -7,6 +7,7 @@ local codegen = require("pf.backend")
 local expand = require("pf.expand")
 local parse = require("pf.parse")
 local pfcompile = require("pfcompile")
+local utils = require("pf.utils")
 
 -- Generate pflang arithmetic
 local PflangNumber, PflangSmallNumber, PflangOp
