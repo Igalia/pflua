@@ -11,7 +11,7 @@
 --  $ pflua=<path-to-pflua>
 --  $ unxz $pflua-bench/savefiles/one-gigabyte.pcap.xz
 --  $ ln -fs $pflua-bench/savefiles/one-gigabyte.pcap \
---      $pflua/tests/pcaps/igalia/one-gigabyte.pcap
+--      $pflua/tests/data/one-gigabyte.pcap
 --
 --]]
 
@@ -57,7 +57,7 @@ end
 function selftest(filter)
    print("selftest: pflua_asm")
 
-   local file = "../tests/pcaps/igalia/one-gigabyte.pcap"
+   local file = "../tests/data/one-gigabyte.pcap"
    if (filter == nil or filter == '') then
       filter = "tcp port 80"
    end
