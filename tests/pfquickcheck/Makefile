@@ -1,3 +1,5 @@
+check: quickcheck
+
 quickcheck: get_savefile
 	./pflua-quickcheck prop_opt_eq_unopt savefiles/wingolog.org.pcap test-filters
 	./pflua-quickcheck prop_opt_eq_unopt savefiles/wingolog.org.pcap
