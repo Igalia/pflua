@@ -11,12 +11,12 @@ generating examples needs them.  Examples: The simplest possible use: specify a
 property file ./pflua-quickcheck properties/pfluamath_eq_libpcap_math
 
 This example's property file takes one mandatory and one optional argument:
-./pflua-quickcheck properties/opt_eq_unopt savefiles/wingolog.org.pcap test-filters
-./pflua-quickcheck properties/opt_eq_unopt savefiles/wingolog.org.pcap
+./pflua-quickcheck properties/opt_eq_unopt ../data/wingolog.org.pcap test-filters
+./pflua-quickcheck properties/opt_eq_unopt ../data/wingolog.org.pcap
 
 This example gives arguments to pflua-quickcheck, specifying the seed and number
 of iterations.  ./pflua-quickcheck --seed=379782615 --iterations=85
-properties/opt_eq_unopt savefiles/wingolog.org.pcap
+properties/opt_eq_unopt ../data/wingolog.org.pcap
 
 About property files: A property file need to define a 'property' function,
       which must return two values, which are expected to be equal if the
