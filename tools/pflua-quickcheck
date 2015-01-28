@@ -1,6 +1,6 @@
 #!/usr/bin/env luajit
 -- -*- lua -*-
-package.path = package.path .. ";../../src/?.lua"
+package.path = package.path .. ";../src/?.lua"
 
 local quickcheck = require('pf.quickcheck')
 

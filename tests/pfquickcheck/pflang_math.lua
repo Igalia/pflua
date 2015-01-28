@@ -1,12 +1,11 @@
 #!/usr/bin/env luajit
 module(..., package.seeall)
-package.path = package.path .. ";../../src/?.lua"
 
 local io = require("io")
 local codegen = require("pf.backend")
 local expand = require("pf.expand")
 local parse = require("pf.parse")
-local pfcompile = require("pfcompile")
+local pfcompile = require("pfquickcheck.pfcompile")
 local libpcap = require("pf.libpcap")
 local bpf = require("pf.bpf")
 local utils = require("pf.utils")

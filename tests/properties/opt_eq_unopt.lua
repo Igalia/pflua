@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
 -- -*- lua -*-
 module(..., package.seeall)
-package.path = package.path .. ";../../src/?.lua"
+package.path = package.path .. ";../?.lua;../../src/?.lua"
 
 local ffi = require("ffi")
 local parse = require("pf.parse")
@@ -12,20 +12,8 @@ local codegen = require('pf.backend')
 local utils = require('pf.utils')
 local pp = utils.pp
 
-local pflua_ir = require('pflua_ir')
-local pfcompile = require('pfcompile')
-
-local function load_packets(file)
-   local header, ptr, ptr_end = savefile.open_and_mmap(file)
-   local ret = {}
-   while ptr < ptr_end do
-      local record = ffi.cast("struct pcap_record *", ptr)
-      local packet = ffi.cast("unsigned char *", record + 1)
-      table.insert(ret, { packet=packet, len=record.incl_len })
-      ptr = packet + record.incl_len
-   end
-   return ret
-end
+local pflua_ir = require('pfquickcheck.pflua_ir')
+local pfcompile = require('pfquickcheck.pfcompile')
 
 local function load_filters(file)
    local ret = {}
@@ -82,7 +70,7 @@ function handle_prop_args(prop_args)
    end
 
    local capture, filter_list = prop_args[1], prop_args[2]
-   local packets = load_packets(capture)
+   local packets = savefile.load_packets(capture)
    local filters
    if filter_list then
       filters = load_filters(filter_list)
