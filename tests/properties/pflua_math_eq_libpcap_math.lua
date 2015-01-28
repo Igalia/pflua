@@ -1,7 +1,8 @@
 #!/usr/bin/env luajit
 -- -*- lua -*-
 module(..., package.seeall)
-local pflang_math = require("pflang_math")
+package.path = package.path .. ";../?.lua;../../src/?.lua"
+local pflang_math = require("pfquickcheck.pflang_math")
 
 function property()
    arithmetic_expr = table.concat(pflang_math.PflangArithmetic(), ' ')
