@@ -258,6 +258,8 @@ local function serialize(builder, stmt)
       elseif op == '+' then return '('..lhs..' + '..rhs..')'
       elseif op == '-' then return '('..lhs..' - '..rhs..')'
       elseif op == '*' then return '('..lhs..' * '..rhs..')'
+      elseif op == '*64' then
+         return 'tonumber(('..lhs..' * 1LL * '..rhs..') % '.. 2^32 ..')'
       elseif op == '/' then return 'floor('..lhs..' / '..rhs..')'
       elseif op == '&' then return 'band('..lhs..','..rhs..')'
       elseif op == '^' then return 'bxor('..lhs..','..rhs..')'

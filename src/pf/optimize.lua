@@ -12,10 +12,10 @@ local set, concat, dup, pp = utils.set, utils.concat, utils.dup, utils.pp
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
 local binops = set(
-   '+', '-', '*', '/', '&', '|', '^', '<<', '>>'
+   '+', '-', '*', '*64', '/', '&', '|', '^', '<<', '>>'
 )
 local associative_binops = set(
-   '+', '*', '&', '|', '^'
+   '+', '*', '*64', '&', '|', '^'
 )
 local bitops = set('&', '|', '^')
 local unops = set('ntohs', 'ntohl', 'uint32', 'int32')
@@ -31,6 +31,7 @@ local folders = {
    ['+'] = function(a, b) return a + b end,
    ['-'] = function(a, b) return a - b end,
    ['*'] = function(a, b) return a * b end,
+   ['*64'] = function(a, b) return tonumber((a * 1LL * b) % 2^32) end,
    ['/'] = function(a, b) return math.floor(a / b) end,
    ['&'] = function(a, b) return bit.band(a, b) end,
    ['^'] = function(a, b) return bit.bxor(a, b) end,
@@ -309,6 +310,7 @@ local function Range(min, max)
    function ret.add(lhs, rhs) return lhs:binary(rhs, '+') end
    function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
+   function ret.mul64(lhs, rhs) return lhs:binary(rhs, '*64') end
    function ret.div(lhs, rhs)
       local rhs_min, rhs_max = rhs:min(), rhs:max()
       -- 0 is prohibited by assertions, so we won't hit it at runtime,
@@ -491,6 +493,7 @@ local function infer_ranges(expr)
       if op == '+' then return lhs:add(rhs) end
       if op == '-' then return lhs:sub(rhs) end
       if op == '*' then return lhs:mul(rhs) end
+      if op == '*64' then return lhs:mul64(rhs) end
       if op == '/' then return lhs:div(rhs) end
       if op == '&' then return lhs:band(rhs) end
       if op == '|' then return lhs:bor(rhs) end

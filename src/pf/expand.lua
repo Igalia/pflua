@@ -962,10 +962,10 @@ local addressables = set(
 )
 
 local binops = set(
-   '+', '-', '*', '/', '&', '|', '^', '&&', '||', '<<', '>>'
+   '+', '-', '*', '*64', '/', '&', '|', '^', '&&', '||', '<<', '>>'
 )
 local associative_binops = set(
-   '+', '*', '&', '|', '^'
+   '+', '*', '*64', '&', '|', '^'
 )
 local bitops = set('&', '|', '^')
 local unops = set('ntohs', 'ntohl', 'uint32')
@@ -1048,6 +1048,10 @@ function expand_arith(expr, dlt)
 
    local op = expr[1]
    if binops[op] then
+      -- Use 64-bit multiplication by default.  The optimizer will
+      -- reduce this back to Lua's normal float multiplication if it
+      -- can.
+      if op == '*' then op = '*64' end
       local lhs, lhs_assertions = expand_arith(expr[2], dlt)
       local rhs, rhs_assertions = expand_arith(expr[3], dlt)
       -- Mod 2^32 to preserve uint32 range.

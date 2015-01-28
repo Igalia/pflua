@@ -14,12 +14,9 @@ local utils = require("pf.utils")
 -- Generate pflang arithmetic
 local PflangNumber, PflangSmallNumber, PflangOp
 function PflangNumber() return math.random(0, 2^32-1) end
--- TODO: remove PflangSmallNumber; it's a workaround to avoid triggering
--- https://github.com/Igalia/pflua/issues/83 (float and integer muls diverge)
-function PflangSmallNumber() return math.random(0, 2^17) end
 function PflangOp() return utils.choose({ '+', '-', '*', '/' }) end
 function PflangArithmetic()
-   return { PflangNumber(), PflangOp(), PflangSmallNumber() }
+   return { PflangNumber(), PflangOp(), PflangNumber() }
 end
 
 -- Evaluate math expressions with libpcap and pflang's IR
