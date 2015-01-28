@@ -15,6 +15,7 @@ $(TEST_SAVEFILE):
 quickcheck: $(TEST_SAVEFILE)
 	# $(PFLUA_QUICKCHECK) properties/opt_eq_unopt $(TEST_SAVEFILE) test-filters # Fix NaN bug
 	# $(PFLUA_QUICKCHECK) properties/opt_eq_unopt $(TEST_SAVEFILE) # Fix NaN bug
+	$(PFLUA_QUICKCHECK) properties/repeatable_randomization
 	$(PFLUA_QUICKCHECK) properties/pflua_math_eq_libpcap_math
 
 .SERIAL: all
