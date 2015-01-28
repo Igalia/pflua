@@ -50,23 +50,29 @@ local folders = {
    ['>'] = function(a, b) return a > b end
 }
 
-local cfkey_cache, cfkey = {}, nil
+local cfkey_cache, cfkey
 
 local function memoize(f)
    return function (arg)
+      -- The key that goes into the cache is the string representation
+      -- of the argument, like #<table 0xdeadbeef>.  If we intern into
+      -- the cache, we have to keep the corresponding object alive as
+      -- well.
       local result = cfkey_cache[arg]
       if result == nil then
          result = f(arg)
          cfkey_cache[arg] = result
+         table.insert(cfkey_cache.cached_objects, arg)
       end
       return result
    end
 end
 
 local function clear_cache()
-   cfkey_cache = {}
+   cfkey_cache = { cached_objects={} }
 end
 
+clear_cache()
 cfkey = memoize(function (expr)
    if type(expr) == 'table' then
       local ret = 'table('..cfkey(expr[1])
@@ -189,7 +195,6 @@ function simplify_if(test, t, f)
    elseif op == 'false' then return f
    elseif op == 'fail' then return test
    elseif t[1] == 'true' and f[1] == 'false' then return test
-   -- FIXME: Memoize cfkey to avoid O(n^2) badness.
    elseif op == 'if' then
       if test[3][1] == 'fail' then
          -- if (if A fail B) C D -> if A fail (if B C D)
