@@ -310,7 +310,7 @@ local function Range(min, max)
    function ret.add(lhs, rhs) return lhs:binary(rhs, '+') end
    function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
-   function ret.mul64(lhs, rhs) return lhs:binary(rhs, '*64') end
+   function ret.mul64(lhs, rhs) return Range(0, 2^32-1) end
    function ret.div(lhs, rhs)
       local rhs_min, rhs_max = rhs:min(), rhs:max()
       -- 0 is prohibited by assertions, so we won't hit it at runtime,
