@@ -1,5 +1,8 @@
-PATH := .:../deps/luajit/usr/local/bin:$(PATH)
+PATH := ../deps/luajit/usr/local/bin:$(PATH)
+
+all:
+	@true
 
 check:
-	#$(MAKE) -C regression # TODO: unbreak
+	./test-matches data
 	#$(MAKE) -C pfquickcheck # Fix NaN bug and luajit setup for travis-ci
