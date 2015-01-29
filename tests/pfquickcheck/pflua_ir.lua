@@ -15,27 +15,25 @@ function False() return { 'false' } end
 function Fail() return { 'fail' } end
 function ComparisonOp() return choose({ '<', '>' }) end
 function BinaryOp() return choose({ '+', '-', '/' }) end
-function UnaryOp()
-   return choose({ 'uint32', 'int32', 'ntohs', 'ntohl' })
-end
+function UnaryOp() return choose({ 'int32', 'ntohs', 'ntohl' }) end
 -- Boundary numbers are often particularly interesting; test them often
 function Number()
    if math.random() < 0.2
-      then return math.random(-2^31, 2^32 - 1)
+      then return math.random(0, 2^32 - 1)
    else
-      return choose({ 0, 1, -2^31, 2^32-1, 2^31-1 })
+      return choose({ 0, 1, 2^31-1, 2^31, 2^32-1 })
    end
 end
 function Len() return 'len' end
-function Unary(db) return { UnaryOp(), Arithmetic(db) } end
+function Unary(db) return { 'uint32', { UnaryOp(), Arithmetic(db) } } end
 function Binary(db)
    local op, lhs, rhs = BinaryOp(), Arithmetic(db), Arithmetic(db)
    if op == '/' then table.insert(db, { '!=', rhs, 0 }) end
-   return { op, lhs, rhs }
+   return { 'uint32', { op, lhs, rhs } }
 end
 function PacketAccess(db)
    local pkt_access_size = choose({1, 2, 4})
-   local position = {'uint32', Arithmetic(db) }
+   local position = Arithmetic(db)
    table.insert(db, {'>=', 'len', {'+', position, pkt_access_size}})
    return { '[]', position, pkt_access_size }
 end
