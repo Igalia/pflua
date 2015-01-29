@@ -9,6 +9,20 @@ local expand_arith, expand_relop, expand_bool
 
 local set, concat, dup, pp = utils.set, utils.concat, utils.dup, utils.pp
 
+-- Pflang's numbers are unsigned 32-bit integers, but sometimes we use
+-- negative numbers because the bitops module prefers them.
+local UINT32_MAX = 2^32-1
+local INT32_MAX = 2^31-1
+local INT32_MIN = -2^31
+
+-- We use use Lua arithmetic to implement pflang operations, so
+-- intermediate results can exceed the int32|uint32 range.  Those
+-- intermediate results are then clamped back to the range with the
+-- 'int32' or 'uint32' operations.  Multiplication is clamped internally
+-- by the '*64' operation.  We'll never see a value outside this range.
+local INT_MAX = UINT32_MAX + UINT32_MAX
+local INT_MIN = INT32_MIN + INT32_MIN
+
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
 local binops = set(
@@ -32,7 +46,12 @@ local folders = {
    ['-'] = function(a, b) return a - b end,
    ['*'] = function(a, b) return a * b end,
    ['*64'] = function(a, b) return tonumber((a * 1LL * b) % 2^32) end,
-   ['/'] = function(a, b) return math.floor(a / b) end,
+   ['/'] = function(a, b)
+      -- If the denominator is zero, the code is unreachable, so it
+      -- doesn't matter what we return.
+      if b == 0 then return 0 end
+      return math.floor(a / b)
+   end,
    ['&'] = function(a, b) return bit.band(a, b) end,
    ['^'] = function(a, b) return bit.bxor(a, b) end,
    ['|'] = function(a, b) return bit.bor(a, b) end,
@@ -268,6 +287,8 @@ end
 
 -- Range inference.
 local function Range(min, max)
+   assert(min == min, 'min is NaN')
+   assert(max == max, 'max is NaN')
    -- if min is less than max, we have unreachable code.  still, let's
    -- not violate assumptions (e.g. about wacky bitshift semantics)
    if min > max then min, max = min, min end
@@ -277,8 +298,6 @@ local function Range(min, max)
    function ret:range() return self:min(), self:max() end
    function ret:fold()
       if self:min() == self:max() then
-         local Inf = 1/0
-         assert(self:min() ~= Inf)
          return self:min()
       end
    end
@@ -297,7 +316,7 @@ local function Range(min, max)
           and bit.tobit(self:min()) <= bit.tobit(self:max())) then
          return Range(bit.tobit(self:min()), bit.tobit(self:max()))
       end
-      return Range(-2^31, 2^31-1)
+      return Range(INT32_MIN, INT32_MAX)
    end
    function ret.binary(lhs, rhs, op) -- for monotonic functions
       local fold = assert(folders[op])
@@ -310,7 +329,7 @@ local function Range(min, max)
    function ret.add(lhs, rhs) return lhs:binary(rhs, '+') end
    function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
-   function ret.mul64(lhs, rhs) return Range(0, 2^32-1) end
+   function ret.mul64(lhs, rhs) return Range(0, UINT32_MAX) end
    function ret.div(lhs, rhs)
       local rhs_min, rhs_max = rhs:min(), rhs:max()
       -- 0 is prohibited by assertions, so we won't hit it at runtime,
@@ -336,7 +355,9 @@ local function Range(min, max)
    end
    function ret.band(lhs, rhs)
       lhs, rhs = lhs:tobit(), rhs:tobit()
-      if lhs:min() < 0 and rhs:min() < 0 then return Range(-2^31, 2^31-1) end
+      if lhs:min() < 0 and rhs:min() < 0 then
+         return Range(INT32_MIN, INT32_MAX)
+      end
       return Range(0, math.max(math.min(lhs:max(), rhs:max()), 0))
    end
    function ret.bor(lhs, rhs)
@@ -346,7 +367,7 @@ local function Range(min, max)
          while y < x do y = y * 2 end
          return y - 1
       end
-      if lhs:min() < 0 or rhs:min() < 0 then return Range(-2^31, -1) end
+      if lhs:min() < 0 or rhs:min() < 0 then return Range(INT32_MIN, -1) end
       return Range(bit.bor(lhs:min(), rhs:min()),
                    saturate(bit.bor(lhs:max(), rhs:max())))
    end
@@ -372,7 +393,7 @@ local function Range(min, max)
                          bit.lshift(max_lhs, max_shift))
          end
       end
-      return Range(-2^31, 2^31-1)
+      return Range(INT32_MIN, INT32_MAX)
    end
    function ret.rshift(lhs, rhs)
       lhs, rhs = lhs:tobit(), rhs:tobit()
@@ -398,14 +419,13 @@ local function Range(min, max)
                       bit.rshift(max_lhs, min_shift))
       else
          -- Otherwise punt.
-         return Range(-2^31, 2^31-1)
+         return Range(INT32_MIN, INT32_MAX)
       end
    end
    return ret
 end
 
 local function infer_ranges(expr)
-   local Inf = 1/0
    local function cons(car, cdr) return { car, cdr } end
    local function car(pair) return pair[1] end
    local function cdr(pair) return pair[2] end
@@ -420,7 +440,7 @@ local function infer_ranges(expr)
          if range then return range end
          db = cdr(db)
       end
-      return Range(-Inf, Inf)
+      return Range(INT_MIN, INT_MAX)
    end
    local function define(db, expr, range)
       if type(expr) == 'number' then return expr end
@@ -484,7 +504,7 @@ local function infer_ranges(expr)
    end
    local function unop_range(op, rhs)
       if op == 'ntohs' then return Range(0, 0xffff) end
-      if op == 'ntohl' then return Range(-2^31, 2^31-1) end
+      if op == 'ntohl' then return Range(INT32_MIN, INT32_MAX) end
       if op == 'uint32' then return Range(0, 2^32) end
       if op == 'int32' then return rhs:tobit() end
       error('unexpected op '..op)
@@ -595,8 +615,8 @@ local function infer_ranges(expr)
             if (op == 'uint32' and 0 <= rhs_range:min()
                 and rhs_range:max() <= 2^32) then
                return rhs
-            elseif (op == 'int32' and -2^31 <= rhs_range:min()
-                and rhs_range:max() <= 2^31-1) then
+            elseif (op == 'int32' and INT32_MIN <= rhs_range:min()
+                and rhs_range:max() <= INT32_MAX) then
                return rhs
             end
             local range = unop_range(op, rhs_range)
