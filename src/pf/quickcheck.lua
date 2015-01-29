@@ -1,6 +1,6 @@
 module(...,package.seeall)
 
-local gmtime = require('pf.utils').gmtime
+local utils = require('pf.utils')
 
 local program_name = 'pflua-quickcheck'
 
@@ -17,7 +17,7 @@ function initialize(options)
       options.seed, options.iterations, options.prop_name, options.prop_args
 
    if not seed then
-      seed = math.floor(gmtime() * 1e6) % 10^9
+      seed = math.floor(utils.gmtime() * 1e6) % 10^9
       print("Using time as seed: "..seed)
    end
    math.randomseed(assert(tonumber(seed)))
@@ -82,13 +82,16 @@ function run()
           rerun_usage(i)
           os.exit(1)
       end
-      if expected ~= got then
+      if not utils.equals(expected, got) then
           print("The property was falsified.")
           -- If the property file has extra info available, show it
           if prop.print_extra_information then
              prop.print_extra_information()
           else
-             print(("Expected: %s\nGot:      %s"):format(expected, got))
+             print('Expected:')
+             utils.pp(expected)
+             print('Got:')
+             utils.pp(got)
           end
           rerun_usage(i)
           os.exit(1)

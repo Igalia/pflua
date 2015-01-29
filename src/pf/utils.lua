@@ -71,6 +71,21 @@ function equals(expected, actual)
    end
 end
 
+function is_array(x)
+   if type(x) ~= 'table' then return false end
+   if #x == 0 then return false end
+   for k,v in pairs(x) do
+      if type(k) ~= 'number' then return false end
+      -- Restrict to unsigned 32-bit integer keys.
+      if k < 0 or k >= 2^32 then return false end
+      -- Array indices are integers.
+      if k - math.floor(k) ~= 0 then return false end
+      -- Negative zero is not a valid array index.
+      if 1 / k < 0 then return false end
+   end
+   return true
+end
+
 function pp(expr, indent, suffix)
    indent = indent or ''
    suffix = suffix or ''
@@ -80,15 +95,28 @@ function pp(expr, indent, suffix)
       print(indent..'"'..expr..'"'..suffix)
    elseif type(expr) == 'boolean' then
       print(indent..(expr and 'true' or 'false')..suffix)
-   elseif type(expr) == 'table' then
+   elseif is_array(expr) then
+      assert(#expr > 0)
       if #expr == 1 then
-         print(indent..'{ "'..expr[1]..'" }'..suffix)
+         if type(expr[1]) == 'table' then
+            print(indent..'{')
+            pp(expr[1], indent..'  ', ' }'..suffix)
+         else
+            print(indent..'{ "'..expr[1]..'" }'..suffix)
+         end
       else
-         print(indent..'{ "'..expr[1]..'",')
+         if type(expr[1]) == 'table' then
+            print(indent..'{')
+            pp(expr[1], indent..'  ', ',')
+         else
+            print(indent..'{ "'..expr[1]..'",')
+         end
          indent = indent..'  '
          for i=2,#expr-1 do pp(expr[i], indent, ',') end
          pp(expr[#expr], indent, ' }'..suffix)
       end
+   elseif type(expr) == 'table' then
+      error('unimplemented')
    else
       error("unsupported type "..type(expr))
    end

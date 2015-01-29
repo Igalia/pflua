@@ -45,8 +45,8 @@ end
 function Comparison()
    local asserts = {}
    local expr = { ComparisonOp(), Arithmetic(asserts), Arithmetic(asserts) }
-   while #asserts > 0 do
-      expr = { 'if', table.remove(asserts), expr, { 'fail' } }
+   for i=#asserts,1,-1 do
+      expr = { 'if', asserts[i], expr, { 'fail' } }
    end
    return expr
 end
