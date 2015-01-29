@@ -14,6 +14,7 @@ local set, concat, dup, pp = utils.set, utils.concat, utils.dup, utils.pp
 local UINT32_MAX = 2^32-1
 local INT32_MAX = 2^31-1
 local INT32_MIN = -2^31
+local UINT16_MAX = 2^16-1
 
 -- We use use Lua arithmetic to implement pflang operations, so
 -- intermediate results can exceed the int32|uint32 range.  Those
@@ -33,7 +34,6 @@ local associative_binops = set(
 )
 local bitops = set('&', '|', '^')
 local unops = set('ntohs', 'ntohl', 'uint32', 'int32')
-local bswap_ops = set('ntohs', 'ntohl')
 -- ops that produce results of known types
 local int32ops = set('&', '|', '^', 'ntohs', 'ntohl', '<<', '>>', 'int32')
 local uint32ops = set('uint32', '[]')
@@ -102,18 +102,26 @@ local commute = {
    ['<']='>', ['<=']='>=', ['=']='=', ['!=']='!=', ['>=']='<=', ['>']='<'
 }
 
-function try_invert(relop, expr, C)
+local function try_invert(relop, expr, C)
    assert(type(C) == 'number' and type(expr) ~= 'number')
    local op = expr[1]
    local is_eq = relop == '=' or relop == '!='
-   if bswap_ops[op] and is_eq then
+   if op == 'ntohl' and is_eq then
       local rhs = expr[2]
       if int32ops[rhs[1]] then
-         -- htonl(INT32) = C => INT32 = htonl(C)
+         assert(INT32_MIN <= C and C <= INT32_MAX)
+         -- ntohl(INT32) = C => INT32 = ntohl(C)
          return relop, rhs, assert(folders[op])(C)
       elseif uint32ops[rhs[1]] then
-         -- htonl(UINT32) = C => UINT32 = uint32(htonl(C))
+         -- ntohl(UINT32) = C => UINT32 = uint32(ntohl(C))
          return relop, rhs, assert(folders[op])(C) % 2^32
+      end
+   elseif op == 'ntohs' and is_eq then
+      local rhs = expr[2]
+      if ((rhs[1] == 'ntohs' or (rhs[1] == '[]' and rhs[3] <= 2))
+           and 0 <= C and C <= UINT16_MAX) then
+         -- ntohs(UINT16) = C => UINT16 = ntohs(C)
+         return relop, rhs, assert(folders[op])(C)
       end
    elseif op == 'uint32' and is_eq then
       local rhs = expr[2]
@@ -129,14 +137,22 @@ function try_invert(relop, expr, C)
       end
    elseif bitops[op] and is_eq then
       local lhs, rhs = expr[2], expr[3]
-      if type(lhs) == 'number' and bswap_ops[rhs[1]] then
-         -- bitop(C, SWAP(X)) = C => bitop(SWAP(C), X) = SWAP(C)
+      if type(lhs) == 'number' and rhs[1] == 'ntohl' then
+         -- bitop(C, ntohl(X)) = C => bitop(ntohl(C), X) = ntohl(C)
          local swap = assert(folders[rhs[1]])
          return relop, { op, swap(lhs), rhs[2] }, swap(C)
-      elseif type(rhs) == 'number' and bswap_ops[lhs[1]] then
-         -- bitop(SWAP(X), C) = C => bitop(X, SWAP(C)) = SWAP(C)
+      elseif type(rhs) == 'number' and lhs[1] == 'ntohl' then
+         -- bitop(ntohl(X), C) = C => bitop(X, ntohl(C)) = ntohl(C)
          local swap = assert(folders[lhs[1]])
          return relop, { op, lhs[2], swap(rhs) }, swap(C)
+      elseif op == '&' then
+         if type(lhs) == 'number' then lhs, rhs = rhs, lhs end
+         if (type(lhs) == 'table' and lhs[1] == 'ntohs'
+             and type(rhs) == 'number' and 0 <= C and C <= UINT16_MAX) then
+            -- ntohs(X) & C = C => X & ntohs(C) = ntohs(C)
+            local swap = assert(folders[lhs[1]])
+            return relop, { op, lhs[2], swap(rhs) }, swap(C)
+         end
       end
    end
    return relop, expr, C
@@ -433,7 +449,7 @@ local function infer_ranges(expr)
    local function push(db) return cons({}, db) end
    local function lookup(db, expr)
       if type(expr) == 'number' then return Range(expr, expr) end
-      if expr == 'len' then return Range(0, 2^16-1) end
+      if expr == 'len' then return Range(0, UINT16_MAX) end
       local key = cfkey(expr)
       while db do
          local range = car(db)[key]
