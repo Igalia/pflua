@@ -7,7 +7,7 @@ module(..., package.seeall)
 local choose = require("pf.utils").choose
 
 local True, False, Fail, ComparisonOp, BinaryOp, UnaryOp, Number, Len
-local Unary, Binary, Arithmetic, Comparison, Conditional
+local Binary, Arithmetic, Comparison, Conditional
 -- Logical intentionally is not local; it is used elsewhere
 
 function True() return { 'true' } end
@@ -15,7 +15,6 @@ function False() return { 'false' } end
 function Fail() return { 'fail' } end
 function ComparisonOp() return choose({ '<', '>' }) end
 function BinaryOp() return choose({ '+', '-', '/' }) end
-function UnaryOp() return choose({ 'int32', 'ntohs', 'ntohl' }) end
 -- Boundary numbers are often particularly interesting; test them often
 function Number()
    if math.random() < 0.2
@@ -25,7 +24,6 @@ function Number()
    end
 end
 function Len() return 'len' end
-function Unary(db) return { 'uint32', { UnaryOp(), Arithmetic(db) } } end
 function Binary(db)
    local op, lhs, rhs = BinaryOp(), Arithmetic(db), Arithmetic(db)
    if op == '/' then table.insert(db, { '!=', rhs, 0 }) end
@@ -35,10 +33,14 @@ function PacketAccess(db)
    local pkt_access_size = choose({1, 2, 4})
    local position = Arithmetic(db)
    table.insert(db, {'>=', 'len', {'+', position, pkt_access_size}})
-   return { '[]', position, pkt_access_size }
+   local access = { '[]', position, pkt_access_size }
+   if pkt_access_size == 1 then return access end
+   if pkt_access_size == 2 then return { 'ntohs', access } end
+   if pkt_access_size == 4 then return { 'uint32', { 'ntohs', access } } end
+   error('unreachable')
 end
 function Arithmetic(db)
-   return choose({ Unary, Binary, Number, Len, PacketAccess })(db)
+   return choose({ Binary, Number, Len, PacketAccess })(db)
 end
 function Comparison()
    local asserts = {}
