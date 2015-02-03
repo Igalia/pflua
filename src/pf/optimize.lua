@@ -629,7 +629,7 @@ local function infer_ranges(expr)
                return assert(folders[op])(rhs_range:fold())
             end
             if (op == 'uint32' and 0 <= rhs_range:min()
-                and rhs_range:max() <= 2^32) then
+                and rhs_range:max() <= UINT32_MAX) then
                return rhs
             elseif (op == 'int32' and INT32_MIN <= rhs_range:min()
                 and rhs_range:max() <= INT32_MAX) then
