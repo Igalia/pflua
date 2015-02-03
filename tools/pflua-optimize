@@ -1,0 +1,43 @@
+#!/usr/bin/env luajit
+-- -*- lua -*-
+
+package.path = package.path .. ";../src/?.lua"
+
+local optimize = require("pf.optimize")
+local utils = require("pf.utils")
+
+function usage()
+   local content = [=[
+Usage: pflua-compile [FILE]
+
+Takes an expanded AST expression, optimizes it, and prints out the
+result.  Useful when tracking down optimizer bugs.  If FILE is given as
+a command-line argument, we read the expression from the file; otherwise
+it is read from standard input.
+   ]=]
+   print(content);
+end
+
+-- Print help
+local input
+
+if #arg == 0 then
+   input = io.stdin
+elseif #arg == 1 then
+   if arg[1] == '--help' or arg[1] == '-h' then
+      usage()
+      os.exit(0)
+   end
+   input = assert(io.open(arg[1]))
+else
+   usage()
+   os.exit(1)
+end
+
+local expr = assert(loadstring('return '..input:read('*a')))()
+
+print('Optimizing:')
+utils.pp(expr)
+local optimized_expr = optimize.optimize(expr)
+print('Result:')
+utils.pp(optimized_expr)
