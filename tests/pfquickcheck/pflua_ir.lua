@@ -6,7 +6,7 @@
 module(..., package.seeall)
 local choose = require("pf.utils").choose
 
-local True, False, Fail, ComparisonOp, BinaryOp, UnaryOp, Number, Len
+local True, False, Fail, ComparisonOp, BinaryOp, Number, Len
 local Binary, Arithmetic, Comparison, Conditional
 -- Logical intentionally is not local; it is used elsewhere
 
