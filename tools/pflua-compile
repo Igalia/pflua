@@ -1,4 +1,5 @@
 #!/usr/bin/env luajit
+-- -*- lua -*-
 
 package.path = package.path .. ";../src/?.lua"
 
@@ -8,7 +9,7 @@ local utils = require("pf.utils")
 
 function usage()
    local content = [=[
-Usage: pflang-compile [--bpf] [--lua] [--pflua] <pflang-expression>
+Usage: pflua-compile [--bpf] [--lua] [--pflua] <pflang-expression>
 
 Options:
 
