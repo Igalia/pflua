@@ -11,7 +11,7 @@ local pfcompile = require('pfquickcheck.pfcompile')
 
 local function usage()
    local content = [=[
-Usage: pflua-compile [--match-packet #packet file.pcap] [FILE]
+Usage: pflua-optimize [--match-packet #packet file.pcap] [FILE]
 
 Takes an expanded AST expression, optimizes it, and prints out the
 result.  Useful when tracking down optimizer bugs.  If FILE is given as
@@ -30,8 +30,7 @@ local function run(input, options)
    print('Result:')
    utils.pp(optimized_expr)
 
-   if (options.pktfile)
-   then
+   if options.pktfile then
       local unopt_pred, opt_pred, packets, packet, P, len, unopt_res, opt_res
       unopt_pred = pfcompile.compile_ast(expr, "Unopt")
       opt_pred = pfcompile.compile_ast(optimized_expr, "Opt")
@@ -41,24 +40,22 @@ local function run(input, options)
 
       unopt_res = unopt_pred(P, len)
       opt_res = opt_pred(P, len)
-      if unopt_res ~= opt_res
-      then
+      if unopt_res ~= opt_res then
          print("Packet results did not match!")
-         print("Unoptimized: %s, optimized: %s"):format(unopt_res, opt_res)
-         exit(1)
+         print(("Unoptimized: %s, optimized: %s"):format(unopt_res, opt_res))
+         os.exit(1)
       else
          print("Match status the same before and after optimization.")
       end
    end
 end
 
-local function initialize_from_command_line(args)
+local function parse_command_line(args)
    local input
    local options = {}
    while #args >= 1 and args[1]:match("^%-%-") do
       local param_arg = table.remove(args, 1)
-      if param_arg == '--match-packet'
-      then
+      if param_arg == '--match-packet' then
          options.pktnum = tonumber(table.remove(args, 1))
          options.pktfile = table.remove(args, 1)
          print(options.pktnum, options.pktfile)
@@ -82,7 +79,7 @@ end
 
 local function main(...)
    local args = { ... }
-   run(initialize_from_command_line(args))
+   run(parse_command_line(args))
 end
 
 main(...)
