@@ -107,6 +107,38 @@ local function residualize_lua(program)
    return result
 end
 
+local function splice_tail(result, expr)
+   if expr[1] == 'do' then
+      -- Splice a tail "do" into the parent do.
+      for j=2,#expr do
+         if j==#expr then
+            splice_tail(result, expr[j])
+         else
+            table.insert(result, expr[j])
+         end
+      end
+      return
+   elseif expr[1] == 'if' then
+      if expr[3][1] == 'return' or expr[3][1] == 'goto' then
+         -- Splice the consequent of a tail "if" into the parent do.
+         table.insert(result, { 'if', expr[2], expr[3] })
+         if expr[4] then splice_tail(result, expr[4]) end
+         return
+      end
+   elseif expr[1] == 'label' then
+      -- Likewise, try to splice the body of a tail labelled
+      -- statement.
+      local tail = { 'do' }
+      splice_tail(tail, expr[3])
+      if #tail > 2 then
+         table.insert(result, { 'label', expr[2], tail[2] })
+         for i=3,#tail do table.insert(result, tail[i]) end
+         return
+      end
+   end
+   table.insert(result, expr)
+end
+
 -- Lua := Do | Return | Goto | If | Bind | Label
 -- Do := 'do' Lua+
 -- Return := 'return' Bool
@@ -115,37 +147,6 @@ end
 -- Bind := 'bind' Name Expr
 -- Label := 'label' Lua
 local function cleanup(expr, is_last)
-   local function splice_tail(result, expr)
-      if expr[1] == 'do' then
-         -- Splice a tail "do" into the parent do.
-         for j=2,#expr do
-            if j==#expr then
-               splice_tail(result, expr[j])
-            else
-               table.insert(result, expr[j])
-            end
-         end
-         return
-      elseif expr[1] == 'if' then
-         if expr[3][1] == 'return' or expr[3][1] == 'goto' then
-            -- Splice the consequent of a tail "if" into the parent do.
-            table.insert(result, { 'if', expr[2], expr[3] })
-            if expr[4] then splice_tail(result, expr[4]) end
-            return
-         end
-      elseif expr[1] == 'label' then
-         -- Likewise, try to splice the body of a tail labelled
-         -- statement.
-         local tail = { 'do' }
-         splice_tail(tail, expr[3])
-         if #tail > 2 then
-            table.insert(result, { 'label', expr[2], tail[2] })
-            for i=3,#tail do table.insert(result, tail[i]) end
-            return
-         end
-      end
-      table.insert(result, expr)
-   end
    local op = expr[1]
    if op == 'do' then
       if #expr == 2 then return cleanup(expr[2], is_last) end
