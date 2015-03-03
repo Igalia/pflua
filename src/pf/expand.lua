@@ -973,45 +973,51 @@ local leaf_primitives = set(
    'true', 'false', 'fail'
 )
 
-local function expand_offset(level, dlt)
+local expand_offset
+
+local function assert_expr(expr, dlt)
+   local dlt = dlt or "EN10MB"
+   local test, asserts = expand_relop(expr, dlt)
+   return concat(asserts, { test })
+end
+local function assert_ether_protocol(proto, dlt)
+   return concat(assert_expr(has_ether_protocol(proto)),
+                 assert_expr(has_ether_protocol_min_payload(proto)))
+end
+local function assert_ipv4_protocol(proto)
+   return concat(assert_expr(has_ipv4_protocol(proto)),
+                 assert_expr(has_ipv4_protocol_min_payload(proto)))
+end
+local function assert_ipv6_protocol(proto)
+   return concat(assert_expr(has_ipv6_protocol(proto)),
+                 assert_expr(has_ipv6_protocol_min_payload(proto)))
+end
+local function assert_first_ipv4_fragment()
+   return assert_expr(is_first_ipv4_fragment())
+end
+local function ipv4_payload_offset(proto, dlt)
+   local dlt = dlt or "EN10MB"
+   local ip_offset, asserts = expand_offset('ip', dlt)
+   if proto then
+      asserts = concat(asserts, assert_ipv4_protocol(proto))
+   end
+   asserts = concat(asserts, assert_first_ipv4_fragment())
+   local res = { '+',
+                 { '<<', { '&', { '[]', ip_offset, 1 }, 0xf }, 2 },
+                 ip_offset }
+   return res, asserts
+end
+local function ipv6_payload_offset(proto, dlt)
+   local dlt = dlt or "EN10MB"
+   local ip_offset, asserts = expand_offset('ip6', dlt)
+   if proto then
+      asserts = concat(asserts, assert_ipv6_protocol(proto))
+   end
+   return { '+', ip_offset, 40 }, asserts
+end
+
+expand_offset = function(level, dlt)
    assert(dlt == "EN10MB", "Encapsulation other than EN10MB unimplemented")
-   local function assert_expr(expr)
-      local test, asserts = expand_relop(expr, dlt)
-      return concat(asserts, { test })
-   end
-   local function assert_ether_protocol(proto)
-      return concat(assert_expr(has_ether_protocol(proto)),
-                    assert_expr(has_ether_protocol_min_payload(proto)))
-   end
-   function assert_ipv4_protocol(proto)
-      return concat(assert_expr(has_ipv4_protocol(proto)),
-                    assert_expr(has_ipv4_protocol_min_payload(proto)))
-   end
-   function assert_ipv6_protocol(proto)
-      return concat(assert_expr(has_ipv6_protocol(proto)),
-                    assert_expr(has_ipv6_protocol_min_payload(proto)))
-   end
-   function assert_first_ipv4_fragment()
-      return assert_expr(is_first_ipv4_fragment())
-   end
-   function ipv4_payload_offset(proto)
-      local ip_offset, asserts = expand_offset('ip', dlt)
-      if proto then
-         asserts = concat(asserts, assert_ipv4_protocol(proto))
-      end
-      asserts = concat(asserts, assert_first_ipv4_fragment())
-      local res = { '+',
-                    { '<<', { '&', { '[]', ip_offset, 1 }, 0xf }, 2 },
-                    ip_offset }
-      return res, asserts
-   end
-   function ipv6_payload_offset(proto)
-      local ip_offset, asserts = expand_offset('ip6', dlt)
-      if proto then
-         asserts = concat(asserts, assert_ipv6_protocol(proto))
-      end
-      return { '+', ip_offset, 40 }, asserts
-   end
 
    -- Note that unlike their corresponding predicates which detect
    -- either IPv4 or IPv6 traffic, [icmp], [udp], and [tcp] only work
