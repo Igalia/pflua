@@ -11,7 +11,9 @@ local utils = require('pf.utils')
 local pflang = require('pfquickcheck.pflang')
 
 function property(packets)
-   --non-local: pkt_idx, pflang_expr, bpf_result, pflua_result
+   --nil pkt_idx, pflang_expr, bpf_result, pflua_result to avoid
+   -- confusing debug information
+   pkt_idx, pflang_expr, bpf_result, pflua_result = nil
    local pkt, P, pkt_len, libpcap_pred, pflua_pred
    a = pflang.Pflang()
    pflang_expr = table.concat(a, ' ')

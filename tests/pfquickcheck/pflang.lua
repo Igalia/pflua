@@ -88,9 +88,71 @@ function Net()
    return srcdstify({ 'net', netspec() })
 end
 
+-- Boundary numbers are often particularly interesting; test them often
+local function uint32()
+   if math.random() < 0.2
+      then return math.random(0, 2^32 - 1)
+   else
+      return choose({ 0, 1, 2^31-1, 2^31, 2^32-1 })
+   end
+end
+
+-- ^ intentionally omitted; 'len < 1 ^ 1' is not valid pflang
+local function binaryMathOp()
+   return choose({ '+', '-', '/', '*', '|', '&' })
+end
+
+local function shiftOp() return choose({ '<<', '>>' }) end
+
+-- Don't generate ==; bug 133
+local function comparisonOp() return choose({ '<', '>', '<=', ">=" }) end
+
+local function binMath()
+   local r, n1, n2, b = math.random()
+   if r < 0.2 then
+      n1, n2, b = uint32(), math.random(0, 32), shiftOp()
+   else
+      n1, n2, b = uint32(), uint32(), binaryMathOp()
+      -- Don't divide by 0
+      if b == '/' then while n2 == 0 do n2 = uint32() end end
+   end
+   return n1, n2, b
+end
+
+-- Filters like 1+1=2 are legitimate pflang, as long as the result is right
+local function Math()
+   local n1, n2, b = binMath()
+   local result
+   if b == '*' then
+      result = n1 * 1LL * n2 -- force non-floating point
+      result = tonumber(result % 2^32) -- Yes, this is necessary
+   elseif b == '/' then result = math.floor(n1 / n2)
+   elseif b == '-' then result = n1 - n2
+   elseif b == '+' then result = n1 + n2
+   elseif b == '|' then result = bit.bor(n1, n2)
+   elseif b == '&' then result = bit.band(n1, n2)
+   elseif b == '>>' then result = bit.rshift(n1, n2)
+   elseif b == '<<' then result = bit.lshift(n1, n2)
+   else error("Unhandled math operator " .. b) end
+   result = result % 2^32 -- doing this twice for * is fine
+   return { n1, b, n2, '=', result }
+end
+
+-- TODO: reduce code duplication
+local function LenWithMath()
+   local r = math.random()
+   local comparison = comparisonOp()
+   if r < 0.1 then
+      return { 'len', comparison, uint32() }
+   else
+      local n1, n2, b = binMath()
+      return { 'len', comparison, n1, b, n2 }
+   end
+end
+
 local function PflangClause()
    return choose({ Empty, ProtocolName, Port, PortRange, ProtocolWithPort,
-                   Host, Net })()
+                   Host, Net, Math, LenWithMath })()
 end
 
 -- Add logical operators (or/not)
