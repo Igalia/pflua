@@ -6,7 +6,8 @@ module(..., package.seeall)
 local choose = require("pf.utils").choose
 
 local function IPProtocol()
-   return choose({ "icmp", "icmp6", "igmp", "igrp", "pim", "ah", "esp", "vrrp",
+   -- Comment out icmp6 temporarily, due to bug 132
+   return choose({ "icmp", "igmp", "igrp", "pim", "ah", "esp", "vrrp",
                     "udp", "tcp" })
    -- Ignore sctp, because "keyword elision not implemented sctp"
 end
