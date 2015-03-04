@@ -45,15 +45,16 @@ local function PflangClause()
    return choose({ ProtocolName, Port, PortRange, ProtocolWithPort })()
 end
 
--- Add logical operators (and/or/not)
+-- Add logical operators (or/not)
+-- Do not test 'and', because it fails fast on the BPF pipeline for some
+-- cases that match no packets. (Bug 130)
 function PflangLogical()
    local r = math.random()
    local pclause = PflangClause()
    local pclause2 = PflangClause()
 
    if r < 0.9 then
-      local logicOp = 'and'
-      if r < 0.45 then logicOp = 'or' end
+      local logicOp = 'or'
 
       table.insert(pclause, logicOp)
       for _,v in ipairs(pclause2) do table.insert(pclause, v) end

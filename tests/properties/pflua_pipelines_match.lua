@@ -11,8 +11,8 @@ local utils = require('pf.utils')
 local pflang = require('pfquickcheck.pflang')
 
 function property(packets)
-   --non-local: pkt_idx, pflang_expr
-   local pkt, P, pkt_len, libpcap_pred, pflua_pred, bpf_result, pflua_result
+   --non-local: pkt_idx, pflang_expr, bpf_result, pflua_result
+   local pkt, P, pkt_len, libpcap_pred, pflua_pred
    a = pflang.Pflang()
    pflang_expr = table.concat(a, ' ')
    pkt, pkt_idx = utils.choose_with_index(packets)
@@ -27,6 +27,7 @@ end
 function print_extra_information()
    print(("The pflang expression was %s and the packet number %s"):
          format(pflang_expr, pkt_idx))
+   print(("BPF: %s, pure-lua: %s"):format(bpf_result, pflua_result))
 end
 
 function handle_prop_args(prop_args)
