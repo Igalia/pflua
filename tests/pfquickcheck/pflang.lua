@@ -2,8 +2,24 @@
 -- -*- lua -*-
 -- This module generates (a subset of) pflang, libpcap's filter language
 
+-- Convention: initial uppercase letter => generates pflang expression
+-- initial lowercase letter => aux helper
+
 module(..., package.seeall)
 local choose = require("pf.utils").choose
+
+local function Empty() return { "" } end
+
+-- Given something like { 'host', '127.0.0.1' }, make it sometimes
+-- start with src or dst. This should only be called on expressions
+-- which can start with src or dst!
+local function srcdstify(expr)
+   local r = math.random()
+   if r < 1/3 then table.insert(expr, 1, "src")
+   elseif r < 2/3 then table.insert(expr, 1, "dst")
+   end -- else: leave it unchanged
+   return expr
+end
 
 local function IPProtocol()
    -- Comment out icmp6 temporarily, due to bug 132
@@ -22,16 +38,16 @@ local function ProtocolName()
    return { choose({ IPProtocol, MoreProtocols })() }
 end
 
-local function PortNumber()
+local function portNumber()
    return math.random(1, 2^16 - 1)
 end
 
 local function Port()
-   return { "port", PortNumber() }
+   return { "port", portNumber() }
 end
 
 local function PortRange()
-   local port1, port2 = PortNumber(), PortNumber()
+   local port1, port2 = portNumber(), portNumber()
    -- work around bug 129
    if port1 > port2 then port1, port2 = port2, port1 end
    return { "portrange", port1 .. '-' .. port2 }
@@ -39,11 +55,21 @@ end
 
 local function ProtocolWithPort()
    protocol = choose({ "tcp", "udp" })
-   return { protocol, "port", PortNumber() }
+   return { protocol, "port", portNumber() }
+end
+
+local function octet() return math.random(0, 255) end
+
+local function ipv4Addr()
+   return table.concat({ octet(), octet(), octet(), octet() }, '.')
+end
+
+local function Host()
+   return srcdstify({ 'host', ipv4Addr() })
 end
 
 local function PflangClause()
-   return choose({ ProtocolName, Port, PortRange, ProtocolWithPort })()
+   return choose({ Empty, ProtocolName, Port, PortRange, ProtocolWithPort, Host })()
 end
 
 -- Add logical operators (or/not)
@@ -67,5 +93,7 @@ function PflangLogical()
 end
 
 function Pflang()
-   return choose({ PflangClause, PflangLogical })()
+   -- Work around bugs 131 and 132
+   --return choose({ PflangClause, PflangLogical })()
+   return PflangClause()
 end
