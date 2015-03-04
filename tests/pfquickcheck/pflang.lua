@@ -68,8 +68,29 @@ local function Host()
    return srcdstify({ 'host', ipv4Addr() })
 end
 
+local function netmask() return math.random(0, 32) end
+
+-- This function is overly conservative with zeroing octets.
+-- TODO: zero more precisely? It's trickier than it looks; tcpdump says
+-- 10.0.0.0/6 isn't ok ('non-network bits set'), but 10.0.0.0/7 is!
+function netspec()
+   local mask = netmask()
+   local o1, o2, o3, o4 = octet(), octet(), octet(), octet()
+   if mask < 32 then o4 = 0 end
+   if mask < 24 then o3 = 0 end
+   if mask < 16 then o2 = 0 end
+   if mask < 8 then o1 = 0 end
+   local addr = table.concat({ o1, o2, o3, o4 }, '.')
+   return addr .. '/' .. mask
+end
+
+function Net()
+   return srcdstify({ 'net', netspec() })
+end
+
 local function PflangClause()
-   return choose({ Empty, ProtocolName, Port, PortRange, ProtocolWithPort, Host })()
+   return choose({ Empty, ProtocolName, Port, PortRange, ProtocolWithPort,
+                   Host, Net })()
 end
 
 -- Add logical operators (or/not)
