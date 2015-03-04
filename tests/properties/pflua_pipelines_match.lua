@@ -13,7 +13,8 @@ local pflang = require('pfquickcheck.pflang')
 function property(packets)
    --non-local: pkt_idx, pflang_expr
    local pkt, P, pkt_len, libpcap_pred, pflua_pred, bpf_result, pflua_result
-   pflang_expr = pflang.Pflang() --table.concat(pflang_math.PflangArithmetic(), ' ')
+   a = pflang.Pflang()
+   pflang_expr = table.concat(a, ' ')
    pkt, pkt_idx = utils.choose_with_index(packets)
    P, pkt_len = pkt.packet, pkt.len
    libpcap_pred = pf.compile_filter(pflang_expr, { bpf = true })

@@ -5,12 +5,24 @@
 module(..., package.seeall)
 local choose = require("pf.utils").choose
 
-local ProtocolName
+local ProtocolName, PortNumber, Port, PortRange
 
 function ProtocolName()
-   return choose({ "ip", "tcp", "udp" })
+   return { choose({ "ip", "tcp", "udp" }) }
+end
+
+function PortNumber()
+   return math.random(1, 2^16 - 1)
+end
+
+function Port()
+   return { "port", PortNumber() }
+end
+
+function PortRange()
+   return { "portrange", PortNumber() .. '-' .. PortNumber() }
 end
 
 function Pflang()
-   return choose({ ProtocolName })()
+   return choose({ ProtocolName, Port, PortRange })()
 end
