@@ -6,21 +6,6 @@ local verbose = os.getenv("PF_VERBOSE");
 
 local set, pp = utils.set, utils.pp
 
-local env = {
-   floor=require('math').floor,
-
-   band=require('bit').band,
-   bxor=require('bit').bxor,
-   bor=require('bit').bor,
-   bswap=require('bit').bswap,
-   tobit=require('bit').tobit,
-   lshift=require('bit').lshift,
-   rshift=require('bit').rshift,
-   bswap=require('bit').bswap,
-
-   cast=require('ffi').cast
-}
-
 local relop_map = {
    ['<']='<', ['<=']='<=', ['=']='==', ['!=']='~=', ['>=']='>=', ['>']='>'
 }
@@ -186,6 +171,7 @@ end
 local function filter_builder(...)
    local written = 'return function('
    local indent = ''
+   local libraries = {}
    local builder = {}
    function builder.write(str)
       written = written .. str
@@ -212,8 +198,20 @@ local function filter_builder(...)
    function builder.writelabel(label)
       builder.write('::'..label..'::\n')
    end
+   function builder.c(str)
+      local lib, func = str:match('([a-z]+).([a-z]+)')
+      if libraries[str] then return func end
+      libraries[str] = 'local '..func..' = require("'..lib..'").'..func
+      return func
+   end
+   function builder.header()
+      for _,library in pairs(libraries) do
+         written = library.."\n"..written
+      end
+   end
    function builder.finish(str)
       builder.pop()
+      builder.header()
       if verbose then print(written) end
       return written
    end
@@ -228,13 +226,13 @@ local function filter_builder(...)
    return builder
 end
 
-local function read_buffer_word_by_type(buffer, offset, size)
+local function read_buffer_word_by_type(builder, buffer, offset, size)
    if size == 1 then
       return buffer..'['..offset..']'
    elseif size == 2 then
-      return ('cast("uint16_t*", '..buffer..'+'..offset..')[0]')
+      return builder.c('ffi.cast')..'("uint16_t*", '..buffer..'+'..offset..')[0]'
    elseif size == 4 then
-      return ('cast("uint32_t*", '..buffer..'+'..offset..')[0]')
+      return (builder.c('ffi.cast')..'("uint32_t*", '..buffer..'+'..offset..')[0]')
    else
       error("bad [] size: "..size)
    end
@@ -247,25 +245,25 @@ local function serialize(builder, stmt)
       if type(expr) == 'string' then return expr end
       assert(type(expr) == 'table', 'unexpected type '..type(expr))
       local op, lhs = expr[1], serialize_value(expr[2])
-      if op == 'ntohs' then return 'rshift(bswap('..lhs..'), 16)'
-      elseif op == 'ntohl' then return 'bswap('..lhs..')'
-      elseif op == 'int32' then return 'tobit('..lhs..')'
+      if op == 'ntohs' then return builder.c('bit.rshift')..'('..builder.c('bit.bswap')..'('..lhs..'), 16)'
+      elseif op == 'ntohl' then return builder.c('bit.bswap')..'('..lhs..')'
+      elseif op == 'int32' then return builder.c('bit.tobit')..'('..lhs..')'
       elseif op == 'uint32' then return '('..lhs..' % '.. 2^32 ..')'
       end
       local rhs = serialize_value(expr[3])
       if op == '[]' then
-         return read_buffer_word_by_type('P', lhs, rhs)
+         return read_buffer_word_by_type(builder, 'P', lhs, rhs)
       elseif op == '+' then return '('..lhs..' + '..rhs..')'
       elseif op == '-' then return '('..lhs..' - '..rhs..')'
       elseif op == '*' then return '('..lhs..' * '..rhs..')'
       elseif op == '*64' then
          return 'tonumber(('..lhs..' * 1LL * '..rhs..') % '.. 2^32 ..')'
-      elseif op == '/' then return 'floor('..lhs..' / '..rhs..')'
-      elseif op == '&' then return 'band('..lhs..','..rhs..')'
-      elseif op == '^' then return 'bxor('..lhs..','..rhs..')'
-      elseif op == '|' then return 'bor('..lhs..','..rhs..')'
-      elseif op == '<<' then return 'lshift('..lhs..','..rhs..')'
-      elseif op == '>>' then return 'rshift('..lhs..','..rhs..')'
+      elseif op == '/' then return builder.c('math.floor')..'('..lhs..' / '..rhs..')'
+      elseif op == '&' then return builder.c('bit.band')..'('..lhs..','..rhs..')'
+      elseif op == '^' then return builder.c('bit.bxor')..'('..lhs..','..rhs..')'
+      elseif op == '|' then return builder.c('bit.bor')..'('..lhs..','..rhs..')'
+      elseif op == '<<' then return builder.c('bit.lshift')..'('..lhs..','..rhs..')'
+      elseif op == '>>' then return builder.c('bit.rshift')..'('..lhs..','..rhs..')'
       else error('unexpected op', op) end
    end
 
@@ -350,9 +348,7 @@ function emit_lua(ssa)
 end
 
 function emit_and_load(ssa, name)
-   local func = assert(loadstring(emit_lua(ssa), name))
-   setfenv(func, env)
-   return func()
+   return assert(loadstring(emit_lua(ssa), name))()
 end
 
 function selftest()
