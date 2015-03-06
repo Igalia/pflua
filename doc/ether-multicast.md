@@ -30,6 +30,7 @@ end
 ## Direct pflang compilation
 
 ```
+local band = require("bit").band
 return function(P,length)
    if length < 1 then return false end
    return band(P[0],1) ~= 0

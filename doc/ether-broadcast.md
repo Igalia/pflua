@@ -35,6 +35,7 @@ end
 ## Direct pflang compilation
 
 ```
+local cast = require("ffi").cast
 return function(P,length)
    if length < 6 then return false end
    if cast("uint16_t*", P+0)[0] ~= 65535 then return false end

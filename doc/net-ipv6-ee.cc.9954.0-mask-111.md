@@ -76,6 +76,8 @@ end
 ## Direct pflang compilation
 
 ```
+local band = require("bit").band
+local cast = require("ffi").cast
 return function(P,length)
    if length < 54 then return false end
    if cast("uint16_t*", P+12)[0] ~= 56710 then return false end

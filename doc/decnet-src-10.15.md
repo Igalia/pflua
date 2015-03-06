@@ -82,6 +82,8 @@ end
 ## Direct pflang compilation
 
 ```
+local band = require("bit").band
+local cast = require("ffi").cast
 return function(P,length)
    if length < 21 then return false end
    local var2 = band(P[16],7)

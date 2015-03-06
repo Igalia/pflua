@@ -58,6 +58,7 @@ end
 ## Direct pflang compilation
 
 ```
+local cast = require("ffi").cast
 return function(P,length)
    if length < 34 then return false end
    local var1 = cast("uint16_t*", P+12)[0]
