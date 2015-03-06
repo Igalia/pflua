@@ -96,6 +96,11 @@ end
 ## Direct pflang compilation
 
 ```
+local rshift = require("bit").rshift
+local bswap = require("bit").bswap
+local cast = require("ffi").cast
+local lshift = require("bit").lshift
+local band = require("bit").band
 return function(P,length)
    if length < 34 then return false end
    local var1 = cast("uint16_t*", P+12)[0]

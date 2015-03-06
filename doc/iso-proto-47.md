@@ -40,6 +40,9 @@ end
 ## Direct pflang compilation
 
 ```
+local rshift = require("bit").rshift
+local bswap = require("bit").bswap
+local cast = require("ffi").cast
 return function(P,length)
    if length < 18 then return false end
    if rshift(bswap(cast("uint16_t*", P+12)[0]), 16) > 1500 then return false end
