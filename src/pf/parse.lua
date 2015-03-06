@@ -20,9 +20,8 @@ local function set(...)
 end
 
 local punctuation = set(
-   '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=',
-   '+', '-', '*', '/', '&', '|', '^', '&&', '||', '<<', '>>',
-   '\\'
+   '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=', '==',
+   '+', '-', '*', '/', '&', '|', '^', '&&', '||', '<<', '>>', '\\'
 )
 
 local function lex_host_or_keyword(str, pos)
@@ -864,8 +863,10 @@ local function parse_logical_or_arithmetic(lexer, pick_first)
          end
          if lexer.peek() == ')' then return exp end
          local op = lexer.next()
-         assert(set('>', '<', '>=', '<=', '=', '!=')[op],
+         assert(set('>', '<', '>=', '<=', '=', '!=', '==')[op],
                 "expected a comparison operator, got "..op)
+         -- Normalize == to =, because libpcap treats them identically
+         if op == '==' then op = '=' end
          exp = { op, exp, parse_arithmetic(lexer) }
       end
       while true do
