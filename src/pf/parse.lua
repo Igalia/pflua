@@ -761,6 +761,7 @@ local primitives = {
    ah = nullary(),
    esp = nullary(),
    vrrp = nullary(),
+   sctp = nullary(),
    protochain = unary(parse_proto_arg),
    arp = table_parser(arp_types, nullary()),
    rarp = table_parser(rarp_types, nullary()),
