@@ -22,21 +22,21 @@
 ```
 return function (P, length)
    local A = 0
-   if 14 > length then return 0 end
+   if 14 > length then return false end
    A = bit.bor(bit.lshift(P[12], 8), P[12+1])
    if not (A==34525) then goto L8 end
-   if 26 > length then return 0 end
+   if 26 > length then return false end
    A = bit.bor(bit.lshift(P[22], 24),bit.lshift(P[22+1], 16), bit.lshift(P[22+2], 8), P[22+3])
    if not (A==-1) then goto L8 end
-   if 30 > length then return 0 end
+   if 30 > length then return false end
    A = bit.bor(bit.lshift(P[26], 24),bit.lshift(P[26+1], 16), bit.lshift(P[26+2], 8), P[26+3])
    if not (A==-286331154) then goto L8 end
-   if 34 > length then return 0 end
+   if 34 > length then return false end
    A = bit.bor(bit.lshift(P[30], 24),bit.lshift(P[30+1], 16), bit.lshift(P[30+2], 8), P[30+3])
    if not (bit.band(A, -16777216)==0) then goto L8 end
-   do return 65535 end
+   do return true end
    ::L8::
-   do return 0 end
+   do return false end
    error("end of bpf")
 end
 ```

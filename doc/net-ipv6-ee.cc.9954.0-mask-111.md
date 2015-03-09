@@ -34,40 +34,40 @@
 ```
 return function (P, length)
    local A = 0
-   if 14 > length then return 0 end
+   if 14 > length then return false end
    A = bit.bor(bit.lshift(P[12], 8), P[12+1])
    if not (A==34525) then goto L20 end
-   if 26 > length then return 0 end
+   if 26 > length then return false end
    A = bit.bor(bit.lshift(P[22], 24),bit.lshift(P[22+1], 16), bit.lshift(P[22+2], 8), P[22+3])
    if not (A==15597772) then goto L10 end
-   if 30 > length then return 0 end
+   if 30 > length then return false end
    A = bit.bor(bit.lshift(P[26], 24),bit.lshift(P[26+1], 16), bit.lshift(P[26+2], 8), P[26+3])
    if not (A==0) then goto L10 end
-   if 34 > length then return 0 end
+   if 34 > length then return false end
    A = bit.bor(bit.lshift(P[30], 24),bit.lshift(P[30+1], 16), bit.lshift(P[30+2], 8), P[30+3])
    if not (A==0) then goto L10 end
-   if 38 > length then return 0 end
+   if 38 > length then return false end
    A = bit.bor(bit.lshift(P[34], 24),bit.lshift(P[34+1], 16), bit.lshift(P[34+2], 8), P[34+3])
    A = bit.band(A, -131072)
    if (A==-1722548224) then goto L19 end
    ::L10::
-   if 42 > length then return 0 end
+   if 42 > length then return false end
    A = bit.bor(bit.lshift(P[38], 24),bit.lshift(P[38+1], 16), bit.lshift(P[38+2], 8), P[38+3])
    if not (A==15597772) then goto L20 end
-   if 46 > length then return 0 end
+   if 46 > length then return false end
    A = bit.bor(bit.lshift(P[42], 24),bit.lshift(P[42+1], 16), bit.lshift(P[42+2], 8), P[42+3])
    if not (A==0) then goto L20 end
-   if 50 > length then return 0 end
+   if 50 > length then return false end
    A = bit.bor(bit.lshift(P[46], 24),bit.lshift(P[46+1], 16), bit.lshift(P[46+2], 8), P[46+3])
    if not (A==0) then goto L20 end
-   if 54 > length then return 0 end
+   if 54 > length then return false end
    A = bit.bor(bit.lshift(P[50], 24),bit.lshift(P[50+1], 16), bit.lshift(P[50+2], 8), P[50+3])
    A = bit.band(A, -131072)
    if not (A==-1722548224) then goto L20 end
    ::L19::
-   do return 65535 end
+   do return true end
    ::L20::
-   do return 0 end
+   do return false end
    error("end of bpf")
 end
 ```

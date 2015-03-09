@@ -34,40 +34,40 @@ return function (P, length)
    local A = 0
    local X = 0
    local T = 0
-   if 14 > length then return 0 end
+   if 14 > length then return false end
    A = bit.bor(bit.lshift(P[12], 8), P[12+1])
    if not (A==34525) then goto L7 end
-   if 21 > length then return 0 end
+   if 21 > length then return false end
    A = P[20]
    if (A==132) then goto L5 end
    if (A==6) then goto L5 end
    if not (A==17) then goto L18 end
    ::L5::
-   if 56 > length then return 0 end
+   if 56 > length then return false end
    A = bit.bor(bit.lshift(P[54], 8), P[54+1])
    if (A==80) then goto L17 end
    goto L18
    ::L7::
    if not (A==2048) then goto L18 end
-   if 24 > length then return 0 end
+   if 24 > length then return false end
    A = P[23]
    if (A==132) then goto L12 end
    if (A==6) then goto L12 end
    if not (A==17) then goto L18 end
    ::L12::
-   if 22 > length then return 0 end
+   if 22 > length then return false end
    A = bit.bor(bit.lshift(P[20], 8), P[20+1])
    if not (bit.band(A, 8191)==0) then goto L18 end
-   if 14 >= length then return 0 end
+   if 14 >= length then return false end
    X = bit.lshift(bit.band(P[14], 15), 2)
    T = bit.tobit((X+14))
-   if T < 0 or T + 2 > length then return 0 end
+   if T < 0 or T + 2 > length then return false end
    A = bit.bor(bit.lshift(P[T], 8), P[T+1])
    if not (A==80) then goto L18 end
    ::L17::
-   do return 65535 end
+   do return true end
    ::L18::
-   do return 0 end
+   do return false end
    error("end of bpf")
 end
 ```

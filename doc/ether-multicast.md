@@ -16,12 +16,12 @@
 ```
 return function (P, length)
    local A = 0
-   if 1 > length then return 0 end
+   if 1 > length then return false end
    A = P[0]
    if (bit.band(A, 1)==0) then goto L2 end
-   do return 65535 end
+   do return true end
    ::L2::
-   do return 0 end
+   do return false end
    error("end of bpf")
 end
 ```
