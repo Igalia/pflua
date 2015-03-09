@@ -35,7 +35,8 @@ EXAMPLES = \
 	decnet-src-10.15.md \
 	decnet-host-10.15.md \
 	l1.md \
-	icmp6.md
+	icmp6.md \
+	sctp.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -157,3 +158,6 @@ l1.md: $(PFLUA)
 
 icmp6.md: $(PFLUA)
 	../tools/dump-markdown "icmp6" > $@.tmp && mv $@.tmp $@
+
+sctp.md: $(PFLUA)
+	../tools/dump-markdown "sctp" > $@.tmp && mv $@.tmp $@
