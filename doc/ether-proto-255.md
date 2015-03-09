@@ -18,15 +18,15 @@
 ```
 return function (P, length)
    local A = 0
-   if 14 > length then return 0 end
+   if 14 > length then return false end
    A = bit.bor(bit.lshift(P[12], 8), P[12+1])
    if (runtime_u32(A)>1500) then goto L4 end
-   if 15 > length then return 0 end
+   if 15 > length then return false end
    A = P[14]
    if not (A==255) then goto L4 end
-   do return 65535 end
+   do return true end
    ::L4::
-   do return 0 end
+   do return false end
    error("end of bpf")
 end
 ```

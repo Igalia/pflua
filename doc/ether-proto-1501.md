@@ -16,12 +16,12 @@
 ```
 return function (P, length)
    local A = 0
-   if 14 > length then return 0 end
+   if 14 > length then return false end
    A = bit.bor(bit.lshift(P[12], 8), P[12+1])
    if not (A==1501) then goto L2 end
-   do return 65535 end
+   do return true end
    ::L2::
-   do return 0 end
+   do return false end
    error("end of bpf")
 end
 ```
