@@ -26,8 +26,7 @@ function compile_filter(filter_str, opts)
    elseif opts.bpf then
       local bytecode = libpcap.compile(filter_str, dlt)
       if opts.source then return bpf.compile_lua(bytecode) end
-      local bpf_prog = bpf.compile(bytecode)
-      return function(P, len) return bpf_prog(P, len) ~= 0 end
+      return bpf.compile(bytecode)
    else
       local expr = parse.parse(filter_str)
       expr = expand.expand(expr, dlt)

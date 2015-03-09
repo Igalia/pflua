@@ -201,12 +201,12 @@ function compile_lua(bpf)
       end
       if     mode == BPF_ABS then
          assert(k >= 0, "packet size >= 2G???")
-         write('if ' .. k + bytes .. ' > length then return 0 end')
+         write('if ' .. k + bytes .. ' > length then return false end')
          rhs = P_ref(size, k)
       elseif mode == BPF_IND then
          write(assign(declare('T'), add(X(), k)))
          -- Assuming packet can't be 2GB in length
-         write('if T < 0 or T + ' .. bytes .. ' > length then return 0 end')
+         write('if T < 0 or T + ' .. bytes .. ' > length then return false end')
          rhs = P_ref(size, 'T')
       elseif mode == BPF_LEN then rhs = 'bit.tobit(length)'
       elseif mode == BPF_IMM then rhs = k
@@ -223,7 +223,7 @@ function compile_lua(bpf)
       elseif mode == BPF_MEM then rhs = M(k)
       elseif mode == BPF_MSH then
          assert(k >= 0, "packet size >= 2G???")
-         write('if ' .. k .. ' >= length then return 0 end')
+         write('if ' .. k .. ' >= length then return false end')
          rhs = lsh(band(P_ref(BPF_B, k), 0xf), 2)
       else
          error('bad mode ' .. mode)
@@ -301,7 +301,8 @@ function compile_lua(bpf)
       elseif src == BPF_A then rhs = A()
       else error('bad src ' .. src)
       end
-      write('do return ' .. u32(rhs) .. ' end')
+      local result = u32(rhs) ~= 0 and "true" or "false"
+      write('do return '..result..' end')
    end
 
    local function misc(op)
