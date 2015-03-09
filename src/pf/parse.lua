@@ -424,6 +424,8 @@ local function parse_portrange_arg(lexer)
       end
       local from, to = to_port_number(tok:sub(1, pos - 2)), to_port_number(tok:sub(pos))
       if from and to then
+         -- For libpcap compatibility, if to < from, swap them
+         if from > to then from, to = to, from end
          return { from, to }
       end
    end
@@ -998,7 +1000,7 @@ function selftest ()
    parse_test("tcp src portrange ftp-data-90",
               { 'tcp_src_portrange', { 20, 90 } })
    parse_test("tcp src portrange 80-ftp-data",
-              { 'tcp_src_portrange', { 80, 20 } })
+              { 'tcp_src_portrange', { 20, 80 } }) -- swapped!
    parse_test("tcp src portrange ftp-data-iso-tsap",
               { 'tcp_src_portrange', { 20, 102 } })
    parse_test("tcp src portrange echo-ftp-data",
