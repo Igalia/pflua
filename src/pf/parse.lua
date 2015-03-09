@@ -696,8 +696,8 @@ local function parse_primary_arithmetic(lexer, tok)
       local size = 1
       if lexer.check(':') then
          if lexer.check(1) then size = 1
-         elseif lexer.check(2) then size = 1
-         else lexer.consume(4); size = 1 end
+         elseif lexer.check(2) then size = 2
+         else lexer.consume(4); size = 4 end
       end
       lexer.consume(']')
       return { '['..tok..']', pos, size}
@@ -1011,7 +1011,7 @@ function selftest ()
               { "and",
                  { "tcp_port", 80 },
                  { "!=",
-                    { "-", { "-", { "[ip]", 2, 1 },
+                    { "-", { "-", { "[ip]", 2, 2 },
                        { "<<", { "&", { "[ip]", 0, 1 }, 15 }, 2 } },
                     { ">>", { "&", { "[tcp]", 12, 1 }, 240 }, 2 } }, 0 } })
    parse_test("ether host ff:ff:ff:33:33:33",
