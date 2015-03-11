@@ -874,6 +874,7 @@ local primitive_expanders = {
    ah = function(expr) return has_ip_protocol(PROTO_AH) end,
    esp = function(expr) return has_ip_protocol(PROTO_ESP) end,
    vrrp = function(expr) return has_ip_protocol(PROTO_VRRP) end,
+   sctp = function(expr) return has_ip_protocol(PROTO_SCTP) end,
    protochain = expand_ip_protochain,
    arp = expand_arp,
    arp_host = expand_arp_host,
