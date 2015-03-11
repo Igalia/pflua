@@ -36,7 +36,12 @@ EXAMPLES = \
 	decnet-host-10.15.md \
 	l1.md \
 	icmp6.md \
-	sctp.md
+	sctp.md \
+	packet-access-igmp.md \
+	packet-access-pim.md \
+	packet-access-igrp.md \
+	packet-access-vrrp.md \
+	packet-access-sctp.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -161,3 +166,18 @@ icmp6.md: $(PFLUA)
 
 sctp.md: $(PFLUA)
 	../tools/dump-markdown "sctp" > $@.tmp && mv $@.tmp $@
+
+packet-access-igmp.md: $(PFLUA)
+	../tools/dump-markdown "igmp[8] < 8" > $@.tmp && mv $@.tmp $@
+
+packet-access-pim.md: $(PFLUA)
+	../tools/dump-markdown "pim[8] < 8" > $@.tmp && mv $@.tmp $@
+
+packet-access-igrp.md : $(PFLUA)
+	../tools/dump-markdown "igrp[8] < 8" > $@.tmp && mv $@.tmp $@
+
+packet-access-vrrp.md: $(PFLUA)
+	../tools/dump-markdown "vrrp[8] < 8" > $@.tmp && mv $@.tmp $@
+
+packet-access-sctp.md: $(PFLUA)
+	../tools/dump-markdown "sctp[8] < 8" > $@.tmp && mv $@.tmp $@
