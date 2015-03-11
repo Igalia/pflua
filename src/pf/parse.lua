@@ -984,6 +984,9 @@ function selftest ()
               { 'type', 'mgt', 'deauth' })
    parse_test("1+1=2",
               { '=', { '+', 1, 1 }, 2 })
+   parse_test("len=4", { '=', 'len', 4 })
+   parse_test("len == 4", { '=', 'len', 4 })
+   parse_test("sctp", { 'sctp' })
    parse_test("1+2*3+4=5",
               { '=', { '+', { '+', 1, { '*', 2, 3 } }, 4 }, 5 })
    parse_test("1+1=2 and tcp",
