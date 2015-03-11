@@ -8,7 +8,7 @@ PFLUA_QUICKCHECK=$(ABS_TOP_SRCDIR)/tools/pflua-quickcheck
 all:
 	@true
 
-check: quickcheck
+check: quickcheck regression
 	./test-matches data
 	# Make sure PF_VERBOSE isn't causing crashes
 	PF_VERBOSE=1 $(ABS_TOP_SRCDIR)/tools/pflua-compile "ip" >/dev/null 2>&1
@@ -21,5 +21,12 @@ quickcheck: $(TEST_SAVEFILE)
 	$(PFLUA_QUICKCHECK) properties/pflua_math_eq_libpcap_math
 	$(PFLUA_QUICKCHECK) properties/opt_eq_unopt $(TEST_SAVEFILE)
 	$(PFLUA_QUICKCHECK) properties/opt_eq_unopt $(TEST_SAVEFILE) test-filters
+
+pipeline_diverge: $(TEST_SAVEFILE)
+	cd regression && ./multi_octet.sh
+	cd regression && ./portrange_bigger_first.sh
+
+regression: pipeline_diverge
+	echo "All regression tests passed"
 
 .SERIAL: all
