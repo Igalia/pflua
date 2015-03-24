@@ -84,7 +84,12 @@ local PROTO_VRRP = 112        -- 0x70
 local ip_min_payloads = {
    [PROTO_ICMP] = 8,
    [PROTO_UDP] = 8,
-   [PROTO_TCP] = 20
+   [PROTO_TCP] = 20,
+   [PROTO_IGMP] = 8,
+   [PROTO_IGRP] = 8,
+   [PROTO_PIM] = 4,
+   [PROTO_SCTP] = 12,
+   [PROTO_VRRP] = 8
 }
 
 -- ISO protocols
@@ -1039,6 +1044,16 @@ local function expand_offset(level, dlt)
       return ipv4_payload_offset(PROTO_UDP)
    elseif level == 'tcp' then
       return ipv4_payload_offset(PROTO_TCP)
+   elseif level == 'igmp' then
+      return ipv4_payload_offset(PROTO_IGMP)
+   elseif level == 'igrp' then
+      return ipv4_payload_offset(PROTO_IGRP)
+   elseif level == 'pim' then
+      return ipv4_payload_offset(PROTO_PIM)
+   elseif level == 'sctp' then
+      return ipv4_payload_offset(PROTO_SCTP)
+   elseif level == 'vrrp' then
+      return ipv4_payload_offset(PROTO_VRRP)
    end
    error('invalid level '..level)
 end

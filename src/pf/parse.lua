@@ -293,7 +293,8 @@ end
 
 local addressables = set(
    'arp', 'rarp', 'wlan', 'ether', 'fddi', 'tr', 'ppp',
-   'slip', 'link', 'radio', 'ip', 'ip6', 'tcp', 'udp', 'icmp'
+   'slip', 'link', 'radio', 'ip', 'ip6', 'tcp', 'udp', 'icmp',
+   'igmp', 'pim', 'igrp', 'vrrp', 'sctp'
 )
 
 local function nullary()
@@ -1050,6 +1051,11 @@ function selftest ()
              { 'src_net', { 'ipv4/mask', { 'ipv4', 192, 168, 1, 0 }, { 'ipv4', 255, 255, 255, 0 } } })
    parse_test("less 100", {"less", 100})
    parse_test("greater 50 + 50", {"greater", {"+", 50, 50}})
+   parse_test("sctp[8] < 8", {'<', { '[sctp]', 8, 1 }, 8})
+   parse_test("igmp[8] < 8", {'<', { '[igmp]', 8, 1 }, 8})
+   parse_test("igrp[8] < 8", {'<', { '[igrp]', 8, 1 }, 8})
+   parse_test("pim[8] < 8", {'<', { '[pim]', 8, 1 }, 8})
+   parse_test("vrrp[8] < 8", {'<', { '[vrrp]', 8, 1 }, 8})
    parse_test("icmp[icmptype] != icmp-echo and icmp[icmptype] != icmp-echoreply",
               { "and",
                 { "!=", { "[icmp]", 0, 1 }, 8 },
