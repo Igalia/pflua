@@ -1,11 +1,14 @@
 #!/usr/bin/env luajit
 
-package.path = package.path .. ";../../src/?.lua"
+package.path = package.path .. ";../../src/?.lua;../../tests/?.lua"
 
 local ffi = require("ffi")
 local pf = require("pf")
 local utils = require("pf.utils")
 local savefile = require("pf.savefile")
+local optimize = require('pf.optimize')
+local pfcompile = require('pfquickcheck.pfcompile')
+
 
 local function usage()
    print([[
@@ -17,9 +20,9 @@ Usage: pflua-pipelines-match IN.PCAP FILTER PKT_NUMBER
    os.exit(false)
 end
 
-local function filter(packets, pflua_pred, bpf_pred, pkt_number)
+local function filter(packets, pred1, pred2, pkt_number)
    local pkt = packets[pkt_number]
-   local res = pflua_pred(pkt.packet, pkt.len) == bpf_pred(pkt.packet, pkt.len)
+   local res = pred1(pkt.packet, pkt.len) == pred2(pkt.packet, pkt.len)
    local verbose = os.getenv("PF_VERBOSE")
    if verbose then
       if res then
@@ -31,15 +34,52 @@ local function filter(packets, pflua_pred, bpf_pred, pkt_number)
    return res
 end
 
-function main(in_file, filter_input, pkt_number)
-   local packets = savefile.load_packets(in_file)
+
+function main_filter(pcap_file, filter_input, pkt_number)
+   local packets = savefile.load_packets(pcap_file)
    local pflua_pred = pf.compile_filter(filter_input)
    local bpf_pred = pf.compile_filter(filter_input, { bpf = true })
    os.exit(filter(packets, pflua_pred, bpf_pred, pkt_number))
 end
 
--- Parse args
-local in_file, filter_str, pkt_number = arg[1], arg[2], arg[3]
-if not pkt_number then usage() end
+local function read_and_compile_ast(ir_file, optimize_ast)
+   local ir_in = assert(io.open(ir_file))
+   local ir_str = ir_in:read('*a')
+   local ast = assert(loadstring('return ' .. ir_str))()
+   ir_in:close()
+   if optimize_ast then ast = optimize.optimize(ast) end
+   return pfcompile.compile_ast(ast, ir_file)
+end
 
-main(in_file, filter_str, tonumber(pkt_number))
+function main_ir(pcap_file, ir1, ir2, pkt_number)
+   local packets = savefile.load_packets(pcap_file)
+   local ir1_pred = read_and_compile_ast(ir1, false)
+   local ir2_pred
+   -- It's more useful to check the *current* optimization rather than some
+   -- known good past one, for the sake of regression testing.
+   -- The special value "HEAD" for an ir file indicates that the first IR
+   -- should be optimized, instead of compared against a different literal one.
+   if ir2 == "HEAD" then
+      ir2_pred = read_and_compile_ast(ir1, true)
+   else
+      ir2_pred = read_and_compile_ast(ir2, false)
+   end
+   os.exit(filter(packets, ir1_pred, ir2_pred, pkt_number))
+end
+
+-- Parse args
+local is_ir = false
+if arg[1] == '--ir' then
+   is_ir = true
+   table.remove(arg, 1)
+end
+
+if is_ir then
+   local pcap_file, ir1, ir2, pkt_number = arg[1], arg[2], arg[3], arg[4]
+   if not pkt_number then usage() end
+   main_ir(pcap_file, ir1, ir2, tonumber(pkt_number))
+else
+   local pcap_file, filter_str, pkt_number = arg[1], arg[2], arg[3]
+   if not pkt_number then usage() end
+   main_filter(pcap_file, filter_str, tonumber(pkt_number), is_ir)
+end

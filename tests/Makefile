@@ -22,6 +22,9 @@ quickcheck: $(TEST_SAVEFILE)
 	$(PFLUA_QUICKCHECK) properties/opt_eq_unopt $(TEST_SAVEFILE)
 	$(PFLUA_QUICKCHECK) properties/opt_eq_unopt $(TEST_SAVEFILE) test-filters
 
+optimizer_regression: $(TEST_SAVEFILE)
+	cd regression && ./range_check.sh
+
 pipeline_diverge: $(TEST_SAVEFILE)
 	cd regression && ./multi_octet.sh
 	cd regression && ./portrange_bigger_first.sh
@@ -29,7 +32,7 @@ pipeline_diverge: $(TEST_SAVEFILE)
 math_regression:
 	cd regression && ./integer_multiplication.sh
 
-regression: pipeline_diverge math_regression
+regression: pipeline_diverge math_regression optimizer_regression
 	echo "All regression tests passed"
 
 .SERIAL: all
