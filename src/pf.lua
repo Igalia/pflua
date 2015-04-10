@@ -10,12 +10,17 @@ local optimize = require('pf.optimize')
 local anf = require('pf.anf')
 local ssa = require('pf.ssa')
 local backend = require('pf.backend')
+local utils = require('pf.utils')
 
+-- TODO: rename the 'libpcap' option to reduce terminology overload
+local compile_defaults = {
+   optimize=true, libpcap=false, bpf=false, source=false
+}
 function compile_filter(filter_str, opts)
-   local opts = opts or {}
+   local opts = utils.parse_opts(opts or {}, compile_defaults)
    local dlt = opts.dlt or "EN10MB"
-   if opts.pcap_offline_filter then
-      local bytecode = libpcap.compile(filter_str, dlt)
+   if opts.libpcap then
+      local bytecode = libpcap.compile(filter_str, dlt, opts.optimize)
       if opts.source then return bpf.disassemble(bytecode) end
       local header = types.pcap_pkthdr(0, 0, 0, 0)
       return function(P, len)
@@ -24,13 +29,13 @@ function compile_filter(filter_str, opts)
          return libpcap.offline_filter(bytecode, header, P) ~= 0
       end
    elseif opts.bpf then
-      local bytecode = libpcap.compile(filter_str, dlt)
+      local bytecode = libpcap.compile(filter_str, dlt, opts.optimize)
       if opts.source then return bpf.compile_lua(bytecode) end
       return bpf.compile(bytecode)
-   else
+   else -- pflua
       local expr = parse.parse(filter_str)
       expr = expand.expand(expr, dlt)
-      expr = optimize.optimize(expr)
+      if opts.optimize then expr = optimize.optimize(expr) end
       expr = anf.convert_anf(expr)
       expr = ssa.convert_ssa(expr)
       if opts.source then return backend.emit_lua(expr) end
@@ -44,7 +49,7 @@ function selftest ()
    local function test_null(str)
       local f1 = compile_filter(str, { libpcap = true })
       local f2 = compile_filter(str, { bpf = true })
-      local f3 = compile_filter(str, { bpf = false })
+      local f3 = compile_filter(str, {})
       assert(f1(str, 0) == false, "null packet should be rejected (libpcap)")
       assert(f2(str, 0) == false, "null packet should be rejected (bpf)")
       assert(f3(str, 0) == false, "null packet should be rejected (pflua)")
@@ -65,7 +70,7 @@ function selftest ()
 
       local f1 = compile_filter(filter, { libpcap = true })
       local f2 = compile_filter(filter, { bpf = true })
-      local f3 = compile_filter(filter, { bpf = false })
+      local f3 = compile_filter(filter, {})
       local actual
       actual = count_matched(f1)
       assert(actual == expected,
