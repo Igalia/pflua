@@ -26,7 +26,10 @@ pipeline_diverge: $(TEST_SAVEFILE)
 	cd regression && ./multi_octet.sh
 	cd regression && ./portrange_bigger_first.sh
 
-regression: pipeline_diverge
+math_regression:
+	cd regression && ./integer_multiplication.sh
+
+regression: pipeline_diverge math_regression
 	echo "All regression tests passed"
 
 .SERIAL: all
