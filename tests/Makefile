@@ -8,6 +8,8 @@ all:
 
 check: quickcheck
 	./test-matches data
+	# Make sure PF_VERBOSE isn't causing crashes
+	PF_VERBOSE=1 ../tools/pflua-compile "ip" >/dev/null 2>&1
 
 $(TEST_SAVEFILE):
 	wget --output-document $@ $(TEST_SAVEFILE_URL)

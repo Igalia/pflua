@@ -116,7 +116,11 @@ function pp(expr, indent, suffix)
          pp(expr[#expr], indent, ' }'..suffix)
       end
    elseif type(expr) == 'table' then
-      error('unimplemented')
+      if #expr == 0 then
+         print(indent .. '{}')
+      else
+         error('unimplemented')
+      end
    else
       error("unsupported type "..type(expr))
    end
