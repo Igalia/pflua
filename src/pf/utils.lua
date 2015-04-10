@@ -167,6 +167,18 @@ function choose_with_index(choices)
    return choices[idx], idx
 end
 
+function parse_opts(opts, defaults)
+   local ret = {}
+   for k, v in pairs(opts) do
+      if defaults[k] == nil then error('unrecognized option ' .. k) end
+      ret[k] = v
+   end
+   for k, v in pairs(defaults) do
+      if ret[k] == nil then ret[k] = v end
+   end
+   return ret
+end
+
 function selftest ()
    print("selftest: pf.utils")
    local tab = { 1, 2, 3 }

@@ -32,7 +32,7 @@ end
 --
 -- You probably want "RAW" for raw IP (v4 or v6) frames.  If you don't
 -- supply a dlt_name, "RAW" is the default.
-function compile(filter_str, dlt_name)
+function compile(filter_str, dlt_name, optimize)
    if verbose then print(filter_str) end
    if not pcap then pcap = ffi.load("pcap") end
 
@@ -46,8 +46,8 @@ function compile(filter_str, dlt_name)
 
    -- pcap_compile
    local bpf = types.bpf_program()
-   local optimize = true
    local netmask = MAX_UINT32
+   if optimize == nil then optimize = true end -- backwards compatibility
    local err = pcap.pcap_compile(p, bpf, filter_str, optimize, netmask)
 
    if err ~= 0 then

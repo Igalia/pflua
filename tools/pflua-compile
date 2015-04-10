@@ -40,13 +40,19 @@ if (not(flags["--bpf-asm"] or flags["--bpf-lua"] or flags["--lua"])) then
    flags["--lua"] = true
 end
 
+
+local optimize = true
+if flags["-O0"] then optimize = false end
+
 local filter = arg[#arg]
 if flags["--bpf-asm"] then
-   print(pf.compile_filter(filter, {pcap_offline_filter=true, source=true}))
+   print(pf.compile_filter(filter, {pcap_offline_filter=true, source=true,
+                                    optimize=optimize}))
 end
 if flags["--bpf-lua"] then
-   print(pf.compile_filter(filter, {bpf=true, source=true}))
+   print(pf.compile_filter(filter, {bpf=true, source=true,
+                                    optimize=optimize}))
 end
 if flags["--lua"] then
-   print(pf.compile_filter(filter, {source=true}))
+   print(pf.compile_filter(filter, {source=true, optimize=optimize}))
 end
