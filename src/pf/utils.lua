@@ -4,13 +4,11 @@ local ffi = require("ffi")
 local C = ffi.C
 
 ffi.cdef[[
-typedef long time_t;
-typedef long suseconds_t;
-struct timeval {
-  time_t      tv_sec;     /* seconds */
-  suseconds_t tv_usec;    /* microseconds */
+struct pflua_timeval {
+  long tv_sec;     /* seconds */
+  long tv_usec;    /* microseconds */
 };
-int gettimeofday(struct timeval *tv, struct timezone *tz);
+int gettimeofday(struct pflua_timeval *tv, struct timezone *tz);
 ]]
 
 -- now() returns the current time.  The first time it is called, the
@@ -18,7 +16,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz);
 -- of what the current epoch is.
 local zero_sec, zero_usec
 function now()
-   local tv = ffi.new("struct timeval")
+   local tv = ffi.new("struct pflua_timeval")
    assert(C.gettimeofday(tv, nil) == 0)
    if not zero_sec then
       zero_sec = tv.tv_sec
@@ -30,7 +28,7 @@ function now()
 end
 
 function gmtime()
-   local tv = ffi.new("struct timeval")
+   local tv = ffi.new("struct pflua_timeval")
    assert(C.gettimeofday(tv, nil) == 0)
    local secs = tonumber(tv.tv_sec)
    secs = secs + tonumber(tv.tv_usec) * 1e-6
