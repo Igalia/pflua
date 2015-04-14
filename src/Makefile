@@ -1,4 +1,5 @@
-PATH := .:../deps/luajit/usr/local/bin:$(PATH)
+TOP_SRCDIR:=..
+include $(TOP_SRCDIR)/common.mk
 
 all:
 

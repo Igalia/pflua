@@ -1,4 +1,5 @@
-LUAJIT_O := deps/luajit/src/libluajit.a
+include common.mk
+LUAJIT_O := $(ABS_TOP_SRCDIR)/deps/luajit/src/libluajit.a
 
 LUAJIT_CFLAGS := -DLUAJIT_USE_PERFTOOLS -DLUAJIT_USE_GDBJIT
 

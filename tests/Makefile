@@ -1,7 +1,9 @@
-PATH := ../deps/luajit/usr/local/bin:$(PATH)
+TOP_SRCDIR:=..
+include $(TOP_SRCDIR)/common.mk
+
 TEST_SAVEFILE_URL='https://github.com/Igalia/pflua-test/blob/master/savefiles/wingolog.org.pcap?raw=true'
 TEST_SAVEFILE=data/wingolog.pcap
-PFLUA_QUICKCHECK=../tools/pflua-quickcheck
+PFLUA_QUICKCHECK=$(ABS_TOP_SRCDIR)/tools/pflua-quickcheck
 
 all:
 	@true
@@ -9,7 +11,7 @@ all:
 check: quickcheck
 	./test-matches data
 	# Make sure PF_VERBOSE isn't causing crashes
-	PF_VERBOSE=1 ../tools/pflua-compile "ip" >/dev/null 2>&1
+	PF_VERBOSE=1 $(ABS_TOP_SRCDIR)/tools/pflua-compile "ip" >/dev/null 2>&1
 
 $(TEST_SAVEFILE):
 	wget --output-document $@ $(TEST_SAVEFILE_URL)
