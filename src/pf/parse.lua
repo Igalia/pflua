@@ -275,7 +275,7 @@ local function tokens(str)
       return true
    end
    local function error_str(message, ...)
-      local location_error_message = "Error: In expression \"%s\""
+      local location_error_message = "Pflua parse error: In expression \"%s\""
       local start = #location_error_message - 4
       local cursor_pos = start + last_pos
 
@@ -838,7 +838,15 @@ local function parse_primitive_or_arithmetic(lexer)
    -- short for `not host vs and host ace` and which should not be
    -- confused with `not (host vs or ace)`."  For now we punt on this
    -- part of the grammar.
-   lexer.error('keyword elision not implemented %s', tok)
+   local msg =
+[[%s is not a recognized keyword. Likely causes:
+a) %s is a typo, invalid keyword, or similar error.
+b) You're trying to implicitly repeat the previous clause's keyword.
+Instead of libpcap-style elision, explicitly use keywords in each clause:
+ie, "host a and host b", not "host a and b".]]
+
+   local err = string.format(msg, tok, tok)
+   lexer.error(err)
 end
 
 local logical_ops = set('&&', 'and', '||', 'or')
