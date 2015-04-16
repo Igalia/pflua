@@ -17,12 +17,3 @@ check:
 	luajit -l pf.ssa -e 'pf.ssa.selftest()'
 	luajit -l pf.backend -e 'pf.backend.selftest()'
 	luajit -l pf -e 'pf.selftest()'
-
-test:
-	luajit -l bpf_pflua_ts -e 'bpf_pflua_ts.run()'
-
-test_jit_off:
-	luajit -joff -l bpf_pflua_ts -e 'bpf_pflua_ts.run()'
-
-trace:
-	luajit -jdump -l bpf_pflua_ts -e 'bpf_pflua_ts.run()'
