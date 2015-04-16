@@ -534,8 +534,15 @@ end
 
 -- Host
 
--- Format IPv4 expr: { { 'ipv4', 127, 0, 0, 1 }, 8 }
--- Format IPv6 expr: { { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 }, 128 }
+
+--[[
+* Format IPv4 expr:
+  { 'net', { 'ipv4', 127, 0, 0, 1 } }
+  { 'ipv4/len', { 'ipv4', 127, 0, 0, 1 }, 24 }
+* Format IPv6 expr:
+  { 'net', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 } }
+  { 'ipv4/len', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 }, 24 }
+]]--
 local function is_ipv6_addr(expr)
    return expr[2][1] == 'ipv6'
 end
@@ -697,19 +704,28 @@ end
 -- Net
 
 local function expand_src_net(expr)
-   if is_ipv6_addr(expr[2]) then return expand_src_ipv6_host(expr[2]) end
-   return expand_src_host(expr[2])
+   local addr = expr
+   local proto = expr[2][1]
+   if proto:match("/len$") or proto:match("/mask$") then addr = expr[2] end
+   if is_ipv6_addr(addr) then return expand_src_ipv6_host(addr) end
+   return expand_src_host(addr)
 end
 local function expand_dst_net(expr)
-   if is_ipv6_addr(expr[2]) then return expand_dst_ipv6_host(expr[2]) end
-   return expand_dst_host(expr[2])
+   local addr = expr
+   local proto = expr[2][1]
+   if proto:match("/len$") or proto:match("/mask$") then addr = expr[2] end
+   if is_ipv6_addr(addr) then return expand_dst_ipv6_host(addr) end
+   return expand_dst_host(addr)
 end
 
 -- Format IPv4 expr: { 'net', { 'ipv4/len', { 'ipv4', 127, 0, 0, 0 }, 8 } }
 -- Format IPV6 expr: { 'net', { 'ipv6/len', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 1 }, 128 } }
 local function expand_net(expr)
-   if is_ipv6_addr(expr[2]) then return expand_ipv6_host(expr[2]) end
-   return expand_host(expr[2])
+   local addr = expr
+   local proto = expr[2][1]
+   if proto:match("/len$") or proto:match("/mask$") then addr = expr[2] end
+   if is_ipv6_addr(addr) then return expand_ipv6_host(addr) end
+   return expand_host(addr)
 end
 
 -- Packet length
