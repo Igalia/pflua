@@ -1,0 +1,33 @@
+#!/usr/bin/env luajit
+
+package.path = package.path .. ";../../src/?.lua"
+
+local pf = require("pf")
+
+local function usage()
+   print([[
+Usage: check-compile FILTER PATTERN
+   FILTER      Filter to apply, as a string or file.
+   PATTERN     text to look for within the compiled Lua source.
+   ]])
+   os.exit(1)
+end
+
+function main(filter_input, pattern)
+   local pflua_pred = pf.compile_filter(filter_input, {source=true})
+   local res = string.match(pflua_pred, pattern)
+   local verbose = os.getenv("PF_VERBOSE")
+   if res then
+      if verbose then print("The pattern was found in the source.") end
+      os.exit(0)
+   else
+      if verbose then print("The pattern was not found in the source.") end
+      os.exit(1)
+   end
+end
+
+-- Parse args
+local filter_str, pattern = arg[1], arg[2]
+if not pattern then usage() end
+
+main(filter_str, pattern)

@@ -1,0 +1,4 @@
+Here are tests for known, fixed bugs, to make sure they are not re-introduced.
+Conventions:
+- lua files have no file endings
+- tests end with .sh, are minimally complex, and call lua programs to do anything non-trivial
