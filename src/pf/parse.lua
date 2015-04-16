@@ -1064,6 +1064,7 @@ function selftest ()
    parse_test("igrp[8] < 8", {'<', { '[igrp]', 8, 1 }, 8})
    parse_test("pim[8] < 8", {'<', { '[pim]', 8, 1 }, 8})
    parse_test("vrrp[8] < 8", {'<', { '[vrrp]', 8, 1 }, 8})
+   parse_test("not icmp6", {'not', { 'icmp6' } })
    parse_test("icmp[icmptype] != icmp-echo and icmp[icmptype] != icmp-echoreply",
               { "and",
                 { "!=", { "[icmp]", 0, 1 }, 8 },
