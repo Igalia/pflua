@@ -237,15 +237,15 @@ end
 -- Add a "preds" property to all blocks, which is a list of labels of
 -- predecessors.
 local function add_predecessors(ssa)
+   local function add_predecessor(succ, label)
+      table.insert(ssa.blocks[succ].preds, label)
+   end
    local function visit(label, block)
-      local function add_predecessor(succ)
-         table.insert(ssa.blocks[succ].preds, label)
-      end
       if block.control[1] == 'if' then
-         add_predecessor(block.control[3])
-         add_predecessor(block.control[4])
+         add_predecessor(block.control[3], label)
+         add_predecessor(block.control[4], label)
       elseif block.control[1] == 'goto' then
-         add_predecessor(block.control[2])
+         add_predecessor(block.control[2], label)
       else
          assert(block.control[1] == 'return')
       end
