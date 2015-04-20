@@ -22,7 +22,7 @@ Options:
 end
 
 -- Print help
-if (#arg == 0) then
+if #arg == 0 then
    usage()
 end
 
