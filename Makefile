@@ -1,9 +1,10 @@
+TOP_SRCDIR:=.
 include common.mk
 LUAJIT_O := $(ABS_TOP_SRCDIR)/deps/luajit/src/libluajit.a
 
 LUAJIT_CFLAGS := -DLUAJIT_USE_PERFTOOLS -DLUAJIT_USE_GDBJIT
 
-all: $(LUAJIT_O)
+all: $(LUAJIT_O) env
 	$(MAKE) -C doc
 
 $(LUAJIT_O): check_luajit deps/luajit/Makefile
@@ -19,6 +20,10 @@ check_luajit:
 	    echo "Can't find deps/luajit/. You might need to: git submodule update --init"; exit 1; \
 	fi
 
+env:
+	@echo "#!/bin/bash\nLUA_PATH=$(LUA_PATH) exec \"\$$@\"" > env
+	chmod +x env
+
 check:
 	$(MAKE) -C src check
 	$(MAKE) -C tools check
@@ -29,5 +34,6 @@ clean:
 	$(MAKE) -C deps/luajit clean
 	$(MAKE) -C src clean
 	$(MAKE) -C tools clean
+	rm -rf env
 
 .SERIAL: all
