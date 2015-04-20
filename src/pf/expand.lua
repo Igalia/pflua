@@ -141,11 +141,12 @@ local function is_first_ipv4_fragment()
    return { '=', { '&', { '[ip]', 6, 2 }, 0x1fff }, 0 }
 end
 local function has_ipv6_protocol(proto)
-   return { 'or',
-            { '=', { '[ip6]', 6, 1 }, proto },
-            { 'and',
-              { '=', { '[ip6]', 6, 1 }, 44 },
-              { '=', { '[ip6]', 40, 1 }, proto } } }
+   return { 'and', { 'ip6' },
+            { 'or',
+              { '=', { '[ip6]', 6, 1 }, proto },
+              { 'and',
+                { '=', { '[ip6]', 6, 1 }, 44 },
+                { '=', { '[ip6]', 40, 1 }, proto } } } }
 end
 local function has_ipv6_protocol_min_payload(proto)
    -- Assume the minimum ipv6 header size.
@@ -154,9 +155,7 @@ local function has_ipv6_protocol_min_payload(proto)
    return { '<=', 0, { '[ip6]', min_payload - 1, 1 } }
 end
 local function has_ip_protocol(proto)
-   return { 'if', { 'ip' },
-            has_ipv4_protocol(proto),
-            { 'and', { 'ip6' }, has_ipv6_protocol(proto) } }
+   return { 'if', { 'ip' }, has_ipv4_protocol(proto), has_ipv6_protocol(proto) }
 end
 
 -- Port operations

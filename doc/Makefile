@@ -42,7 +42,8 @@ EXAMPLES = \
 	packet-access-pim.md \
 	packet-access-igrp.md \
 	packet-access-vrrp.md \
-	packet-access-sctp.md
+	packet-access-sctp.md \
+	icmp6-or-ip.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -182,3 +183,6 @@ packet-access-vrrp.md: $(PFLUA)
 
 packet-access-sctp.md: $(PFLUA)
 	../tools/dump-markdown "sctp[8] < 8" > $@.tmp && mv $@.tmp $@
+
+icmp6-or-ip.md: $(PFLUA)
+	../tools/dump-markdown "icmp6 or ip" > $@.tmp && mv $@.tmp $@
