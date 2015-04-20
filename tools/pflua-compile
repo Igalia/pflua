@@ -9,21 +9,20 @@ local utils = require("pf.utils")
 
 function usage()
    local content = [=[
-Usage: pflua-compile [--bpf] [--lua] [--pflua] <pflang-expression>
+Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua] <pflang-expression>
 
 Options:
-
    --bpf-asm   Print libpcap-generated BPF asm code for <pflang-expression>
    --bpf-lua   Print Lua code compiled from BPF for <pflang-expression>
    --lua       Print Lua code compiled directly for <pflang-expression> (DEFAULT)
 
-   ]=]
+   -O0         Disable optimizations. (Optimizations are on by default) ]=]
    print(content);
    os.exit()
 end
 
 -- Print help
-if (#arg == 0) then
+if #arg == 0 then
    usage()
 end
 
@@ -46,7 +45,7 @@ if flags["-O0"] then optimize = false end
 
 local filter = arg[#arg]
 if flags["--bpf-asm"] then
-   print(pf.compile_filter(filter, {pcap_offline_filter=true, source=true,
+   print(pf.compile_filter(filter, {libpcap=true, source=true,
                                     optimize=optimize}))
 end
 if flags["--bpf-lua"] then
