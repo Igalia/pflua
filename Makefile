@@ -1,3 +1,4 @@
+TOP_SRCDIR:=.
 include common.mk
 LUAJIT_O := $(ABS_TOP_SRCDIR)/deps/luajit/src/libluajit.a
 
