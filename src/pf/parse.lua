@@ -39,7 +39,7 @@ local function lex_ipv4_or_host(str, pos)
       return byte
    end
    local digits, dot = str:match("^(%d%d?%d?)()%.", pos)
-   if not digits then return lex_host_or_keyword(str, start_pos) end
+   if not digits then return lex_host_or_keyword(str) end
    local addr = { 'ipv4' }
    local byte = lex_byte(digits)
    if not byte then return lex_host_or_keyword(str, pos) end
@@ -133,7 +133,6 @@ local function lex_ehost(str, pos)
 end
 
 local function lex_addr(str, pos)
-   local start_pos = pos
    if str:match("^%d%d?%d?%.", pos) then
       return lex_ipv4_or_host(str, pos)
    elseif str:match("^%x%x?%:", pos) then
