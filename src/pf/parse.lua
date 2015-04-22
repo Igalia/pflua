@@ -132,15 +132,42 @@ local function lex_ehost(str, pos)
    return addr, pos
 end
 
+local function lex_net_ipv4(str, pos)
+   local function lex_byte(str)
+      local byte = tonumber(str, 10)
+      if byte >= 256 then return nil end
+      return byte
+   end
+   local addr = { 'ipv4' }
+   local digits, dot = str:match("^(%d%d?%d?)()", pos)
+   if not digits then return lex_host_or_keyword(str, pos) end
+   local bytes = lex_byte(digits)
+   table.insert(addr, bytes)
+   pos = dot
+   for i=1,3 do
+      digits, dot = str:match(".(%d%d?%d?)()", pos)
+      if not digits then break end
+      bytes = lex_byte(digits)
+      table.insert(addr, bytes)
+      pos = dot
+   end
+   local terminators = " \t\r\n)/"
+   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
+          "unexpected terminator for ipv4 address")
+   return addr, pos
+end
+
 local function lex_addr(str, pos)
-   if str:match("^%d%d?%d?%.", pos) then
-      return lex_ipv4_or_host(str, pos)
-   elseif str:match("^%x%x?%:", pos) then
+   if str:match("^%x%x?%:", pos) then
       local result, pos = lex_ehost(str, pos)
       if result then return result, pos end
       return lex_ipv6(str, pos)
    elseif str:match("^%x?%x?%x?%x?%:", pos) then
       return lex_ipv6(str, pos)
+   elseif str:match("^net%s+%d", pos - 4) then
+      return lex_net_ipv4(str, pos)
+   elseif str:match("^%d%d?%d?%.", pos) then
+      return lex_ipv4_or_host(str, pos)
    else
       return lex_host_or_keyword(str, pos)
    end
@@ -353,6 +380,15 @@ function parse_net_arg(lexer)
    end
 
    local arg = lexer.next()
+   -- IPv4 dotted triple, dotted pair or bare net addresses
+   if arg[1] == 'ipv4' and #arg < 5 then
+      local mask_len = 32
+      for i=#arg+1,5 do
+         arg[i] = 0
+         mask_len = mask_len - 8
+      end
+      return { 'ipv4/len', arg, mask_len }
+   end
    if arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       if lexer.check('/') then
          local mask_len = parse_int_arg(lexer, arg[1] == 'ipv4' and 32 or 128)
@@ -378,9 +414,6 @@ function parse_net_arg(lexer)
       end
    elseif type(arg) == 'string' then
       lexer.error('named nets currently unsupported %s', arg)
-   else
-      assert(type(arg) == 'number')  -- `net 10'
-      lexer.error('bare numbered nets currently unsupported %s', arg)
    end
 end
 
@@ -1068,5 +1101,14 @@ function selftest ()
               { "and",
                 { "!=", { "[icmp]", 0, 1 }, 8 },
                 { "!=", { "[icmp]", 0, 1 }, 0 } })
+   parse_test("net 192.0.0.0", {'net', { 'ipv4', 192, 0, 0, 0 } })
+   parse_test("net 192.168.1.0/24",
+               { 'net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
+   parse_test("net 192.168.1",
+               { 'net', { 'ipv4/len', { 'ipv4', 192, 168, 1, 0 }, 24 } })
+   parse_test("net 192.168",
+               { 'net', { 'ipv4/len', { 'ipv4', 192, 168, 0, 0 }, 16 } })
+   parse_test("net 192",
+               { 'net', { 'ipv4/len', { 'ipv4', 192, 0, 0, 0 }, 8 } })
    print("OK")
 end
