@@ -1,2 +1,3 @@
 #!/bin/bash
-../../env pipe-lua-libpcap-match ../data/wingolog.pcap "icmp6 or portrange 14682-50101" 14951
+thisdir=$(dirname $0)
+"${thisdir}/../../env" pipe-lua-libpcap-match "${thisdir}/../data/wingolog.pcap" "icmp6 or portrange 14682-50101" 14951

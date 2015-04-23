@@ -31,5 +31,5 @@ pflang_regression_tests: $(TEST_SAVEFILE) $(PFLANG_REGRESSION_TESTS)
 
 .PHONY: $(PFLANG_REGRESSION_TESTS)
 $(PFLANG_REGRESSION_TESTS):
-	cd pflang-reg && ./`basename $@`
+	./$@
 .SERIAL: all
