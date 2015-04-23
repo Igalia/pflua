@@ -1,0 +1,3 @@
+#!/bin/bash
+thisdir=$(dirname $0)
+"${thisdir}/../../env" pipe-lua-libpcap-match "${thisdir}/../data/wingolog.pcap" "icmp6 or ip" 2442
