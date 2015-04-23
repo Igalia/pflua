@@ -1,1 +1,2 @@
-data/wingolog.pcap "icmp6 or portrange 14682-50101" 14951
+#!/bin/bash
+../../env pipe-lua-libpcap-match ../data/wingolog.pcap "icmp6 or portrange 14682-50101" 14951

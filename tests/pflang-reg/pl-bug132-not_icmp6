@@ -1,1 +1,2 @@
-data/wingolog.pcap "not icmp6" 1
+#!/bin/bash
+../../env pipe-lua-libpcap-match ../data/wingolog.pcap "not icmp6" 1

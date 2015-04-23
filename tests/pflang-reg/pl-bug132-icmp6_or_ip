@@ -1,1 +1,2 @@
-data/wingolog.pcap "icmp6 or ip" 2442
+#!/bin/bash
+../../env pipe-lua-libpcap-match ../data/wingolog.pcap "icmp6 or ip" 2442
