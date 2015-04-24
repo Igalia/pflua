@@ -45,49 +45,49 @@ local function unimplemented(expr, dlt)
 end
 
 -- Ethernet protocols
-local PROTO_IPV4 = 2048       -- 0x800
-local PROTO_ARP = 2054        -- 0x806
-local PROTO_RARP = 32821      -- 0x8035
-local PROTO_ATALK = 32923     -- 0x809b
-local PROTO_AARP = 33011      -- 0x80f3
-local PROTO_IPV6 = 34525      -- 0x86dd
-local PROTO_DECNET = 24579    -- 0x6003
-local PROTO_SCA = 24583       -- 0x6007
-local PROTO_LAT = 24580       -- 0x6004
-local PROTO_MOPDL = 24577     -- 0x6001
-local PROTO_MOPRC = 24578     -- 0x6002
-local PROTO_ISO = 65278       -- 0xfefe
-local PROTO_STP = 66          -- 0x42
-local PROTO_IPX = 33079       -- 0X8137
-local PROTO_NETBEUI = 61680   -- 0xf0f0
+local PROTO_AARP    = 33011 -- 0x80f3
+local PROTO_ARP     = 2054  -- 0x806
+local PROTO_ATALK   = 32923 -- 0x809b
+local PROTO_DECNET  = 24579 -- 0x6003
+local PROTO_IPV4    = 2048  -- 0x800
+local PROTO_IPV6    = 34525 -- 0x86dd
+local PROTO_IPX     = 33079 -- 0X8137
+local PROTO_ISO     = 65278 -- 0xfefe
+local PROTO_LAT     = 24580 -- 0x6004
+local PROTO_MOPDL   = 24577 -- 0x6001
+local PROTO_MOPRC   = 24578 -- 0x6002
+local PROTO_NETBEUI = 61680 -- 0xf0f0
+local PROTO_RARP    = 32821 -- 0x8035
+local PROTO_SCA     = 24583 -- 0x6007
+local PROTO_STP     = 66    -- 0x42
 
 local ether_min_payloads = {
    [PROTO_IPV4] = 20,
-   [PROTO_ARP] = 28,
+   [PROTO_ARP]  = 28,
    [PROTO_RARP] = 28,
    [PROTO_IPV6] = 40
 }
 
 -- IP protocols
-local PROTO_ICMP = 1          -- 0x1
-local PROTO_ICMP6 = 58        -- 0x3a
-local PROTO_TCP = 6           -- 0x6
-local PROTO_UDP = 17          -- 0x11
-local PROTO_SCTP = 132        -- 0x84
-local PROTO_IGMP = 2          -- 0x2
-local PROTO_IGRP = 9          -- 0x9
-local PROTO_PIM = 103         -- 0x67
-local PROTO_AH = 51           -- 0x33
-local PROTO_ESP = 50          -- 0x32
-local PROTO_VRRP = 112        -- 0x70
+local PROTO_AH    = 51  -- 0x33
+local PROTO_ESP   = 50  -- 0x32
+local PROTO_ICMP  = 1   -- 0x1
+local PROTO_ICMP6 = 58  -- 0x3a
+local PROTO_IGMP  = 2   -- 0x2
+local PROTO_IGRP  = 9   -- 0x9
+local PROTO_PIM   = 103 -- 0x67
+local PROTO_SCTP  = 132 -- 0x84
+local PROTO_TCP   = 6   -- 0x6
+local PROTO_UDP   = 17  -- 0x11
+local PROTO_VRRP  = 112 -- 0x70
 
 local ip_min_payloads = {
    [PROTO_ICMP] = 8,
-   [PROTO_UDP] = 8,
-   [PROTO_TCP] = 20,
+   [PROTO_UDP]  = 8,
+   [PROTO_TCP]  = 20,
    [PROTO_IGMP] = 8,
    [PROTO_IGRP] = 8,
-   [PROTO_PIM] = 4,
+   [PROTO_PIM]  = 4,
    [PROTO_SCTP] = 12,
    [PROTO_VRRP] = 8
 }
@@ -97,6 +97,11 @@ local ip_min_payloads = {
 local PROTO_CLNP = 129        -- 0x81
 local PROTO_ESIS = 130        -- 0x82
 local PROTO_ISIS = 131        -- 0x83
+
+local ETHER_TYPE       = 12
+local ETHER_PAYLOAD    = 14
+local IP_FLAGS         = 6
+local IP_PROTOCOL      = 9
 
 -- Minimum payload checks insert a byte access to the last byte of the
 -- minimum payload size.  Since the comparison should fold (because it
@@ -117,17 +122,22 @@ end
 -- Access Point of the 802.3 frame. It works as an EtherType at LLC level.
 --
 -- See: https://tools.ietf.org/html/draft-ietf-isis-ext-eth-01
+
+local ETHER_MAX_LEN = 1500
+
 local function has_ether_protocol(proto)
-   if proto > 1500 then return { '=', { '[ether]', 12, 2 }, proto } end
+   if proto > ETHER_MAX_LEN then 
+      return { '=', { '[ether]', ETHER_TYPE, 2 }, proto }
+   end
    return { 'and',
-            { '<=', {'[ether]', 12, 2}, 1500 },
-            { '=', { '[ether]', 14, 1}, proto } }
+            { '<=', {'[ether]', ETHER_TYPE, 2}, ETHER_MAX_LEN },
+            { '=', { '[ether]', ETHER_PAYLOAD, 1}, proto } }
 end
 local function has_ether_protocol_min_payload(proto)
    return has_proto_min_payload(ether_min_payloads, proto, '[ether*]')
 end
 local function has_ipv4_protocol(proto)
-   return { '=', { '[ip]', 9, 1 }, proto }
+   return { '=', { '[ip]', IP_PROTOCOL, 1 }, proto }
 end
 local function has_ipv4_protocol_min_payload(proto)
    -- Since the [ip*] accessor asserts that is_first_ipv4_fragment(),
@@ -137,16 +147,21 @@ local function has_ipv4_protocol_min_payload(proto)
    min_payload = min_payload + assert(ether_min_payloads[PROTO_IPV4])
    return { '<=', 0, { '[ip]', min_payload - 1, 1 } }
 end
+
 local function is_first_ipv4_fragment()
-   return { '=', { '&', { '[ip]', 6, 2 }, 0x1fff }, 0 }
+   return { '=', { '&', { '[ip]', IP_FLAGS, 2 }, 0x1fff }, 0 }
 end
 local function has_ipv6_protocol(proto)
+   local IPV6_NEXT_HEADER_1 = 6
+   local IPV6_NEXT_HEADER_2 = 40
+   local IPV6_FRAGMENTATION_EXTENSION_HEADER = 44
    return { 'and', { 'ip6' },
             { 'or',
-              { '=', { '[ip6]', 6, 1 }, proto },
+              { '=', { '[ip6]', IPV6_NEXT_HEADER_1, 1 }, proto },
               { 'and',
-                { '=', { '[ip6]', 6, 1 }, 44 },
-                { '=', { '[ip6]', 40, 1 }, proto } } } }
+                { '=', { '[ip6]', IPV6_NEXT_HEADER_1, 1 },
+                  IPV6_FRAGMENTATION_EXTENSION_HEADER },
+                { '=', { '[ip6]', IPV6_NEXT_HEADER_2, 1 }, proto } } } }
 end
 local function has_ipv6_protocol_min_payload(proto)
    -- Assume the minimum ipv6 header size.
@@ -160,20 +175,24 @@ end
 
 -- Port operations
 --
+
+local SRC_PORT = 0
+local DST_PORT = 2
+
 local function has_ipv4_src_port(port)
-   return { '=', { '[ip*]', 0, 2 }, port }
+   return { '=', { '[ip*]', SRC_PORT, 2 }, port }
 end
 local function has_ipv4_dst_port(port)
-   return { '=', { '[ip*]', 2, 2 }, port }
+   return { '=', { '[ip*]', DST_PORT, 2 }, port }
 end
 local function has_ipv4_port(port)
    return { 'or', has_ipv4_src_port(port), has_ipv4_dst_port(port) }
 end
 local function has_ipv6_src_port(port)
-   return { '=', { '[ip6*]', 0, 2 }, port }
+   return { '=', { '[ip6*]', SRC_PORT, 2 }, port }
 end
 local function has_ipv6_dst_port(port)
-   return { '=', { '[ip6*]', 2, 2 }, port }
+   return { '=', { '[ip6*]', DST_PORT, 2 }, port }
 end
 local function has_ipv6_port(port)
    return { 'or', has_ipv6_src_port(port), has_ipv6_dst_port(port) }
@@ -257,26 +276,26 @@ end
 --
 local function has_ipv4_src_portrange(lo, hi)
    return { 'and',
-            { '<=', lo, { '[ip*]', 0, 2 } },
-            { '<=', { '[ip*]', 0, 2 }, hi } }
+            { '<=', lo, { '[ip*]', SRC_PORT, 2 } },
+            { '<=', { '[ip*]', SRC_PORT, 2 }, hi } }
 end
 local function has_ipv4_dst_portrange(lo, hi)
    return { 'and',
-            { '<=', lo, { '[ip*]', 2, 2 } },
-            { '<=', { '[ip*]', 2, 2 }, hi } }
+            { '<=', lo, { '[ip*]', DST_PORT, 2 } },
+            { '<=', { '[ip*]', DST_PORT, 2 }, hi } }
 end
 local function has_ipv4_portrange(lo, hi)
    return { 'or', has_ipv4_src_portrange(lo, hi), has_ipv4_dst_portrange(lo, hi) }
 end
 local function has_ipv6_src_portrange(lo, hi)
    return { 'and',
-            { '<=', lo, { '[ip6*]', 0, 2 } },
-            { '<=', { '[ip6*]', 0, 2 }, hi } }
+            { '<=', lo, { '[ip6*]', SRC_PORT, 2 } },
+            { '<=', { '[ip6*]', SRC_PORT, 2 }, hi } }
 end
 local function has_ipv6_dst_portrange(lo, hi)
    return { 'and',
-            { '<=', lo, { '[ip6*]', 2, 2 } },
-            { '<=', { '[ip6*]', 2, 2 }, hi } }
+            { '<=', lo, { '[ip6*]', DST_PORT, 2 } },
+            { '<=', { '[ip6*]', DST_PORT, 2 }, hi } }
 end
 local function has_ipv6_portrange(lo, hi)
    return { 'or', has_ipv6_src_portrange(lo, hi), has_ipv6_dst_portrange(lo, hi) }
@@ -392,10 +411,14 @@ local function expand_ip6_broadcast(expr)
    error("only link-layer/IP broadcast filters supported")
 end
 local function expand_ip_multicast(expr)
-   return { '=', { '[ip]', 16, 1 }, 224 }
+   local IPV4_MULTICAST = 224 -- 0xe0
+   local IPV4_DEST_ADDRESS = 16
+   return { '=', { '[ip]', IPV4_DEST_ADDRESS, 1 }, IPV4_MULTICAST }
 end
 local function expand_ip6_multicast(expr)
-   return { '=', { '[ip6]', 24, 1 }, 255 }
+   local IPV6_MULTICAST = 255 -- 0xff
+   local IPV6_DEST_ADDRESS_OFFSET = 24 -- 14 + 24 = 38 (last two bytes of dest address)
+   return { '=', { '[ip6]', IPV6_DEST_ADDRESS_OFFSET, 1 }, IPV6_MULTICAST }
 end
 local function expand_ip4_protochain(expr)
    -- FIXME: Not implemented yet. BPF code of ip protochain is rather complex.
@@ -449,10 +472,10 @@ local iso_protos = {
 
 local function has_iso_protocol(proto)
   return { 'and',
-           { '<=', { '[ether]', 12, 2 }, 1500 },
+           { '<=', { '[ether]', ETHER_TYPE, 2 }, ETHER_MAX_LEN },
            { 'and',
-             { '=', { '[ether]', 14, 2 }, 65278 },
-             { '=', { '[ether]', 17, 1 }, proto } } }
+             { '=', { '[ether]', ETHER_PAYLOAD, 2 }, PROTO_ISO },
+             { '=', { '[ether]', ETHER_PAYLOAD + 3, 1 }, proto } } }
 end
 
 local function expand_iso_proto(expr)
@@ -570,6 +593,9 @@ end
 
 -- Ether
 
+local MAC_DST = 0
+local MAC_SRC = 6 
+
 local function ehost_to_int(addr)
    assert(addr[1] == 'ehost', "Not a valid ehost address")
    return uint16(addr[2], addr[3]), uint32(addr[4], addr[5], addr[6], addr[7])
@@ -577,14 +603,14 @@ end
 local function expand_ether_src_host(expr)
    local hi, lo = ehost_to_int(expr[2])
    return { 'and',
-            { '=', { '[ether]', 6, 2 }, hi },
-            { '=', { '[ether]', 8, 4 }, lo } }
+            { '=', { '[ether]', MAC_SRC, 2 }, hi },
+            { '=', { '[ether]', MAC_SRC + 2, 4 }, lo } }
 end
 local function expand_ether_dst_host(expr)
    local hi, lo = ehost_to_int(expr[2])
    return { 'and',
-            { '=', { '[ether]', 0, 2 }, hi },
-            { '=', { '[ether]', 2, 4 }, lo } }
+            { '=', { '[ether]', MAC_DST, 2 }, hi },
+            { '=', { '[ether]', MAC_DST + 2, 4 }, lo } }
 end
 local function expand_ether_host(expr)
    return { 'or', expand_ether_src_host(expr), expand_ether_dst_host(expr) }
@@ -593,8 +619,8 @@ local function expand_ether_broadcast(expr)
    local broadcast = { 'ehost', 255, 255, 255, 255, 255, 255 }
    local hi, lo = ehost_to_int(broadcast)
    return { 'and',
-            { '=', { '[ether]', 0, 2 }, hi },
-            { '=', { '[ether]', 2, 4 }, lo } }
+            { '=', { '[ether]', MAC_DST, 2 }, hi },
+            { '=', { '[ether]', MAC_DST + 2, 4 }, lo } }
 end
 local function expand_ether_multicast(expr)
    return { '!=', { '&', { '[ether]', 0, 1 }, 1 }, 0 }
@@ -614,23 +640,27 @@ end
 local function expand_rarp(expr)
    return has_ether_protocol(PROTO_RARP)
 end
+
 local function expand_atalk(expr)
+  local ATALK_ID_1 = 491675     -- 0x7809B
+  local ATALK_ID_2 = 2863268616 -- 0xaaaa0308
   return { 'or',
            has_ether_protocol(PROTO_ATALK),
-           { 'if', { '>', { '[ether]', 12, 2}, 1500 },
+           { 'if', { '>', { '[ether]', ETHER_TYPE, 2}, ETHER_MAX_LEN },
              { 'fail' },
              { 'and',
-               { '=', { '[ether]', 18, 2 }, 491675 },
-               { '=', { '[ether]', 14, 4 }, 2863268616 } } } }
+               { '=', { '[ether]', ETHER_PAYLOAD + 4, 2 }, ATALK_ID_1 },
+               { '=', { '[ether]', ETHER_PAYLOAD, 4 }, ATALK_ID_2 } } } }
 end
 local function expand_aarp(expr)
+  local AARP_ID = 2863268608 -- 0xaaaa0300
   return { 'or',
            has_ether_protocol(PROTO_AARP),
-           { 'if', { '>', { '[ether]', 12, 2}, 1500 },
+           { 'if', { '>', { '[ether]', ETHER_TYPE, 2}, ETHER_MAX_LEN },
              { 'fail' },
              { 'and',
-               { '=', { '[ether]', 18, 2 }, 33011 },
-               { '=', { '[ether]', 14, 4 }, 2863268608 } } } }
+               { '=', { '[ether]', ETHER_PAYLOAD + 4, 2 }, PROTO_AARP },
+               { '=', { '[ether]', ETHER_PAYLOAD, 4 }, AARP_ID } } } }
 end
 local function expand_decnet(expr)
    return has_ether_protocol(PROTO_DECNET)
@@ -649,31 +679,35 @@ local function expand_moprc(expr)
 end
 local function expand_iso(expr)
    return { 'and',
-            { '<=', { '[ether]', 12, 2 }, 1500 },
-            { '=', { '[ether]', 14, 2 }, PROTO_ISO } }
+            { '<=', { '[ether]', ETHER_TYPE, 2 }, ETHER_MAX_LEN },
+            { '=', { '[ether]', ETHER_PAYLOAD, 2 }, PROTO_ISO } }
 end
 local function expand_stp(expr)
    return { 'and',
-            { '<=', { '[ether]', 12, 2 }, 1500 },
-            { '=', { '[ether]', 14, 1 }, PROTO_STP } }
+            { '<=', { '[ether]', ETHER_TYPE, 2 }, ETHER_MAX_LEN },
+            { '=', { '[ether]', ETHER_PAYLOAD, 1 }, PROTO_STP } }
 end
+
 local function expand_ipx(expr)
+  local IPX_SAP =      224        -- 0xe0
+  local IPX_CHECKSUM = 65535      -- 0xffff
+  local AARP_ID =      2863268608 -- 0xaaaa0300
   return { 'or',
            has_ether_protocol(PROTO_IPX),
-           { 'if', { '>', { '[ether]', 12, 2}, 1500 },
+           { 'if', { '>', { '[ether]', ETHER_TYPE, 2}, ETHER_MAX_LEN },
              { 'fail' },
              { 'or',
                { 'and',
-                 { '=', { '[ether]', 18, 2 }, 33079 },
-                 { '=', { '[ether]', 14, 4 }, 2863268608 } },
+                 { '=', { '[ether]', ETHER_PAYLOAD + 4, 2 }, PROTO_IPX },
+                 { '=', { '[ether]', ETHER_PAYLOAD, 4 }, AARP_ID } },
                { 'or',
-                 { '=', { '[ether]', 14, 1 }, 224 },
-                 { '=', { '[ether]', 14, 2 }, 65535 } } } } }
+                 { '=', { '[ether]', ETHER_PAYLOAD, 1 }, IPX_SAP },
+                 { '=', { '[ether]', ETHER_PAYLOAD, 2 }, IPX_CHECKSUM } } } } }
 end
 local function expand_netbeui(expr)
    return { 'and',
-            { '<=', { '[ether]', 12, 2 }, 1500 },
-            { '=', { '[ether]', 14, 2 }, PROTO_NETBEUI } }
+            { '<=', { '[ether]', ETHER_TYPE, 2 }, ETHER_MAX_LEN },
+            { '=', { '[ether]', ETHER_PAYLOAD, 2 }, PROTO_NETBEUI } }
 end
 
 local ether_protos = {
@@ -741,27 +775,27 @@ end
 local function expand_decnet_src(expr)
    local addr = expr[2]
    local addr_int = uint16(addr[2], addr[3])
-   return { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 2 },
-            { '=', { '[ether]', 19, 2}, addr_int },
-            { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33026 },
-              { '=', { '[ether]', 20, 2}, addr_int },
-              { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 6 },
-                { '=', { '[ether]', 31, 2}, addr_int },
-                { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33030 },
-                  { '=', { '[ether]', 32, 2}, addr_int },
+   return { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 1}, 7 }, 2 },
+            { '=', { '[ether]', ETHER_PAYLOAD + 5, 2}, addr_int },
+            { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 2}, 65287 }, 33026 },
+              { '=', { '[ether]', ETHER_PAYLOAD + 6, 2}, addr_int },
+              { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 1}, 7 }, 6 },
+                { '=', { '[ether]', ETHER_PAYLOAD + 17, 2}, addr_int },
+                { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 2}, 65287 }, 33030 },
+                  { '=', { '[ether]', ETHER_PAYLOAD + 18, 2}, addr_int },
                   { 'fail' } } } } }
 end
 local function expand_decnet_dst(expr)
    local addr = expr[2]
    local addr_int = uint16(addr[2], addr[3])
-   return { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 2 },
-            { '=', { '[ether]', 17, 2}, addr_int },
-            { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33026 },
-              { '=', { '[ether]', 18, 2}, addr_int },
-              { 'if', { '=', { '&', { '[ether]', 16, 1}, 7 }, 6 },
-                { '=', { '[ether]', 23, 2}, addr_int },
-                { 'if', { '=', { '&', { '[ether]', 16, 2}, 65287 }, 33030 },
-                  { '=', { '[ether]', 24, 2}, addr_int },
+   return { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 1}, 7 }, 2 },
+            { '=', { '[ether]', ETHER_PAYLOAD + 3, 2}, addr_int },
+            { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 2}, 65287 }, 33026 },
+              { '=', { '[ether]', ETHER_PAYLOAD + 4, 2}, addr_int },
+              { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 1}, 7 }, 6 },
+                { '=', { '[ether]', ETHER_PAYLOAD + 9, 2}, addr_int },
+                { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 2}, 65287 }, 33030 },
+                  { '=', { '[ether]', ETHER_PAYLOAD + 10, 2}, addr_int },
                   { 'fail' } } } } }
 end
 local function expand_decnet_host(expr)
@@ -786,8 +820,8 @@ local function expand_isis_protocol(...)
       if i == #values then return { '=', reg, values[i] } end
       return { lop, { '=', reg, values[i] }, concat(lop, reg, values, i+1) }
    end
-   return { 'if', has_iso_protocol(131),
-            concat('or', { '[ether]', 21, 1 }, {...} ),
+   return { 'if', has_iso_protocol(PROTO_ISIS),
+            concat('or', { '[ether]', ETHER_PAYLOAD + 7, 1 }, {...} ),
             { 'fail' } }
 end
 local function expand_l1(expr)
@@ -1040,15 +1074,15 @@ local function expand_offset(level, dlt)
    if level == 'ether' then
       return 0, {}
    elseif level == 'ether*' then
-      return 14, {}
+      return ETHER_PAYLOAD, {}
    elseif level == 'arp' then
-      return 14, assert_ether_protocol(PROTO_ARP)
+      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_ARP)
    elseif level == 'rarp' then
-      return 14, assert_ether_protocol(PROTO_RARP)
+      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_RARP)
    elseif level == 'ip' then
-      return 14, assert_ether_protocol(PROTO_IPV4)
+      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_IPV4)
    elseif level == 'ip6' then
-      return 14, assert_ether_protocol(PROTO_IPV6)
+      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_IPV6)
    elseif level == 'ip*' then
       return ipv4_payload_offset()
    elseif level == 'ip6*' then
