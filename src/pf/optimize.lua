@@ -727,7 +727,7 @@ function optimize_inner(expr)
    expr = simplify(expr)
    expr = simplify(cfold(expr, {}))
    expr = simplify(infer_ranges(expr))
-   expr = simplify(lhoist(expr))
+   --expr = simplify(lhoist(expr))
    clear_cache()
    return expr
 end
