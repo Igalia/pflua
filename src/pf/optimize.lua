@@ -669,7 +669,7 @@ local function lhoist(expr, db)
    local function annotate(expr, kt, kf)
       local function aexpr(min_t, min_f, expr) return { min_t, min_f, expr } end
       local function branch_mins(abranch, min)
-         local branch_min_t, branch_min_f = abranch[1], abranch[1]
+         local branch_min_t, branch_min_f = abranch[1], abranch[2]
          return math.max(branch_min_t, min), math.max(branch_min_f, min)
       end
       local op = expr[1]
@@ -689,7 +689,7 @@ local function lhoist(expr, db)
             if f[1] == 'true' then f_min_f = t_min_f end
             if t[1] == 'false' then t_min_t = f_min_t end
             if f[1] == 'false' then f_min_t = t_min_t end
-            return math.min(t_min_t, f_min_t), math.min(f_min_t, f_min_t)
+            return math.min(t_min_t, f_min_t), math.min(t_min_f, f_min_f)
          end
          local min_t, min_f = if_mins()
          return aexpr(min_t, min_f, { op, test_a, t_a, f_a })
