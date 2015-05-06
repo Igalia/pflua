@@ -14,6 +14,7 @@ function prepend {
 
 thisdir=$(cd $(dirname $0) && pwd)
 
+prepend LUA_PATH ';' "${thisdir}/tests/?.lua"
 prepend LUA_PATH ';' "${thisdir}/src/?.lua"
 prepend PATH ':' "${thisdir}/tools"
 
