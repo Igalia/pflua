@@ -98,37 +98,38 @@ return function(P,length)
       if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
       local var9 = lshift(band(P[14],15),2)
       if (var9 + 18) > length then return false end
-      local var16 = rshift(bswap(cast("uint16_t*", P+(var9 + 16))[0]), 16)
-      if var16 < 80 then return false end
-      return var16 <= 90
+      if rshift(bswap(cast("uint16_t*", P+(var9 + 16))[0]), 16) < 80 then return false end
+      local var19 = lshift(band(P[14],15),2)
+      if (var19 + 18) > length then return false end
+      return rshift(bswap(cast("uint16_t*", P+(var19 + 16))[0]), 16) <= 90
    else
       if length < 58 then return false end
       if var1 ~= 56710 then return false end
-      local var24 = P[20]
-      if var24 == 6 then goto L24 end
+      local var28 = P[20]
+      if var28 == 6 then goto L26 end
       do
-         if var24 ~= 44 then goto L27 end
+         if var28 ~= 44 then goto L29 end
          do
-            if P[54] == 6 then goto L24 end
-            goto L27
+            if P[54] == 6 then goto L26 end
+            goto L29
          end
-::L27::
-         if var24 == 17 then goto L24 end
-         if var24 ~= 44 then goto L33 end
+::L29::
+         if var28 == 17 then goto L26 end
+         if var28 ~= 44 then goto L35 end
          do
-            if P[54] == 17 then goto L24 end
-            goto L33
+            if P[54] == 17 then goto L26 end
+            goto L35
          end
-::L33::
-         if var24 == 132 then goto L24 end
-         if var24 ~= 44 then return false end
-         if P[54] == 132 then goto L24 end
+::L35::
+         if var28 == 132 then goto L26 end
+         if var28 ~= 44 then return false end
+         if P[54] == 132 then goto L26 end
          return false
       end
-::L24::
-      local var34 = rshift(bswap(cast("uint16_t*", P+56)[0]), 16)
-      if var34 < 80 then return false end
-      return var34 <= 90
+::L26::
+      local var38 = rshift(bswap(cast("uint16_t*", P+56)[0]), 16)
+      if var38 < 80 then return false end
+      return var38 <= 90
    end
 end
 

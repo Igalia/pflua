@@ -113,38 +113,45 @@ return function(P,length)
          return false
       end
 ::L8::
-      if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
-      local var9 = lshift(band(P[14],15),2)
-      local var10 = (var9 + 16)
-      if var10 > length then return false end
-      if rshift(bswap(cast("uint16_t*", P+(var9 + 14))[0]), 16) <= 6000 then return true end
-      if (var9 + 18) > length then return false end
-      return rshift(bswap(cast("uint16_t*", P+var10)[0]), 16) <= 6000
+      local var6 = band(cast("uint16_t*", P+20)[0],65311)
+      if var6 ~= 0 then goto L15 end
+      do
+         local var9 = lshift(band(P[14],15),2)
+         if (var9 + 16) > length then return false end
+         if rshift(bswap(cast("uint16_t*", P+(var9 + 14))[0]), 16) <= 6000 then return true end
+         goto L15
+      end
+::L15::
+      if var6 ~= 0 then return false end
+      if (lshift(band(P[14],15),2) + 18) > length then return false end
+      local var25 = lshift(band(P[14],15),2)
+      if (var25 + 18) > length then return false end
+      return rshift(bswap(cast("uint16_t*", P+(var25 + 16))[0]), 16) <= 6000
    else
       if length < 56 then return false end
       if var1 ~= 56710 then return false end
-      local var28 = P[20]
-      if var28 == 6 then goto L26 end
+      local var34 = P[20]
+      if var34 == 6 then goto L32 end
       do
-         if var28 ~= 44 then goto L29 end
+         if var34 ~= 44 then goto L35 end
          do
-            if P[54] == 6 then goto L26 end
-            goto L29
-         end
-::L29::
-         if var28 == 17 then goto L26 end
-         if var28 ~= 44 then goto L35 end
-         do
-            if P[54] == 17 then goto L26 end
+            if P[54] == 6 then goto L32 end
             goto L35
          end
 ::L35::
-         if var28 == 132 then goto L26 end
-         if var28 ~= 44 then return false end
-         if P[54] == 132 then goto L26 end
+         if var34 == 17 then goto L32 end
+         if var34 ~= 44 then goto L41 end
+         do
+            if P[54] == 17 then goto L32 end
+            goto L41
+         end
+::L41::
+         if var34 == 132 then goto L32 end
+         if var34 ~= 44 then return false end
+         if P[54] == 132 then goto L32 end
          return false
       end
-::L26::
+::L32::
       if rshift(bswap(cast("uint16_t*", P+54)[0]), 16) <= 6000 then return true end
       if length < 58 then return false end
       return rshift(bswap(cast("uint16_t*", P+56)[0]), 16) <= 6000
