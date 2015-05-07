@@ -1,0 +1,3 @@
+#!/bin/bash
+thisdir=$(dirname $0)
+"${thisdir}/../../env" pflua-pipelines-match "${thisdir}/../data/arp.pcap" "405434949 * 1881196573 == 1588910545" 1
