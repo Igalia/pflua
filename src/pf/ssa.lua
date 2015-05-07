@@ -75,6 +75,8 @@ local function lower(expr)
          finish_goto(block, kt)
       elseif op == 'false' then
          finish_goto(block, kf)
+      elseif op == 'match' then
+         finish_return(block, { 'true' })
       elseif op == 'fail' then
          finish_return(block, { 'false' })
       else

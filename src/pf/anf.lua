@@ -11,6 +11,8 @@ local binops = set(
 )
 local unops = set('ntohs', 'ntohl', 'uint32', 'int32')
 
+local simple = set('true', 'false', 'match', 'fail')
+
 local count = 0
 
 local function fresh()
@@ -75,7 +77,7 @@ local function lower_bool(expr, k)
          return k({ 'if', test, lower(t), lower(f) })
       end
       return lower_bool(test, have_test)
-   elseif op == 'true' or op == 'false' or op == 'fail' then
+   elseif simple[op] then
       return k(expr)
    else
       return lower_comparison(expr, k)
@@ -129,7 +131,7 @@ local function cse(expr)
          end
       elseif op == 'if' then
          return { 'if', visit(expr[2], env), visit(expr[3], env), visit(expr[4], env) }
-      elseif op == 'true' or op == 'false' or op == 'fail' then
+      elseif simple[op] then
          return expr
       else
          assert(relops[op])
@@ -164,7 +166,7 @@ local function inline_single_use_variables(expr)
          elseif binops[op] then
             count(expr[2])
             count(expr[3])
-         elseif op == 'true' or op == 'false' or op == 'fail' then
+         elseif simple[op] then
 
          else 
             assert(op == '[]')
@@ -203,7 +205,7 @@ local function inline_single_use_variables(expr)
          end
       elseif op == 'if' then
          return { 'if', subst(expr[2]), subst(expr[3]), subst(expr[4]) }
-      elseif op == 'true' or op == 'false' or op == 'fail' then
+      elseif simple[op] then
          return expr
       else
          assert(relops[op])
