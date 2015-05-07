@@ -647,7 +647,7 @@ local function expand_atalk(expr)
   return { 'or',
            has_ether_protocol(PROTO_ATALK),
            { 'if', { '>', { '[ether]', ETHER_TYPE, 2}, ETHER_MAX_LEN },
-             { 'fail' },
+             { 'false' },
              { 'and',
                { '=', { '[ether]', ETHER_PAYLOAD + 4, 2 }, ATALK_ID_1 },
                { '=', { '[ether]', ETHER_PAYLOAD, 4 }, ATALK_ID_2 } } } }
@@ -657,7 +657,7 @@ local function expand_aarp(expr)
   return { 'or',
            has_ether_protocol(PROTO_AARP),
            { 'if', { '>', { '[ether]', ETHER_TYPE, 2}, ETHER_MAX_LEN },
-             { 'fail' },
+             { 'false' },
              { 'and',
                { '=', { '[ether]', ETHER_PAYLOAD + 4, 2 }, PROTO_AARP },
                { '=', { '[ether]', ETHER_PAYLOAD, 4 }, AARP_ID } } } }
@@ -695,7 +695,7 @@ local function expand_ipx(expr)
   return { 'or',
            has_ether_protocol(PROTO_IPX),
            { 'if', { '>', { '[ether]', ETHER_TYPE, 2}, ETHER_MAX_LEN },
-             { 'fail' },
+             { 'false' },
              { 'or',
                { 'and',
                  { '=', { '[ether]', ETHER_PAYLOAD + 4, 2 }, PROTO_IPX },
@@ -783,7 +783,7 @@ local function expand_decnet_src(expr)
                 { '=', { '[ether]', ETHER_PAYLOAD + 17, 2}, addr_int },
                 { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 2}, 65287 }, 33030 },
                   { '=', { '[ether]', ETHER_PAYLOAD + 18, 2}, addr_int },
-                  { 'fail' } } } } }
+                  { 'false' } } } } }
 end
 local function expand_decnet_dst(expr)
    local addr = expr[2]
@@ -796,7 +796,7 @@ local function expand_decnet_dst(expr)
                 { '=', { '[ether]', ETHER_PAYLOAD + 9, 2}, addr_int },
                 { 'if', { '=', { '&', { '[ether]', ETHER_PAYLOAD + 2, 2}, 65287 }, 33030 },
                   { '=', { '[ether]', ETHER_PAYLOAD + 10, 2}, addr_int },
-                  { 'fail' } } } } }
+                  { 'false' } } } } }
 end
 local function expand_decnet_host(expr)
    return { 'or', expand_decnet_src(expr), expand_decnet_dst(expr) }
@@ -822,7 +822,7 @@ local function expand_isis_protocol(...)
    end
    return { 'if', has_iso_protocol(PROTO_ISIS),
             concat('or', { '[ether]', ETHER_PAYLOAD + 7, 1 }, {...} ),
-            { 'fail' } }
+            { 'false' } }
 end
 local function expand_l1(expr)
    return expand_isis_protocol(L1_IIH, L1_LSP, L1_CSNP, L1_PSNP, PTP_IIH)
@@ -1032,7 +1032,7 @@ local function expand_offset(level, dlt)
    assert(dlt == "EN10MB", "Encapsulation other than EN10MB unimplemented")
    local function guard_expr(expr)
       local test, guards = expand_relop(expr, dlt)
-      return concat(guards, { { test, { 'fail' } } })
+      return concat(guards, { { test, { 'false' } } })
    end
    local function guard_ether_protocol(proto)
       return concat(guard_expr(has_ether_protocol(proto)),
