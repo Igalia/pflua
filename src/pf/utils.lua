@@ -181,6 +181,15 @@ function parse_opts(opts, defaults)
    return ret
 end
 
+function table_values_all_equal(t)
+   local val
+   for _, v in pairs(t) do
+      if val == nil then val = v end
+      if v ~= val then return false end
+   end
+   return true, val
+end
+
 function selftest ()
    print("selftest: pf.utils")
    local tab = { 1, 2, 3 }
