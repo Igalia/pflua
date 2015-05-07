@@ -54,18 +54,28 @@ end
 ```
 local cast = require("ffi").cast
 return function(P,length)
-   if length < 100 then return false end
+   if length < 34 then return false end
    local var1 = cast("uint16_t*", P+12)[0]
    if var1 == 8 then
-      return cast("uint32_t*", P+30)[0] == 16860352
+      if cast("uint32_t*", P+30)[0] == 16860352 then goto L6 end
+      goto L7
+   else
+      if length < 42 then return false end
+      if var1 == 1544 then goto L12 end
+      do
+         if var1 == 13696 then goto L12 end
+         return false
+      end
+::L12::
+      if cast("uint32_t*", P+38)[0] == 16860352 then goto L6 end
+      goto L7
    end
-   if var1 == 1544 then goto L8 end
+::L6::
    do
-      if var1 == 13696 then goto L8 end
-      return false
+      return length >= 100
    end
-::L8::
-   return cast("uint32_t*", P+38)[0] == 16860352
+::L7::
+   return false
 end
 
 ```

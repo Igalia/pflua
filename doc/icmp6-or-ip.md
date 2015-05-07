@@ -49,14 +49,15 @@ end
 ```
 local cast = require("ffi").cast
 return function(P,length)
-   if length < 54 then return false end
+   if length < 14 then return false end
    local var1 = cast("uint16_t*", P+12)[0]
    if var1 ~= 56710 then goto L7 end
    do
+      if length < 54 then return false end
       local var2 = P[20]
       if var2 == 58 then return true end
-      if length < 55 then return false end
       if var2 ~= 44 then goto L7 end
+      if length < 55 then return false end
       if P[54] == 58 then return true end
       goto L7
    end
