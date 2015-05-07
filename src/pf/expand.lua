@@ -1030,42 +1030,42 @@ local leaf_primitives = set(
 
 local function expand_offset(level, dlt)
    assert(dlt == "EN10MB", "Encapsulation other than EN10MB unimplemented")
-   local function assert_expr(expr)
-      local test, asserts = expand_relop(expr, dlt)
-      return concat(asserts, { test })
+   local function guard_expr(expr)
+      local test, guards = expand_relop(expr, dlt)
+      return concat(guards, { { test, { 'fail' } } })
    end
-   local function assert_ether_protocol(proto)
-      return concat(assert_expr(has_ether_protocol(proto)),
-                    assert_expr(has_ether_protocol_min_payload(proto)))
+   local function guard_ether_protocol(proto)
+      return concat(guard_expr(has_ether_protocol(proto)),
+                    guard_expr(has_ether_protocol_min_payload(proto)))
    end
-   function assert_ipv4_protocol(proto)
-      return concat(assert_expr(has_ipv4_protocol(proto)),
-                    assert_expr(has_ipv4_protocol_min_payload(proto)))
+   function guard_ipv4_protocol(proto)
+      return concat(guard_expr(has_ipv4_protocol(proto)),
+                    guard_expr(has_ipv4_protocol_min_payload(proto)))
    end
-   function assert_ipv6_protocol(proto)
-      return concat(assert_expr(has_ipv6_protocol(proto)),
-                    assert_expr(has_ipv6_protocol_min_payload(proto)))
+   function guard_ipv6_protocol(proto)
+      return concat(guard_expr(has_ipv6_protocol(proto)),
+                    guard_expr(has_ipv6_protocol_min_payload(proto)))
    end
-   function assert_first_ipv4_fragment()
-      return assert_expr(is_first_ipv4_fragment())
+   function guard_first_ipv4_fragment()
+      return guard_expr(is_first_ipv4_fragment())
    end
    function ipv4_payload_offset(proto)
-      local ip_offset, asserts = expand_offset('ip', dlt)
+      local ip_offset, guards = expand_offset('ip', dlt)
       if proto then
-         asserts = concat(asserts, assert_ipv4_protocol(proto))
+         guards = concat(guards, guard_ipv4_protocol(proto))
       end
-      asserts = concat(asserts, assert_first_ipv4_fragment())
+      guards = concat(guards, guard_first_ipv4_fragment())
       local res = { '+',
                     { '<<', { '&', { '[]', ip_offset, 1 }, 0xf }, 2 },
                     ip_offset }
-      return res, asserts
+      return res, guards
    end
    function ipv6_payload_offset(proto)
-      local ip_offset, asserts = expand_offset('ip6', dlt)
+      local ip_offset, guards = expand_offset('ip6', dlt)
       if proto then
-         asserts = concat(asserts, assert_ipv6_protocol(proto))
+         guards = concat(guards, guard_ipv6_protocol(proto))
       end
-      return { '+', ip_offset, 40 }, asserts
+      return { '+', ip_offset, 40 }, guards
    end
 
    -- Note that unlike their corresponding predicates which detect
@@ -1076,13 +1076,13 @@ local function expand_offset(level, dlt)
    elseif level == 'ether*' then
       return ETHER_PAYLOAD, {}
    elseif level == 'arp' then
-      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_ARP)
+      return ETHER_PAYLOAD, guard_ether_protocol(PROTO_ARP)
    elseif level == 'rarp' then
-      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_RARP)
+      return ETHER_PAYLOAD, guard_ether_protocol(PROTO_RARP)
    elseif level == 'ip' then
-      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_IPV4)
+      return ETHER_PAYLOAD, guard_ether_protocol(PROTO_IPV4)
    elseif level == 'ip6' then
-      return ETHER_PAYLOAD, assert_ether_protocol(PROTO_IPV6)
+      return ETHER_PAYLOAD, guard_ether_protocol(PROTO_IPV6)
    elseif level == 'ip*' then
       return ipv4_payload_offset()
    elseif level == 'ip6*' then
@@ -1107,6 +1107,13 @@ local function expand_offset(level, dlt)
    error('invalid level '..level)
 end
 
+-- Returns two values: the expanded arithmetic expression and an ordered
+-- list of guards.  A guard is a two-element array whose first element
+-- is a test expression.  If all test expressions of the guards are
+-- true, then it is valid to evaluate the arithmetic expression.  The
+-- second element of the guard array is the expression to which the
+-- relop will evaluate if the guard expression fails: either { 'false' }
+-- or { 'fail' }.
 function expand_arith(expr, dlt)
    assert(expr)
    if type(expr) == 'number' or expr == 'len' then return expr, {} end
@@ -1117,37 +1124,38 @@ function expand_arith(expr, dlt)
       -- reduce this back to Lua's normal float multiplication if it
       -- can.
       if op == '*' then op = '*64' end
-      local lhs, lhs_assertions = expand_arith(expr[2], dlt)
-      local rhs, rhs_assertions = expand_arith(expr[3], dlt)
+      local lhs, lhs_guards = expand_arith(expr[2], dlt)
+      local rhs, rhs_guards = expand_arith(expr[3], dlt)
       -- Mod 2^32 to preserve uint32 range.
       local ret = { 'uint32', { op, lhs, rhs } }
-      local assertions = concat(lhs_assertions, rhs_assertions)
+      local guards = concat(lhs_guards, rhs_guards)
       -- RHS of division can't be 0.
       if op == '/' then
-         local div_assert = { '!=', rhs, 0 }
-         assertions = concat(assertions, { div_assert })
+         local div_guard = { { '!=', rhs, 0 }, { 'fail' } }
+         guards = concat(guards, { div_guard })
       end
-      return ret, assertions
+      return ret, guards
    end
 
    assert(op ~= '[]', "expr has already been expanded?")
    local addressable = assert(op:match("^%[(.+)%]$"), "bad addressable")
-   local offset, offset_asserts = expand_offset(addressable, dlt)
-   local lhs, lhs_asserts = expand_arith(expr[2], dlt)
+   local offset, offset_guards = expand_offset(addressable, dlt)
+   local lhs, lhs_guards = expand_arith(expr[2], dlt)
    local size = expr[3]
-   local len_assert = { '<=', { '+', { '+', offset, lhs }, size }, 'len' }
-   local asserts = concat(concat(offset_asserts, lhs_asserts), { len_assert })
+   local len_test = { '<=', { '+', { '+', offset, lhs }, size }, 'len' }
+   local len_guard = { len_test, { 'fail' } }
+   local guards = concat(concat(offset_guards, lhs_guards), { len_guard })
    local ret =  { '[]', { '+', offset, lhs }, size }
-   if size == 1 then return ret, asserts end
-   if size == 2 then return { 'ntohs', ret }, asserts end
-   if size == 4 then return { 'uint32', { 'ntohl', ret } }, asserts end
+   if size == 1 then return ret, guards end
+   if size == 2 then return { 'ntohs', ret }, guards end
+   if size == 4 then return { 'uint32', { 'ntohl', ret } }, guards end
    error('unreachable')
 end
 
 function expand_relop(expr, dlt)
-   local lhs, lhs_assertions = expand_arith(expr[2], dlt)
-   local rhs, rhs_assertions = expand_arith(expr[3], dlt)
-   return { expr[1], lhs, rhs }, concat(lhs_assertions, rhs_assertions)
+   local lhs, lhs_guards = expand_arith(expr[2], dlt)
+   local rhs, rhs_guards = expand_arith(expr[3], dlt)
+   return { expr[1], lhs, rhs }, concat(lhs_guards, rhs_guards)
 end
 
 function expand_bool(expr, dlt)
@@ -1164,9 +1172,13 @@ function expand_bool(expr, dlt)
                expand_bool(expr[3], dlt) }
    elseif relops[expr[1]] then
       -- An arithmetic relop.
-      local res, assertions = expand_relop(expr, dlt)
-      while #assertions ~= 0 do
-         res = { 'if', table.remove(assertions), res, { 'fail' } }
+      local res, guards = expand_relop(expr, dlt)
+      -- We remove guards in LIFO order, resulting in an expression
+      -- whose first guard expression is the first one that was added.
+      while #guards ~= 0 do
+         local guard = table.remove(guards)
+         assert(guard[2])
+         res = { 'if', guard[1], res, guard[2] }
       end
       return res
    elseif expr[1] == 'if' then
