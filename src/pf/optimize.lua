@@ -699,26 +699,34 @@ local function lhoist(expr, db)
    -- Strip the annotated expression AEXPR.  Whenever the packet needs
    -- be longer than the MIN argument, insert a length check and revisit
    -- with the new MIN.  Elide other length checks.
-   local function reduce(aexpr, min)
+   local function reduce(aexpr, min, is_tail)
       local min_t, min_f, expr = aexpr[1], aexpr[2], aexpr[3]
-      if min < min_t and min < min_f then
-         min = math.min(min_t, min_f)
-         return { 'if', { '>=', 'len', min }, reduce(aexpr, min), { 'fail' } }
+      -- min_expr will be the minimum packet length for which this
+      -- expression may match.
+      local min_expr = min_t
+      -- In tail position, only min_t counts.  Otherwise, restrict also
+      -- by min_f.  min_f can be nonzero only if a "fail" side effect
+      -- causes a subexpression to bail out early.
+      if not is_tail then min_expr = math.min(min_expr, min_f) end
+      if min < min_expr then
+         min = min_expr
+         local expr = reduce(aexpr, min, is_tail)
+         return { 'if', { '>=', 'len', min }, expr, { 'fail' } }
       end
       local op = expr[1]
       if op == 'if' then
-         local t, kt, kf =
-            reduce(expr[2], min), reduce(expr[3], min), reduce(expr[4], min)
-         if t[1] == '>=' and t[2] == 'len' and type(t[3]) == 'number' then
-            if t[3] <= min then return kt else return kf end
-         end
+         local t = reduce(expr[2], min, false)
+         local kt = reduce(expr[3], min, is_tail)
+         local kf = reduce(expr[4], min, is_tail)
          return { op, t, kt, kf }
+      elseif op == '>=' and expr[2] == 'len' and type(expr[3]) == 'number' then
+         if expr[3] <= min then return { 'true' } else return { 'false' } end
       else
          return expr
       end
    end
       
-   return reduce(annotate(expr, 'ACCEPT', 'REJECT'), 0)
+   return reduce(annotate(expr, 'ACCEPT', 'REJECT'), 0, true)
 end
 
 function optimize_inner(expr)
@@ -752,6 +760,8 @@ function selftest ()
                    { '=', { '[]', 0, 1 }, 2 },
                    { 'fail' }},
       opt("ether[0] = 2"))
+   assert_equals({ '>=', 'len', 2},
+      opt("greater 1 and greater 2"))
    -- Could check this, but it's very large
    opt("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)")
    opt("tcp port 5555")
