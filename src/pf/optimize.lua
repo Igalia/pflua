@@ -96,7 +96,7 @@ cfkey = memoize(function (expr)
    end
 end)
 
-local simple = set('true', 'false', 'fail')
+local simple = set('true', 'false', 'match', 'fail')
 
 local commute = {
    ['<']='>', ['<=']='>=', ['=']='=', ['!=']='!=', ['>=']='<=', ['>']='<'
@@ -160,7 +160,7 @@ end
 
 local simplify_if
 
-local function simplify(expr)
+local function simplify(expr, is_tail)
    if type(expr) ~= 'table' then return expr end
    local op = expr[1]
    local function decoerce(expr)
@@ -209,12 +209,21 @@ local function simplify(expr)
       end
       return { op, lhs, rhs }
    elseif op == 'if' then
-      local test, t, f = simplify(expr[2]), simplify(expr[3]), simplify(expr[4])
+      local test = simplify(expr[2])
+      local t, f = simplify(expr[3], is_tail), simplify(expr[4], is_tail)
       return simplify_if(test, t, f)
    else
-      local res = { op }
-      for i=2,#expr do table.insert(res, simplify(expr[i])) end
-      return res
+      if op == 'match' or op == 'fail' then return expr end
+      if op == 'true' then
+         if is_tail then return { 'match' } end
+         return expr
+      end
+      if op == 'false' then
+         if is_tail then return { 'fail' } end
+         return expr
+      end
+      assert(op == '[]' and #expr == 3)
+      return { op, simplify(expr[2]), expr[3] }
    end
 end
 
@@ -224,6 +233,8 @@ function simplify_if(test, t, f)
    elseif op == 'false' then return f
    elseif op == 'fail' then return test
    elseif t[1] == 'true' and f[1] == 'false' then return test
+   -- 'match' will only be residualized in tail position.
+   elseif t[1] == 'match' and f[1] == 'fail' then return test
    -- FIXME: Memoize cfkey to avoid O(n^2) badness.
    elseif op == 'if' then
       if test[3][1] == 'fail' then
@@ -477,13 +488,6 @@ local function infer_ranges(expr)
       end
    end
 
-   local function eta(expr, kt, kf)
-      if expr[1] == 'true' then return kt end
-      if expr[1] == 'false' then return kf end
-      if expr[1] == 'fail' then return 'REJECT' end
-      return nil
-   end
-
    -- Returns lhs true range, lhs false range, rhs true range, rhs false range
    local function branch_ranges(op, lhs, rhs)
       local function lt(a, b)
@@ -539,7 +543,7 @@ local function infer_ranges(expr)
       error('unexpected op '..op)
    end
 
-   local function visit(expr, db_t, db_f, kt, kf)
+   local function visit(expr, db_t, db_f)
       if type(expr) ~= 'table' then return expr end
       local op = expr[1]
 
@@ -573,28 +577,27 @@ local function infer_ranges(expr)
          restrict(db_t, rhs, rhs_range_t)
          restrict(db_f, rhs, rhs_range_f)
          return { op, lhs, rhs }
-      elseif op == 'false' or op == 'true' or op == 'fail' then
+      elseif simple[op] then
          return expr
       elseif op == 'if' then
          local test, t, f = expr[2], expr[3], expr[4]
 
          local test_db_t, test_db_f = push(db_t), push(db_t)
-         local test_kt, test_kf = eta(t, kt, kf), eta(f, kt, kf)
-         test = visit(test, test_db_t, test_db_f, test_kt, test_kf)
+         test = visit(test, test_db_t, test_db_f)
 
          local kt_db_t, kt_db_f = push(test_db_t), push(test_db_t)
          local kf_db_t, kf_db_f = push(test_db_f), push(test_db_f)
-         t = visit(t, kt_db_t, kt_db_f, kt, kf)
-         f = visit(f, kf_db_t, kf_db_f, kt, kf)
+         t = visit(t, kt_db_t, kt_db_f)
+         f = visit(f, kf_db_t, kf_db_f)
 
-         if test_kt == 'REJECT' then
+         if t[1] == 'fail' then
             local head_t, head_f = car(kf_db_t), car(kf_db_f)
             local assertions = cadr(kf_db_t)
             merge(db_t, assertions)
             merge(db_t, head_t)
             merge(db_f, assertions)
             merge(db_f, head_f)
-         elseif test_kf == 'REJECT' then
+         elseif f[1] == 'fail' then
             local head_t, head_f = car(kt_db_t), car(kt_db_f)
             local assertions = cadr(kt_db_t)
             merge(db_t, assertions)
@@ -655,18 +658,11 @@ end
 
 -- Length assertion hoisting.
 local function lhoist(expr, db)
-   local function eta(expr, kt, kf)
-      if expr[1] == 'true' then return kt end
-      if expr[1] == 'false' then return kf end
-      if expr[1] == 'fail' then return 'REJECT' end
-      return nil
-   end
-
    -- Recursively annotate the logical expressions in EXPR, returning
    -- tables of the form { MIN_T, MIN_F, EXPR }.  MIN_T indicates that
    -- for this expression to be true, the packet must be at least as
    -- long as MIN_T.  Similarly for MIN_F.
-   local function annotate(expr, kt, kf)
+   local function annotate(expr)
       local function aexpr(min_t, min_f, expr) return { min_t, min_f, expr } end
       local function branch_mins(abranch, min)
          local branch_min_t, branch_min_f = abranch[1], abranch[2]
@@ -677,14 +673,16 @@ local function lhoist(expr, db)
          return aexpr(expr[3], 0, expr)
       elseif op == 'if' then
          local test, t, f = expr[2], expr[3], expr[4]
-         local test_a = annotate(test, eta(t, kt, kf), eta(f, kt, kf))
-         local t_a, f_a = annotate(t, kt, kf), annotate(f, kt, kf)
+         local test_a = annotate(test)
+         local t_a, f_a = annotate(t), annotate(f)
          local test_min_t, test_min_f = test_a[1], test_a[2]
          local t_min_t, t_min_f = branch_mins(t_a, test_min_t)
          local f_min_t, f_min_f = branch_mins(f_a, test_min_f)
          local function if_mins()
-            if eta(t, kt, kf) == 'REJECT' then return f_min_t, f_min_f end
-            if eta(f, kt, kf) == 'REJECT' then return t_min_t, t_min_f end
+            if t[1] == 'match' then t_min_f = f_min_f end
+            if f[1] == 'match' then f_min_f = t_min_f end
+            if t[1] == 'fail' then return f_min_t, f_min_f end
+            if f[1] == 'fail' then return t_min_t, t_min_f end
             if t[1] == 'true' then t_min_f = f_min_f end
             if f[1] == 'true' then f_min_f = t_min_f end
             if t[1] == 'false' then t_min_t = f_min_t end
@@ -724,10 +722,10 @@ local function lhoist(expr, db)
 end
 
 function optimize_inner(expr)
-   expr = simplify(expr)
-   expr = simplify(cfold(expr, {}))
-   expr = simplify(infer_ranges(expr))
-   expr = simplify(lhoist(expr))
+   expr = simplify(expr, true)
+   expr = simplify(cfold(expr, {}), true)
+   expr = simplify(infer_ranges(expr), true)
+   expr = simplify(lhoist(expr), true)
    clear_cache()
    return expr
 end
@@ -744,11 +742,11 @@ function selftest ()
    local expand = require('pf.expand').expand
    local function opt(str) return optimize(expand(parse(str), "EN10MB")) end
    local equals, assert_equals = utils.equals, utils.assert_equals
-   assert_equals({ 'false' },
+   assert_equals({ 'fail' },
       opt("1 = 2"))
    assert_equals({ '=', "len", 1 },
       opt("1 = len"))
-   assert_equals({ 'true' },
+   assert_equals({ 'match' },
       opt("1 = 2/2"))
    assert_equals({ 'if', { '>=', 'len', 1},
                    { '=', { '[]', 0, 1 }, 2 },
