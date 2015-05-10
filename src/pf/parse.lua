@@ -68,9 +68,12 @@ local function lex_ipv6(str, pos)
    end
 
    local after_sep = false
+   local digits_pattern = "^(%x%x?%x?%x?)()"
+   local expected_sep = ":"
+   local ipv4_fields = 0
 
    while true do
-      local digits, next_pos = str:match("^(%x%x?%x?%x?)()", pos)
+      local digits, next_pos = str:match(digits_pattern, pos)
       if not digits then
          if after_sep then
             error("wrong IPv6 address")
@@ -79,22 +82,41 @@ local function lex_ipv6(str, pos)
          end
       end
 
-      table.insert(addr, tonumber(digits, 16))
-      pos = next_pos
+      local sep = str:sub(next_pos, next_pos)
+      if sep == "." and expected_sep == ":" then
+         expected_sep = "."
+         digits_pattern = "^(%d%d?%d?)()"
+         -- Continue loop without advancing pos.
+         -- Will parse field as decimal in the next iteration.
+      else
+         pos = next_pos
 
-      if str:sub(pos, pos) == ":" then
+         if expected_sep == ":" then
+            table.insert(addr, tonumber(digits, 16))
+         else
+            local ipv4_field = tonumber(digits, 10)
+            assert(ipv4_field < 255, "wrong IPv6 address")
+            ipv4_fields = ipv4_fields + 1
+            if ipv4_fields % 2 == 0 then
+               addr[#addr] = addr[#addr] * 256 + ipv4_field
+            else
+               table.insert(addr, ipv4_field)
+            end
+         end
+
+         if sep ~= expected_sep then break end
          pos = pos + 1
-         if not hole_index and str:sub(pos, pos) == ":" then
+         if sep == ":" and not hole_index and str:sub(pos, pos) == ":" then
             pos = pos + 1
             hole_index = #addr + 1
             after_sep = false
          else
             after_sep = true
          end
-      else
-         break
       end
    end
+
+   assert(ipv4_fields == 0 or ipv4_fields == 4, "wrong IPv6 address")
 
    if hole_index then
       local zeros = 9 - #addr
@@ -129,7 +151,7 @@ local function lex_ehost(str, pos)
    local terminators = " \t\r\n)/"
    local last_char = str:sub(pos, pos)
    -- MAC address is actually an IPv6 address
-   if last_char == ':' then return nil, start end
+   if last_char == ':' or last_char == '.' then return nil, start end
    assert(pos > #str or terminators:find(last_char, 1, true),
           "unexpected terminator for ethernet host address")
    return addr, pos
@@ -990,6 +1012,10 @@ function selftest ()
    lex_test("host 127.0.0.1", { 'host', { 'ipv4', 127, 0, 0, 1 } })
    lex_test("net 10.0.0.0/24", { 'net', { 'ipv4', 10, 0, 0, 0 }, '/', 24 })
    lex_test("host ::", { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 0 } })
+   lex_test("host eee:eee:eee:eee:eee:eee:10.20.30.40",
+            { 'host', { 'ipv6', 3822, 3822, 3822, 3822, 3822, 3822, 2580, 7720 } })
+   lex_test("host ::10.20.30.40",
+            { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 2580, 7720 } })
 
    local function lex_error_test(str, expected_err)
       local lexer = tokens(str)
@@ -1010,9 +1036,14 @@ function selftest ()
    end
    lex_error_test(":")
    lex_error_test("1:1:1::1:1:1:1:1", "wrong IPv6 address")
-   lex_error_test("1:1:1::1:1:1:1:1", "wrong IPv6 address")
    lex_error_test("1:11111111", "wrong IPv6 address")
    lex_error_test("1::1:", "wrong IPv6 address")
+   lex_error_test("1:2:3:4:5:6:7:1.2.3.4", "wrong IPv6 address")
+   lex_error_test("1:2:3:4:5:1.2.3.4", "wrong IPv6 address")
+   lex_error_test("1:2:3:4:5:1.2.3.4.5", "wrong IPv6 address")
+   lex_error_test("1:2:3:4:5:6:1.2.3..", "wrong IPv6 address")
+   lex_error_test("1:2:3:4:5:6:1.2.3.4.", "wrong IPv6 address")
+   lex_error_test("1:2:3:4:5:6:1.2.3.300", "wrong IPv6 address")
 
    local function parse_test(str, elts) check(elts, parse(str)) end
    parse_test("",
