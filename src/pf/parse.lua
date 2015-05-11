@@ -473,12 +473,12 @@ local function parse_portrange_arg(lexer)
    local tok = lexer.next()
 
    -- Try to split portrange from start to first hyphen, or from start to
-   -- second hyphen
-   local _, pos = 0
-   while (true) do
-      _, pos = tok:match("^([%w]+)-()", pos)
-      if (not pos) then
-         lexer.error(string.format("Error parsing portrange :%s", portrange))
+   -- second hyphen, and so on.
+   local pos = 1
+   while true do
+      pos = tok:match("^%w+%-()", pos)
+      if not pos then
+         lexer.error('error parsing portrange %s', tok)
       end
       local from, to = to_port_number(tok:sub(1, pos - 2)), to_port_number(tok:sub(pos))
       if from and to then
@@ -1168,5 +1168,16 @@ function selftest ()
                { 'net', { 'ipv4/len', { 'ipv4', 192, 168, 0, 0 }, 16 } })
    parse_test("net 192",
                { 'net', { 'ipv4/len', { 'ipv4', 192, 0, 0, 0 }, 8 } })
+
+   local function parse_error_test(str, expected_err)
+      local ok, actual_err = pcall(parse, str)
+      assert(not ok, "expected error, got no error")
+      if expected_err then
+         assert(actual_err:find(expected_err, 1, true),
+                "expected error "..expected_err.." but got "..actual_err)
+      end
+   end
+   parse_error_test("tcp src portrange 80-fffftp-data", "error parsing portrange 80-fffftp-data")
+   parse_error_test("tcp src portrange 80000-90000", "Not within the range")
    print("OK")
 end
