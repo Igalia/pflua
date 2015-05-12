@@ -12,7 +12,8 @@ ffi.cdef[[
 typedef struct pcap pcap_t;
 int pcap_datalink_name_to_val(const char *name);
 pcap_t *pcap_open_dead(int linktype, int snaplen);
-void pcap_perror(pcap_t *p, const char *suffix);
+char *pcap_geterr(pcap_t *p);
+void pcap_perror(pcap_t *p, const char *prefix);
 int pcap_compile(pcap_t *p, struct bpf_program *fp, const char *str,
                  int optimize, uint32_t netmask);
 int pcap_offline_filter(const struct bpf_program *fp,
@@ -51,8 +52,17 @@ function compile(filter_str, dlt_name, optimize)
    local err = pcap.pcap_compile(p, bpf, filter_str, optimize, netmask)
 
    if err ~= 0 then
-      pcap.pcap_perror(p, "pcap_compile failed!")
-      error("pcap_compile failed")
+      local reason = ffi.string(pcap.pcap_geterr(p))
+      -- Instead of failing fast, return a filter which rejects all packets
+      if reason == "expression rejects all packets" then
+         -- construct the always-rejects filter, which is like the always-true
+         -- filter, except for its return code
+         pcap.pcap_compile(p, bpf, "1=1", true, netmask)
+         bpf.bf_insns[0].k = 0 -- 0 = false, 2^16-1 = true
+      else
+         pcap.pcap_perror(p, "pcap_compile failed!")
+         error("pcap_compile failed")
+      end
    end
 
    return bpf
