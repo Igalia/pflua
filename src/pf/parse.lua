@@ -917,8 +917,8 @@ local parse_logical
 
 local function parse_logical_or_arithmetic(lexer, pick_first)
    local exp
-   if lexer.check('not') then
-      exp = { 'not', parse_logical(lexer, true) }
+   if lexer.peek() == 'not' or lexer.peek() == '!' then
+      exp = { lexer.next(), parse_logical(lexer, true) }
    elseif lexer.check('(') then
       exp = parse_logical_or_arithmetic(lexer)
       lexer.consume(')')
@@ -1099,6 +1099,8 @@ function selftest ()
               { 'not', { 'or', { '=', 1, 1 }, { 'tcp' } } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
+   parse_test("tcp && ip || !1=1",
+              { '||', { '&&', { 'tcp' }, { 'ip' } }, { '!', { '=', 1, 1 } } })
    parse_test("tcp src portrange 80-90",
               { 'tcp_src_portrange', { 80, 90 } })
    parse_test("tcp src portrange ftp-data-90",
