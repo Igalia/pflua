@@ -720,7 +720,10 @@ local function lhoist(expr, db)
          local kf = reduce(expr[4], min, is_tail)
          return { op, t, kt, kf }
       elseif op == '>=' and expr[2] == 'len' and type(expr[3]) == 'number' then
-         if expr[3] <= min then return { 'true' } else return { 'false' } end
+         -- min may be set conservatively low; it is *only* a lower bound.
+         -- If expr[3] is <= min, { 'true' } is a valid optimization.
+         -- Otherwise, there's not enough information; leave expr alone.
+         if expr[3] <= min then return { 'true' } else return expr end
       else
          return expr
       end
