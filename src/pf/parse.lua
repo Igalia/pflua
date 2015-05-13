@@ -916,44 +916,41 @@ end
 local parse_logical
 
 local function parse_logical_or_arithmetic(lexer, pick_first)
-   if lexer.check('not') then
-      return { 'not', parse_logical(lexer) }
+   local exp
+   if lexer.peek() == 'not' or lexer.peek() == '!' then
+      exp = { lexer.next(), parse_logical(lexer, true) }
+   elseif lexer.check('(') then
+      exp = parse_logical_or_arithmetic(lexer)
+      lexer.consume(')')
    else
-      local exp
-      if lexer.check('(') then
-         exp = parse_logical_or_arithmetic(lexer)
-         lexer.consume(')')
+      exp = parse_primitive_or_arithmetic(lexer)
+   end
+   if is_arithmetic(exp) then
+      if arithmetic_precedence[lexer.peek()] then
+         exp = parse_arithmetic(lexer, nil, nil, exp)
+      end
+      if lexer.peek() == ')' then return exp end
+      local op = lexer.next()
+      assert(set('>', '<', '>=', '<=', '=', '!=', '==')[op],
+             "expected a comparison operator, got "..op)
+      -- Normalize == to =, because libpcap treats them identically
+      if op == '==' then op = '=' end
+      exp = { op, exp, parse_arithmetic(lexer) }
+   end
+   if pick_first then return exp end
+   while true do
+      local op = lexer.peek()
+      if not op or op == ')' then return exp end
+      local is_logical = logical_ops[op]
+      if is_logical then
+         lexer.consume(op)
       else
-         exp = parse_primitive_or_arithmetic(lexer)
+         -- The grammar is such that "tcp port 80" should actually
+         -- parse as "tcp and port 80".
+         op = 'and'
       end
-      if is_arithmetic(exp) then
-         if arithmetic_precedence[lexer.peek()] then
-            exp = parse_arithmetic(lexer, nil, nil, exp)
-         end
-         if lexer.peek() == ')' then return exp end
-         local op = lexer.next()
-         assert(set('>', '<', '>=', '<=', '=', '!=', '==')[op],
-                "expected a comparison operator, got "..op)
-         -- Normalize == to =, because libpcap treats them identically
-         if op == '==' then op = '=' end
-         exp = { op, exp, parse_arithmetic(lexer) }
-      end
-      while true do
-         local op = lexer.peek()
-         if not op or op == ')' then return exp end
-         local is_logical = logical_ops[op]
-         if is_logical then
-            if pick_first then return exp end
-            lexer.consume(op)
-         else
-            -- The grammar is such that "tcp port 80" should actually
-            -- parse as "tcp and port 80".
-            op = 'and'
-            if pick_first then return exp end
-         end
-         local rhs = parse_logical(lexer, true)
-         exp = { op, exp, rhs }
-      end
+      local rhs = parse_logical(lexer, true)
+      exp = { op, exp, rhs }
    end
 end
 
@@ -967,7 +964,7 @@ function parse(str)
    local lexer = tokens(str)
    if not lexer.peek({maybe_arithmetic=true}) then return { 'true' } end
    local expr = parse_logical(lexer)
-   assert(not lexer.peek(), "unexpected token", lexer.peek())
+   if lexer.peek() then error("unexpected token "..lexer.peek()) end
    return expr
 end
 
@@ -1096,8 +1093,14 @@ function selftest ()
               { 'or', { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
    parse_test("1+1=2 or tcp and tcp",
               { 'and', { 'or', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } }, { 'tcp' } })
+   parse_test("not 1=1 or tcp",
+              { 'or', { 'not', { '=', 1, 1 } }, { 'tcp' } })
+   parse_test("not (1=1 or tcp)",
+              { 'not', { 'or', { '=', 1, 1 }, { 'tcp' } } })
    parse_test("1+1=2 and (tcp)",
               { 'and', { '=', { '+', 1, 1 }, 2 }, { 'tcp' } })
+   parse_test("tcp && ip || !1=1",
+              { '||', { '&&', { 'tcp' }, { 'ip' } }, { '!', { '=', 1, 1 } } })
    parse_test("tcp src portrange 80-90",
               { 'tcp_src_portrange', { 80, 90 } })
    parse_test("tcp src portrange ftp-data-90",
