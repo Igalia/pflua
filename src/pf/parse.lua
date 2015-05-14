@@ -5,18 +5,13 @@ local constants = require('pf.constants')
 
 local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
 local uint32 = utils.uint32
+local set = utils.set
 
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
       pos = pos + 1
    end
    return pos
-end
-
-local function set(...)
-   local ret = {}
-   for k, v in pairs({...}) do ret[v] = true end
-   return ret
 end
 
 local punctuation = set(
@@ -32,14 +27,14 @@ local function lex_host_or_keyword(str, pos)
    return tonumber(name, 10) or name, next_pos
 end
 
+local function lex_byte(str)
+   local byte = tonumber(str, 10)
+   if byte >= 256 then return nil end
+   return byte
+end
+
 local function lex_ipv4(str, pos)
-   local function lex_byte(str)
-      local byte = tonumber(str, 10)
-      if byte >= 256 then return nil end
-      return byte
-   end
    local digits, dot = str:match("^(%d%d?%d?)()", pos)
-   if not digits then return lex_host_or_keyword(str) end
    local addr = { 'ipv4' }
    local byte = lex_byte(digits)
    if not byte then return lex_host_or_keyword(str, pos) end
@@ -94,8 +89,7 @@ local function lex_ipv6(str, pos)
          if expected_sep == ":" then
             table.insert(addr, tonumber(digits, 16))
          else
-            local ipv4_field = tonumber(digits, 10)
-            assert(ipv4_field < 255, "wrong IPv6 address")
+            local ipv4_field = assert(lex_byte(digits), "wrong IPv6 address")
             ipv4_fields = ipv4_fields + 1
             if ipv4_fields % 2 == 0 then
                addr[#addr] = addr[#addr] * 256 + ipv4_field
@@ -135,23 +129,22 @@ local function lex_ipv6(str, pos)
    return addr, pos
 end
 
+-- It is guaranteed that str:sub(pos) starts with a valid MAC-address.
+-- Return nil if it could also be an IPv6 address.
 local function lex_ehost(str, pos)
-   local start = pos
    local addr = { 'ehost' }
-   local digits, dot = str:match("^(%x%x?)()%:", pos)
-   assert(digits, "failed to parse ethernet host address at "..pos)
+   local digits, dot = str:match("^(%x%x?)():", pos)
    table.insert(addr, tonumber(digits, 16))
    pos = dot
    for i=1,5 do
-      local digits, dot = str:match("^%:(%x%x?)()", pos)
-      assert(digits, "failed to parse ethernet host address at "..pos)
+      local digits, dot = str:match("^:(%x%x?)()", pos)
       table.insert(addr, tonumber(digits, 16))
       pos = dot
    end
    local terminators = " \t\r\n)/"
    local last_char = str:sub(pos, pos)
    -- MAC address is actually an IPv6 address
-   if last_char == ':' or last_char == '.' then return nil, start end
+   if last_char == ':' or last_char == '.' then return nil end
    assert(pos > #str or terminators:find(last_char, 1, true),
           "unexpected terminator for ethernet host address")
    return addr, pos
@@ -159,10 +152,10 @@ end
 
 local function lex_addr_or_host(str, pos)
    if str:match('^%x%x?:%x%x?:%x%x?:%x%x?:%x%x?:%x%x?', pos) then
-      local result, pos = lex_ehost(str, pos)
-      if result then return result, pos end
+      local result, next_pos = lex_ehost(str, pos)
+      if result then return result, next_pos end
       return lex_ipv6(str, pos)
-   elseif str:match("^%x?%x?%x?%x?%:", pos) then
+   elseif str:match("^%x?%x?%x?%x?:", pos) then
       return lex_ipv6(str, pos)
    elseif str:match("^%d%d?%d?", pos) then
       return lex_ipv4(str, pos)
