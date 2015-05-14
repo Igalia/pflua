@@ -45,7 +45,7 @@ local function filter(packets, preds, pkt_number)
       local p = {}
       for k,_ in pairs(results) do table.insert(p, k) end
       local pipelines = table.concat(p, ' ')
-      local msg = "OK: %s all matched: all were %s"
+      local msg = "OK: %s concur: all were %s"
       print(msg:format(pipelines, res))
    else
       print("BUG: pipelines diverged.")
