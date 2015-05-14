@@ -245,12 +245,18 @@ end
 local function tokens(str)
    local pos, next_pos = 1, nil
    local peeked = nil
+   local peeked_address = nil
+   local peeked_maybe_arithmetic = nil
    local last_pos = 0
    local primitive_error = error
    local function peek(opts)
-      if not next_pos then
+      opts = opts or {}
+      if not next_pos or opts.address ~= peeked_address or
+            opts.maybe_arithmetic ~= peeked_maybe_arithmetic then
          pos = skip_whitespace(str, pos)
          peeked, next_pos = lex(str, pos, opts or {})
+         peeked_address = opts.address
+         peeked_maybe_arithmetic = opts.maybe_arithmetic
          assert(next_pos, "next pos is nil")
       end
       return peeked
@@ -1022,6 +1028,7 @@ function selftest ()
    parse_test("1+1=2",
               { '=', { '+', 1, 1 }, 2 })
    parse_test("len=4", { '=', 'len', 4 })
+   parse_test("(len-4>10)", { '>', { '-', 'len', 4 }, 10 })
    parse_test("len == 4", { '=', 'len', 4 })
    parse_test("sctp", { 'sctp' })
    parse_test("1+2*3+4=5",
