@@ -388,29 +388,26 @@ function parse_net_arg(lexer)
    end
 end
 
-local function tointeger(str, min, max)
-   local number = tonumber(str)
-   assert(number and math.floor(number) == number, "Not an integer number: "..number)
-   assert(number >= min and number <= max, "Not within the range: "..number)
-   return number
-end
-
 local function to_port_number(tok)
-   local port
-   if (tonumber(tok)) then
-      port = tointeger(tok, 0, 65535)
-      assert(port, 'out of range '..port)
-   else
-      port = constants.services[tok]
+   local port = tok
+   if type(tok) == 'string' then
+      local next_pos
+      port, next_pos = lex_number(tok, 1, 10)
+      if not port or next_pos ~= #tok+1 then
+         -- Token is not a valid decimal literal, fallback to services.
+         return constants.services[tok]
+      end
    end
+
+   assert(port <= 65535, 'port '..port..' out of range')
    return port
 end
 
 local function parse_port_arg(lexer)
    local tok = lexer.next()
    local result = to_port_number(tok)
-   if (not result) then
-      lexer.error(string.format('unsupported port %s', tok))
+   if not result then
+      lexer.error('unsupported port %s', tok)
    end
    return result
 end
@@ -1126,7 +1123,8 @@ function selftest ()
       end
    end
    parse_error_test("tcp src portrange 80-fffftp-data", "error parsing portrange 80-fffftp-data")
-   parse_error_test("tcp src portrange 80000-90000", "Not within the range")
+   parse_error_test("tcp src portrange 80000-90000", "port 80000 out of range")
+   parse_error_test("tcp src portrange 0x1-0x2", "error parsing portrange 0x1-0x2")
    parse_error_test("tcp src portrange ::1", "error parsing portrange :")
    parse_error_test("tcp src port ::1", "unsupported port :")
    parse_error_test("123$", "unexpected end of decimal literal at 1")
