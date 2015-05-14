@@ -20,7 +20,7 @@ local function set(...)
 end
 
 local punctuation = set(
-   '(', ')', '[', ']', '!', '!=', '<', '<=', '>', '>=', '=', '==',
+   '(', ')', '[', ']', ':', '!', '!=', '<', '<=', '>', '>=', '=', '==',
    '+', '-', '*', '/', '&', '|', '^', '&&', '||', '<<', '>>', '\\'
 )
 
@@ -182,8 +182,8 @@ local function lex_net_ipv4(str, pos)
    return addr, pos
 end
 
-local function lex_addr(str, pos)
-   if str:match("^%x%x?%:", pos) then
+local function lex_addr_or_host(str, pos)
+   if str:match('^%x%x?:%x%x?:%x%x?:%x%x?:%x%x?:%x%x?', pos) then
       local result, pos = lex_ehost(str, pos)
       if result then return result, pos end
       return lex_ipv6(str, pos)
@@ -225,27 +225,29 @@ local function lex_hex(str, pos)
    return ret, next_pos
 end
 
-local function lex_octal_or_addr(str, pos, in_brackets)
+local function lex_octal(str, pos)
    local ret, next_pos = lex_number(str, pos, 8)
    if not ret then
-      if in_brackets then return lex_host_or_keyword(str, pos) end
-      return lex_addr(str, pos)
+      return lex_host_or_keyword(str, pos)
    end
    return ret, next_pos
 end
 
-local function lex_decimal_or_addr(str, pos, in_brackets)
+local function lex_decimal(str, pos)
    local ret, next_pos = lex_number(str, pos, 10)
    if not ret then
-      if in_brackets then return lex_host_or_keyword(str, pos) end
-      return lex_addr(str, pos)
+      return lex_host_or_keyword(str, pos)
    end
    return ret, next_pos
 end
 
-local function lex(str, pos, opts, in_brackets)
+local function lex(str, pos, opts)
    -- EOF.
    if pos > #str then return nil, pos end
+
+   if opts.address then
+      return lex_addr_or_host(str, pos)
+   end
 
    -- Non-alphanumeric tokens.
    local two = str:sub(pos,pos+1)
@@ -253,29 +255,15 @@ local function lex(str, pos, opts, in_brackets)
    local one = str:sub(pos,pos)
    if punctuation[one] then return one, pos+1 end
 
-   -- If we are in brackets, then : separates an expression from an
-   -- access size.  Otherwise it separates parts of an IPv6 address.
-   if in_brackets and one == ':' then return one, pos+1 end
-
    -- Numeric literals or net addresses.
    if opts.maybe_arithmetic and one:match('^%d') then
       if two == ('0x') then
          return lex_hex(str, pos+2)
       elseif two:match('^0%d') then
-         return lex_octal_or_addr(str, pos, in_brackets)
+         return lex_octal(str, pos)
       else
-         return lex_decimal_or_addr(str, pos, in_brackets)
+         return lex_decimal(str, pos)
       end
-   end
-
-   -- MAC address
-   if not in_brackets and str:match('%x%x?:%x%x?:%x%x?:%x%x?:%x%x?:%x%x?', pos) then
-      return lex_addr(str, pos)
-   end
-
-   -- IPV6 net address beginning with [a-fA-F].
-   if not in_brackets and str:match('^%x?%x?%:', pos) then
-      return lex_ipv6(str, pos)
    end
 
    -- "len" is the only bare name that can appear in an arithmetic
@@ -287,25 +275,24 @@ local function lex(str, pos, opts, in_brackets)
       end
    end
 
-   -- Again, if we're in brackets, there won't be an IPv6 address.
-   if in_brackets then return lex_host_or_keyword(str, pos) end
-
-   -- Keywords or addresses.
-   return lex_addr(str, pos)
+   return lex_host_or_keyword(str, pos)
 end
 
 local function tokens(str)
    local pos, next_pos = 1, nil
    local peeked = nil
-   local brackets = 0
+   local peeked_address = nil
+   local peeked_maybe_arithmetic = nil
    local last_pos = 0
    local primitive_error = error
    local function peek(opts)
-      if not next_pos then
+      opts = opts or {}
+      if not next_pos or opts.address ~= peeked_address or
+            opts.maybe_arithmetic ~= peeked_maybe_arithmetic then
          pos = skip_whitespace(str, pos)
-         peeked, next_pos = lex(str, pos, opts or {}, brackets > 0)
-         if peeked == '[' then brackets = brackets + 1 end
-         if peeked == ']' then brackets = brackets - 1 end
+         peeked, next_pos = lex(str, pos, opts or {})
+         peeked_address = opts.address
+         peeked_maybe_arithmetic = opts.maybe_arithmetic
          assert(next_pos, "next pos is nil")
       end
       return peeked
@@ -361,7 +348,7 @@ local function unary(parse_arg)
 end
 
 function parse_host_arg(lexer)
-   local arg = lexer.next()
+   local arg = lexer.next({address=true})
    if type(arg) == 'string' or arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       return arg
    end
@@ -404,7 +391,7 @@ function parse_net_arg(lexer)
       end
    end
 
-   local arg = lexer.next()
+   local arg = lexer.next({address=true})
    -- IPv4 dotted triple, dotted pair or bare net addresses
    if arg[1] == 'ipv4' and #arg < 5 then
       local mask_len = 32
@@ -429,7 +416,7 @@ function parse_net_arg(lexer)
          if (arg[1] == 'ipv6') then
             lexer.error("Not valid syntax for IPv6")
          end
-         local mask = lexer.next()
+         local mask = lexer.next({address=true})
          check_non_network_bits_in_ipv4(arg, ipv4_to_int(mask),
             table.concat(mask, '.', 2))
          assert(mask[1] == arg[1], 'bad mask', mask)
@@ -490,7 +477,7 @@ local function parse_portrange_arg(lexer)
 end
 
 local function parse_ehost_arg(lexer)
-   local arg = lexer.next()
+   local arg = lexer.next({address=true})
    if type(arg) == 'string' or arg[1] == 'ehost' then
       return arg
    end
@@ -556,7 +543,7 @@ end
 local parse_string_arg = simple_typed_arg_parser('string')
 
 local function parse_decnet_host_arg(lexer)
-   local arg = lexer.next()
+   local arg = lexer.next({address=true})
    if type(arg) == 'string' then return arg end
    if arg[1] == 'ipv4' then
       arg[1] = 'decnet'
@@ -1006,41 +993,34 @@ function selftest ()
               '(', '(', 'tcp', '[', 12, ']', '&', 240, ')', '>>', 2, ')',
               ')', '!=', 0, ')'
             }, {maybe_arithmetic=true})
-   lex_test("host 127.0.0.1", { 'host', { 'ipv4', 127, 0, 0, 1 } })
-   lex_test("net 10.0.0.0/24", { 'net', { 'ipv4', 10, 0, 0, 0 }, '/', 24 })
-   lex_test("host ::", { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 0 } })
+   lex_test("host 127.0.0.1", { 'host', { 'ipv4', 127, 0, 0, 1 } }, {address=true})
+   lex_test("host ::", { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 0 } }, {address=true})
    lex_test("host eee:eee:eee:eee:eee:eee:10.20.30.40",
-            { 'host', { 'ipv6', 3822, 3822, 3822, 3822, 3822, 3822, 2580, 7720 } })
+            { 'host', { 'ipv6', 3822, 3822, 3822, 3822, 3822, 3822, 2580, 7720 } }, {address=true})
    lex_test("host ::10.20.30.40",
-            { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 2580, 7720 } })
+            { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 2580, 7720 } }, {address=true})
 
-   local function lex_error_test(str, expected_err)
+   local function addr_error_test(str, expected_err)
       local lexer = tokens(str)
-      while true do
-         local ok, actual_err = pcall(lexer.peek)
-         if not ok then
-            if expected_err then
-               assert(actual_err:find(expected_err, 1, true),
-                      "expected error "..expected_err.." but got "..actual_err)
-            end
-            return
-         elseif actual_err then
-            lexer.next()
-         else
-            error("expected error, got no error")
+      local ok, actual_err = pcall(lexer.peek, {address=true})
+      if not ok then
+         if expected_err then
+            assert(actual_err:find(expected_err, 1, true),
+                   "expected error "..expected_err.." but got "..actual_err)
          end
+      else
+         error("expected error, got no error")
       end
    end
-   lex_error_test(":")
-   lex_error_test("1:1:1::1:1:1:1:1", "wrong IPv6 address")
-   lex_error_test("1:11111111", "wrong IPv6 address")
-   lex_error_test("1::1:", "wrong IPv6 address")
-   lex_error_test("1:2:3:4:5:6:7:1.2.3.4", "wrong IPv6 address")
-   lex_error_test("1:2:3:4:5:1.2.3.4", "wrong IPv6 address")
-   lex_error_test("1:2:3:4:5:1.2.3.4.5", "wrong IPv6 address")
-   lex_error_test("1:2:3:4:5:6:1.2.3..", "wrong IPv6 address")
-   lex_error_test("1:2:3:4:5:6:1.2.3.4.", "wrong IPv6 address")
-   lex_error_test("1:2:3:4:5:6:1.2.3.300", "wrong IPv6 address")
+   addr_error_test("1:1:1::1:1:1:1:1", "wrong IPv6 address")
+   addr_error_test("1:11111111", "wrong IPv6 address")
+   addr_error_test("1::1:", "wrong IPv6 address")
+   addr_error_test("1:2:3:4:5:6:7:1.2.3.4", "wrong IPv6 address")
+   addr_error_test("1:2:3:4:5:1.2.3.4", "wrong IPv6 address")
+   addr_error_test("1:2:3:4:5:1.2.3.4.5", "wrong IPv6 address")
+   addr_error_test("1:2:3:4:5:6:1.2.3..", "wrong IPv6 address")
+   addr_error_test("1:2:3:4:5:6:1.2.3.4.", "wrong IPv6 address")
+   addr_error_test("1:2:3:4:5:6:1.2.3.300", "wrong IPv6 address")
 
    local function parse_test(str, elts) check(elts, parse(str)) end
    parse_test("",
@@ -1081,6 +1061,7 @@ function selftest ()
    parse_test("1+1=2",
               { '=', { '+', 1, 1 }, 2 })
    parse_test("len=4", { '=', 'len', 4 })
+   parse_test("(len-4>10)", { '>', { '-', 'len', 4 }, 10 })
    parse_test("len == 4", { '=', 'len', 4 })
    parse_test("sctp", { 'sctp' })
    parse_test("1+2*3+4=5",
@@ -1182,5 +1163,7 @@ function selftest ()
    end
    parse_error_test("tcp src portrange 80-fffftp-data", "error parsing portrange 80-fffftp-data")
    parse_error_test("tcp src portrange 80000-90000", "Not within the range")
+   parse_error_test("tcp src portrange ::1", "error parsing portrange :")
+   parse_error_test("tcp src port ::1", "unsupported port :")
    print("OK")
 end
