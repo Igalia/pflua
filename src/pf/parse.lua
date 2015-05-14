@@ -79,8 +79,7 @@ end
 local function lex_ipv4(str, pos)
    local digits, dot = str:match("^(%d%d?%d?)()", pos)
    local addr = { 'ipv4' }
-   local byte = lex_byte(digits)
-   if not byte then return lex_host_or_keyword(str, pos) end
+   local byte = assert(lex_byte(digits), "failed to parse ipv4 addr")
    table.insert(addr, byte)
    pos = dot
    for i=1,3 do
@@ -1133,5 +1132,6 @@ function selftest ()
    parse_error_test("0x = 0x", "unexpected end of hexadecimal literal at 1")
    parse_error_test("08 = 0x", "unexpected end of octal literal at 1")
    parse_error_test("09 = 0x", "unexpected end of octal literal at 1")
+   parse_error_test("host 300", "failed to parse ipv4 addr")
    print("OK")
 end
