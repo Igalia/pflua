@@ -24,12 +24,55 @@ local punctuation = set(
    '+', '-', '*', '/', '&', '|', '^', '&&', '||', '<<', '>>', '\\'
 )
 
+local number_terminators = " \t\r\n)]:!<>=+-*/%&|^"
+
+local function lex_number(str, pos, base)
+   local res = 0
+   local i = pos
+   while i <= #str do
+      local chr = str:sub(i,i)
+      local n = tonumber(chr, base)
+      if n then
+         res = res * base + n
+         assert(res <= 0xffffffff, 'integer too large: '..res)
+         i = i + 1
+      elseif not number_terminators:find(chr, 1, true) then
+         return nil
+      else
+         break
+      end
+   end
+
+   if i == pos then
+      -- No digits parsed, can happen when lexing "0x" or "09".
+      return nil
+   end
+   return res, i  -- EOS or end of number.
+end
+
+local function maybe_lex_number(str, pos)
+   if str:match("^0x", pos) then
+      return "hexadecimal", lex_number(str, pos+2, 16)
+   elseif str:match("^0%d", pos) then
+      return "octal", lex_number(str, pos+1, 8)
+   elseif str:match("^%d", pos) then
+      return "decimal", lex_number(str, pos, 10)
+   end
+end
+
 local function lex_host_or_keyword(str, pos)
    local name, next_pos = str:match("^([%w.-]+)()", pos)
    assert(name, "failed to parse hostname or keyword at "..pos)
    assert(name:match("^%w", 1, 1), "bad hostname or keyword "..name)
    assert(name:match("^%w", #name, #name), "bad hostname or keyword "..name)
-   return tonumber(name, 10) or name, next_pos
+
+   local kind, number, number_next_pos = maybe_lex_number(str, pos)
+   -- Only interpret name as a number as a whole.
+   if number and number_next_pos == next_pos then
+      return number, next_pos
+   else
+      return name, next_pos
+   end
 end
 
 local function lex_ipv4(str, pos)
@@ -178,54 +221,12 @@ local function lex_addr_or_host(str, pos)
    return lex_host_or_keyword(str, pos)
 end
 
-local number_terminators = " \t\r\n)]!<>=+-*/%&|^"
-
-local function lex_number(str, pos, base)
-   local res = 0
-   local i = pos
-   while i <= #str do
-      local chr = str:sub(i,i)
-      local n = tonumber(chr, base)
-      if n then
-         res = res * base + n
-         assert(res <= 0xffffffff, 'integer too large: '..res)
-         i = i + 1
-      elseif str:match("^[%a_.]", i) then
-         return nil, i
-      else
-         return res, i
-      end
-   end
-   return res, i  -- EOS
-end
-
-local function lex_hex(str, pos)
-   local ret, next_pos = lex_number(str, pos, 16)
-   assert(ret, "unexpected end of hex literal at "..pos)
-   return ret, next_pos
-end
-
-local function lex_octal(str, pos)
-   local ret, next_pos = lex_number(str, pos, 8)
-   if not ret then
-      return lex_host_or_keyword(str, pos)
-   end
-   return ret, next_pos
-end
-
-local function lex_decimal(str, pos)
-   local ret, next_pos = lex_number(str, pos, 10)
-   if not ret then
-      return lex_host_or_keyword(str, pos)
-   end
-   return ret, next_pos
-end
-
 local function lex(str, pos, opts)
    -- EOF.
    if pos > #str then return nil, pos end
 
    if opts.address then
+      -- Net addresses.
       return lex_addr_or_host(str, pos)
    end
 
@@ -235,14 +236,12 @@ local function lex(str, pos, opts)
    local one = str:sub(pos,pos)
    if punctuation[one] then return one, pos+1 end
 
-   -- Numeric literals or net addresses.
-   if opts.maybe_arithmetic and one:match('^%d') then
-      if two == ('0x') then
-         return lex_hex(str, pos+2)
-      elseif two:match('^0%d') then
-         return lex_octal(str, pos)
-      else
-         return lex_decimal(str, pos)
+   -- Numeric literals.
+   if opts.maybe_arithmetic then
+      local kind, number, next_pos = maybe_lex_number(str, pos)
+      if kind then
+         assert(number, "unexpected end of "..kind.." literal at "..pos)
+         return number, next_pos
       end
    end
 
@@ -1081,6 +1080,10 @@ function selftest ()
               { 'tcp_src_portrange', { 7, 20 } })
    parse_test("tcp port 80",
               { 'tcp_port', 80 })
+   parse_test("tcp port 0x50",
+              { 'tcp_port', 80 })
+   parse_test("tcp port 0120",
+              { 'tcp_port', 80 })
    parse_test("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)",
               { "and",
                  { "tcp_port", 80 },
@@ -1155,5 +1158,11 @@ function selftest ()
    parse_error_test("tcp src portrange 0x1-0x2", "error parsing portrange 0x1-0x2")
    parse_error_test("tcp src portrange ::1", "error parsing portrange :")
    parse_error_test("tcp src port ::1", "unsupported port :")
+   parse_error_test("123$", "unexpected end of decimal literal at 1")
+   parse_error_test("0x123$", "unexpected end of hexadecimal literal at 1")
+   parse_error_test("0123$", "unexpected end of octal literal at 1")
+   parse_error_test("0 = 0x", "unexpected end of hexadecimal literal at 5")
+   parse_error_test("0 = 08", "unexpected end of octal literal at 5")
+   parse_error_test("0 = 09", "unexpected end of octal literal at 5")
    print("OK")
 end
