@@ -9,6 +9,7 @@ local savefile = require("pf.savefile")
 local optimize = require('pf.optimize')
 local utils = require("pf.utils")
 local pfcompile = require('pfquickcheck.pfcompile')
+local libpcap = require("pf.libpcap")
 
 local function usage()
    print([[
@@ -49,9 +50,10 @@ local function filter(packets, preds, pkt_number)
       print(msg:format(pipelines, res))
    else
       print("BUG: pipelines diverged.")
+      print(libpcap.pcap_version())
       local trues, falses = {}, {}
       for k, v in pairs(results) do
-         if v then 
+         if v then
             table.insert(trues, k)
          else
             table.insert(falses, k)
