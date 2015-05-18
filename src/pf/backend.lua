@@ -169,12 +169,15 @@ local function cleanup(expr, is_last)
 end
 
 local function filter_builder(...)
-   local written = 'return function('
+   -- Reserve first part for libraries.
+   local parts = {'', 'return function('}
+   local nparts = 2
    local indent = ''
    local libraries = {}
    local builder = {}
    function builder.write(str)
-      written = written .. str
+      nparts = nparts + 1
+      parts[nparts] = str
    end
    function builder.writeln(str)
       builder.write(indent .. str .. '\n')
@@ -206,12 +209,13 @@ local function filter_builder(...)
    end
    function builder.header()
       for _,library in pairs(libraries) do
-         written = library.."\n"..written
+         parts[1] = library.."\n"..parts[1]
       end
    end
-   function builder.finish(str)
+   function builder.finish()
       builder.pop()
       builder.header()
+      local written = table.concat(parts)
       if verbose then print(written) end
       return written
    end
