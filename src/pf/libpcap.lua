@@ -10,6 +10,7 @@ local MAX_UINT32 = 0xffffffff
 
 ffi.cdef[[
 typedef struct pcap pcap_t;
+const char *pcap_lib_version(void);
 int pcap_datalink_name_to_val(const char *name);
 pcap_t *pcap_open_dead(int linktype, int snaplen);
 char *pcap_geterr(pcap_t *p);
@@ -66,6 +67,10 @@ function compile(filter_str, dlt_name, optimize)
    end
 
    return bpf
+end
+
+function pcap_version()
+   return ffi.string(pcap.pcap_lib_version())
 end
 
 function selftest ()
