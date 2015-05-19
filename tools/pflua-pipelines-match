@@ -135,6 +135,17 @@ local function get_nonflag_args(args)
    return nf
 end
 
+local function filter_string_or_file_contents(filter_or_file)
+   local fd = io.open(filter_or_file)
+   if fd == nil then
+      return filter_or_file -- not a file
+   else
+      local contents = fd:read('*a')
+      fd:close()
+      return contents
+   end
+end
+
 local function run_filters(...)
    local opts = utils.set(...)
    local arg = get_nonflag_args({...})
@@ -167,6 +178,8 @@ local function run_filters(...)
    end
    local pcap_file, filter_str, pkt_number = arg[1], arg[2], arg[3]
    if not pkt_number then usage() end
+   filter_str = filter_string_or_file_contents(filter_str)
+   print(filter_str)
    os.exit(main_pflang(pcap_file, filter_str, tonumber(pkt_number), optimize))
 end
 
