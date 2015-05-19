@@ -21,6 +21,17 @@ Options:
    os.exit()
 end
 
+local function filter_string_or_file_contents(filter_or_file)
+   local fd = io.open(filter_or_file)
+   if fd == nil then
+      return filter_or_file -- not a file
+   else
+      local contents = fd:read('*a')
+      fd:close()
+      return contents
+   end
+end
+
 -- Print help
 if #arg == 0 then
    usage()
@@ -43,7 +54,7 @@ end
 local optimize = true
 if flags["-O0"] then optimize = false end
 
-local filter = arg[#arg]
+local filter = filter_string_or_file_contents(arg[#arg])
 if flags["--bpf-asm"] then
    print(pf.compile_filter(filter, {libpcap=true, source=true,
                                     optimize=optimize}))
