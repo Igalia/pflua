@@ -10,7 +10,7 @@ local function usage()
    local content = [=[
 Usage: pflua-expand [-O0] <pflang-expression>
 Options:
-   --O0       Disable optimizations; optimizations are on by default.]=]
+   -O0       Disable optimizations; optimizations are on by default.]=]
    print(content);
    os.exit()
 end
@@ -27,7 +27,8 @@ if flags["--help"] or flags["-h"] then
    usage()
 end
 
-local expanded = pf.expand.expand(pf.parse.parse(arg[1]), "EN10MB")
+local filter = arg[#arg]
+local expanded = pf.expand.expand(pf.parse.parse(filter), "EN10MB")
 if flags["-O0"] then
    utils.pp(expanded)
 else
