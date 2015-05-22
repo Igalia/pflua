@@ -239,6 +239,7 @@ function simplify_if(test, t, f)
    elseif t[1] == 'true' and f[1] == 'false' then return test
    -- 'match' will only be residualized in tail position.
    elseif t[1] == 'match' and f[1] == 'fail' then return test
+   elseif t[1] == 'fail' and f[1] == 'fail' then return { 'fail' }
    -- FIXME: Memoize cfkey to avoid O(n^2) badness.
    elseif op == 'if' then
       if test[3][1] == 'fail' then
