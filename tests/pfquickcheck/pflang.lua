@@ -226,7 +226,7 @@ local function PacketAccess()
    return {'(', guard, 'and', pkt_access, comparisonOp(), uint8(), ')'}
 end
 
-local function PflangClause()
+function PflangClause()
    return choose({ProtocolName, Port, PortRange, ProtocolWithPort,
                   Host, Net, Math, LenWithMath, PacketAccess})()
 end
