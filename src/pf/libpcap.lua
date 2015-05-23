@@ -22,6 +22,7 @@ int pcap_offline_filter(const struct bpf_program *fp,
 ]]
 
 function offline_filter(bpf, hdr, pkt)
+   if not pcap then pcap = ffi.load("pcap") end
    return pcap.pcap_offline_filter(bpf, hdr, pkt)
 end
 
@@ -69,7 +70,8 @@ function compile(filter_str, dlt_name, optimize)
    return bpf
 end
 
-function pcap_version()
+function pcap_version() 
+   if not pcap then pcap = ffi.load("pcap") end
    return ffi.string(pcap.pcap_lib_version())
 end
 
