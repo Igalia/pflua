@@ -88,13 +88,12 @@ end
 
 cfkey = memoize(function (expr)
    if type(expr) == 'table' then
-      local parts = {'(', cfkey(expr[1])}
-      for i=2,#expr do
-         parts[i*2-1] = ' '
-         parts[i*2] = cfkey(expr[i])
+      local parts = {'('}
+      for i=1,#expr do
+         parts[i+1] = cfkey(expr[i])
       end
-      parts[#expr*2+1] = ')'
-      return table.concat(parts)
+      parts[#parts+1] = ')'
+      return table.concat(parts, " ")
    else
       return expr
    end
