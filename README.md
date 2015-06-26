@@ -134,9 +134,10 @@ for known bugs, and please file a bug if you find one.  Cheers :)
 ## Authors
 
 Pflua was written by Katerina Barone-Adesi, Andy Wingo, Diego Pino, and
-Javier Muñoz at [Igalia, S.L.](https://www.igalia.com/).  Development of
-pflua was supported by Luke Gorrie at [Snabb Gmbh](http://snabb.co/),
-purveyors of fine networking solutions.  Thanks, Snabb!
+Javier Muñoz at [Igalia, S.L.](https://www.igalia.com/), as well as
+Peter Melnichenko. Development of pflua was supported by Luke Gorrie at
+[Snabb Gmbh](http://snabb.co/), purveyors of fine networking solutions. 
+Thanks, Snabb!
 
 Feedback is very welcome!  If you are interested in pflua in a Snabb
 context, probably the best thing is to post a message to the
