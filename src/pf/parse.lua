@@ -993,12 +993,12 @@ function selftest ()
               '(', '(', 'tcp', '[', 12, ']', '&', 240, ')', '>>', 2, ')',
               ')', '!=', 0, ')'
             }, {maybe_arithmetic=true})
-   lex_test("host 127.0.0.1", { 'host', { 'ipv4', 127, 0, 0, 1 } }, {address=true})
-   lex_test("host ::", { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 0 } }, {address=true})
-   lex_test("host eee:eee:eee:eee:eee:eee:10.20.30.40",
-            { 'host', { 'ipv6', 3822, 3822, 3822, 3822, 3822, 3822, 2580, 7720 } }, {address=true})
-   lex_test("host ::10.20.30.40",
-            { 'host', { 'ipv6', 0, 0, 0, 0, 0, 0, 2580, 7720 } }, {address=true})
+   lex_test("127.0.0.1", { { 'ipv4', 127, 0, 0, 1 } }, {address=true})
+   lex_test("::", { { 'ipv6', 0, 0, 0, 0, 0, 0, 0, 0 } }, {address=true})
+   lex_test("eee:eee:eee:eee:eee:eee:10.20.30.40",
+            { { 'ipv6', 3822, 3822, 3822, 3822, 3822, 3822, 2580, 7720 } }, {address=true})
+   lex_test("::10.20.30.40",
+            { { 'ipv6', 0, 0, 0, 0, 0, 0, 2580, 7720 } }, {address=true})
 
    local function addr_error_test(str, expected_err)
       local lexer = tokens(str)
