@@ -938,10 +938,16 @@ function parse_logical(lexer, pick_first)
    return expr
 end
 
-function parse(str)
+function parse(str, opts)
+   opts = opts or {}
    local lexer = tokens(str)
-   if not lexer.peek({maybe_arithmetic=true}) then return { 'true' } end
-   local expr = parse_logical(lexer)
+   local expr
+   if opts.arithmetic then
+      expr = parse_arithmetic(lexer)
+   else
+      if not lexer.peek({maybe_arithmetic=true}) then return { 'true' } end
+      expr = parse_logical(lexer)
+   end
    if lexer.peek() then error("unexpected token "..lexer.peek()) end
    return expr
 end
