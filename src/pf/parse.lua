@@ -32,28 +32,34 @@ local function lex_host_or_keyword(str, pos)
    return tonumber(name, 10) or name, next_pos
 end
 
-local function lex_ipv4_or_host(str, pos)
+local function lex_ipv4(str, pos)
    local function lex_byte(str)
       local byte = tonumber(str, 10)
       if byte >= 256 then return nil end
       return byte
    end
-   local digits, dot = str:match("^(%d%d?%d?)()%.", pos)
-   if not digits then return lex_host_or_keyword(str) end
+   local digits, dot = str:match("^(%d%d?%d?)()", pos)
+   if not digits then return nil end
    local addr = { 'ipv4' }
    local byte = lex_byte(digits)
-   if not byte then return lex_host_or_keyword(str, pos) end
+   if not byte then return nil end
    table.insert(addr, byte)
    pos = dot
    for i=1,3 do
       local digits, dot = str:match("^%.(%d%d?%d?)()", pos)
       if not digits then break end
-      local byte = assert(lex_byte(digits), "failed to parse ipv4 addr")
+      local byte = lex_byte(digits)
+      if not byte then return nil end
       table.insert(addr, byte)
       pos = dot
    end
+
+   local last_char = str:sub(pos, pos)
+   -- IPv4 address is actually a hostname
+   if last_char:match("[%w.-]") then return nil end
+
    local terminators = " \t\r\n)/"
-   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
+   assert(pos > #str or terminators:find(last_char, 1, true),
           "unexpected terminator for ipv4 address")
    return addr, pos
 end
@@ -157,31 +163,6 @@ local function lex_ehost(str, pos)
    return addr, pos
 end
 
-local function lex_net_ipv4(str, pos)
-   local function lex_byte(str)
-      local byte = tonumber(str, 10)
-      if byte >= 256 then return nil end
-      return byte
-   end
-   local addr = { 'ipv4' }
-   local digits, dot = str:match("^(%d%d?%d?)()", pos)
-   if not digits then return lex_host_or_keyword(str, pos) end
-   local bytes = lex_byte(digits)
-   table.insert(addr, bytes)
-   pos = dot
-   for i=1,3 do
-      digits, dot = str:match(".(%d%d?%d?)()", pos)
-      if not digits then break end
-      bytes = lex_byte(digits)
-      table.insert(addr, bytes)
-      pos = dot
-   end
-   local terminators = " \t\r\n)/"
-   assert(pos > #str or terminators:find(str:sub(pos, pos), 1, true),
-          "unexpected terminator for ipv4 address")
-   return addr, pos
-end
-
 local function lex_addr_or_host(str, pos)
    if str:match('^%x%x?:%x%x?:%x%x?:%x%x?:%x%x?:%x%x?', pos) then
       local result, pos = lex_ehost(str, pos)
@@ -189,13 +170,12 @@ local function lex_addr_or_host(str, pos)
       return lex_ipv6(str, pos)
    elseif str:match("^%x?%x?%x?%x?%:", pos) then
       return lex_ipv6(str, pos)
-   elseif str:match("^net%s+%d", pos - 4) then
-      return lex_net_ipv4(str, pos)
-   elseif str:match("^%d%d?%d?%.", pos) then
-      return lex_ipv4_or_host(str, pos)
-   else
-      return lex_host_or_keyword(str, pos)
+   elseif str:match("^%d%d?%d?", pos) then
+      local result, pos = lex_ipv4(str, pos)
+      if result then return result, pos end  -- Fall through.
    end
+
+   return lex_host_or_keyword(str, pos)
 end
 
 local number_terminators = " \t\r\n)]!<>=+-*/%&|^"
@@ -1024,6 +1004,16 @@ function selftest ()
               { 'true' })
    parse_test("host 127.0.0.1",
               { 'host', { 'ipv4', 127, 0, 0, 1 } })
+   parse_test("host 1www.foo.com",
+              { 'host', '1www.foo.com' })
+   parse_test("host 999.foo.com",
+              { 'host', '999.foo.com' })
+   parse_test("host 200.foo.com",
+              { 'host', '200.foo.com' })
+   parse_test("host 1.2.3.4foo.com",
+              { 'host', '1.2.3.4foo.com' })
+   parse_test("host 1.2.3.4.5.com",
+              { 'host', '1.2.3.4.5.com' })
    parse_test("src host 127.0.0.1",
               { 'src_host', { 'ipv4', 127, 0, 0, 1 } })
    parse_test("src net 10.0.0.0/24",
@@ -1148,6 +1138,8 @@ function selftest ()
    parse_test("net 192.168",
                { 'net', { 'ipv4/len', { 'ipv4', 192, 168, 0, 0 }, 16 } })
    parse_test("net 192",
+               { 'net', { 'ipv4/len', { 'ipv4', 192, 0, 0, 0 }, 8 } })
+   parse_test("net  192",
                { 'net', { 'ipv4/len', { 'ipv4', 192, 0, 0, 0 }, 8 } })
 
    local function parse_error_test(str, expected_err)
