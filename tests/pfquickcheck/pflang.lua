@@ -22,6 +22,12 @@ local function uint8() return math.random(0, 2^8-1) end
 
 local function uint16() return math.random(0, 2^16-1) end
 
+local function tohex(n) return string.format("%x", n) end
+
+local function hexByte() return tohex(math.random(0, 0xff)) end
+
+local function hexWord() return tohex(math.random(0, 0xffff)) end
+
 -- Boundary numbers are often particularly interesting; test them often
 local function uint32()
    if math.random() < 0.2
@@ -99,28 +105,104 @@ local function ipv4Addr()
    return table.concat({ uint8(), uint8(), uint8(), uint8() }, '.')
 end
 
--- TODO: generate ipv6 addresses
-local function Host()
-   return optionally_add_src_or_dst({ 'host', ipv4Addr() })
-end
-
-local function netmask() return math.random(0, 32) end
+local function ipv4Netmask() return math.random(0, 32) end
 
 -- This function is overly conservative with zeroing octets.
 -- TODO: zero more precisely?
-function netspec()
-   local mask = netmask()
+local function ipv4Netspec()
+   local r = math.random()
    local o1, o2, o3, o4 = uint8(), uint8(), uint8(), uint8()
-   if mask < 32 then o4 = 0 end
-   if mask < 24 then o3 = 0 end
-   if mask < 16 then o2 = 0 end
-   if mask < 8 then o1 = 0 end
-   local addr = table.concat({ o1, o2, o3, o4 }, '.')
-   return addr .. '/' .. mask
+
+   -- a bare number like '12' is interpreted as 12.0.0.0/8
+   if r < 0.05 then return tostring(o1)
+   elseif r < 0.10 then return table.concat({o1, o2}, '.')
+   elseif r < 0.15 then return table.concat({o1, o2, o3}, '.')
+   else -- return a normal ipv4 netmask
+      local mask = ipv4Netmask()
+      if mask < 32 then o4 = 0 end
+      if mask < 24 then o3 = 0 end
+      if mask < 16 then o2 = 0 end
+      if mask < 8 then o1 = 0 end
+      local addr = table.concat({ o1, o2, o3, o4 }, '.')
+      return addr .. '/' .. mask
+   end
 end
 
-function Net()
-   return optionally_add_src_or_dst({ 'net', netspec() })
+local function abbreviate_ipv6(addrt)
+   local addrt = utils.dup(addrt)
+   local startgap = math.random(2, 7)
+   local gapbytes = math.random(1, 8 - startgap)
+   while gapbytes > 0 do
+      table.remove(addrt, startgap)
+      gapbytes = gapbytes - 1
+   end
+   table.insert(addrt, startgap, '')
+   return addrt
+end
+
+local function ipv6Chunks()
+   local o1, o2, o3, o4 = hexWord(), hexWord(), hexWord(), hexWord()
+   local o5, o6, o7, o8 = hexWord(), hexWord(), hexWord(), hexWord()
+   return {o1, o2, o3, o4, o5, o6, o7, o8}
+end
+
+-- Sometimes, use abbreviated :: form addresses.
+local function ipv6Addr()
+   local r = math.random()
+   local addrt = ipv6Chunks()
+   if r > 0.9 then addrt = abbreviate_ipv6(addrt) end
+   return table.concat(addrt, ':')
+end
+
+local function ipv6Netspec()
+   local r = math.random()
+   local maskbytes = math.random(1, 8)
+   local maskbits = maskbytes * 16
+   local addrt = ipv6Chunks()
+   while maskbytes <= 8 do
+      addrt[maskbytes] = 0
+      maskbytes = maskbytes + 1
+   end
+   if r > 0.9 then addrt = abbreviate_ipv6(addrt) end
+   return table.concat(addrt, ':') .. '/' .. maskbits
+end
+
+local function ipAddr()
+   local r = math.random()
+   if r < 0.5 then return ipv6Addr()
+   else return ipv4Addr()
+   end
+end
+
+-- A bare IP address is a valid netmask too, in this context.
+local function ipv4Net()
+   local r = math.random()
+   if r < 0.9 then return ipv4Netspec()
+   else return ipv4Addr()
+   end
+end
+
+local function ipv6Net()
+   local r = math.random()
+   if r < 0.9 then return ipv6Netspec()
+   else return ipv6Addr()
+   end
+end
+
+local function ipNet()
+   local r = math.random()
+   if r < 0.5 then return ipv4Net()
+   else return ipv6Net()
+   end
+end
+
+-- TODO: generate ipv6 addresses
+local function Host()
+   return optionally_add_src_or_dst({ 'host', ipAddr() })
+end
+
+local function Net()
+   return optionally_add_src_or_dst({ 'net', ipNet() })
 end
 
 -- ^ intentionally omitted; 'len < 1 ^ 1' is not valid pflang
@@ -226,9 +308,21 @@ local function PacketAccess()
    return {'(', guard, 'and', pkt_access, comparisonOp(), uint8(), ')'}
 end
 
+local function etherAddr()
+   local e1, e2, e3 = hexByte(), hexByte(), hexByte()
+   local e4, e5, e6 = hexByte(), hexByte(), hexByte()
+   return table.concat({e1, e2, e3, e4, e5, e6}, ':')
+end
+
+local function Ether()
+   local qual = choose({'host', 'src', 'dst'})
+   local addr = etherAddr()
+   return {'ether', qual, addr}
+end
+
 local function PflangClause()
    return choose({ProtocolName, Port, PortRange, ProtocolWithPort,
-                  Host, Net, Math, LenWithMath, PacketAccess})()
+                  Host, Net, Math, LenWithMath, PacketAccess, Ether})()
 end
 
 -- Add logical operators (or/not)
