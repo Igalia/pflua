@@ -1137,15 +1137,25 @@ function expand_arith(expr, dlt)
       return ret, guards
    end
 
+   local is_addr = false
+   if op == 'addr' then
+      is_addr = true
+      expr = expr[2]
+      op = expr[1]
+   end
    assert(op ~= '[]', "expr has already been expanded?")
    local addressable = assert(op:match("^%[(.+)%]$"), "bad addressable")
    local offset, offset_guards = expand_offset(addressable, dlt)
    local lhs, lhs_guards = expand_arith(expr[2], dlt)
    local size = expr[3]
    local len_test = { '<=', { '+', { '+', offset, lhs }, size }, 'len' }
-   local len_guard = { len_test, { 'fail' } }
+   -- ip[100000] will abort the whole matcher.  &ip[100000] will just
+   -- cause the clause to fail to match.
+   local len_guard = { len_test, is_addr and { 'false' } or { 'fail' } }
    local guards = concat(concat(offset_guards, lhs_guards), { len_guard })
-   local ret =  { '[]', { '+', offset, lhs }, size }
+   local addr =  { '+', offset, lhs }
+   if is_addr then return addr, guards end
+   local ret = { '[]', addr, size }
    if size == 1 then return ret, guards end
    if size == 2 then return { 'ntohs', ret }, guards end
    if size == 4 then return { 'uint32', { 'ntohl', ret } }, guards end

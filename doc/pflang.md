@@ -9,7 +9,9 @@ pleasantly terse and expressive, and has a huge amount of
 domain-specific knowledge baked into it.
 
 At the same time, to a language professional, pflang can be infuriating.
-This page documents some less-known aspects of pflang.
+This page documents some less-known aspects of pflang.  See also [pflua
+extensions to
+pflang](https://github.com/Igalia/pflua/blob/master/doc/extensions.md).
 
 ## Specification
 
@@ -96,8 +98,8 @@ Some parts of pflang are quite surprising.
 One set of restrictions is for packet accessors, e.g. the `ip[0]` in
 `ip[0] == 42`.
 
-* If the packet is not an IPv4 or IPv6 packet, the filter will
-  immediately fail.
+* If the packet is not an IPv4 or IPv6 packet, the clause fails to
+  match.
 
 * If the index (e.g. 0 in this case) is not within the packet, then the
   filter immediately fails.

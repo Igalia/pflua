@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+allow_address_of = true
+
 local utils = require('pf.utils')
 local constants = require('pf.constants')
 
@@ -704,6 +706,25 @@ local rarp_types = {
 
 local parse_arithmetic
 
+local function parse_addressable(lexer, tok)
+   if not tok then
+      tok = lexer.next({maybe_arithmetic=true})
+      if not addressables[tok] then
+         lexer.error('bad token while parsing addressable: %s', tok)
+      end
+   end
+   lexer.consume('[')
+   local pos = parse_arithmetic(lexer)
+   local size = 1
+   if lexer.check(':') then
+      if lexer.check(1) then size = 1
+      elseif lexer.check(2) then size = 2
+      else lexer.consume(4); size = 4 end
+   end
+   lexer.consume(']')
+   return { '['..tok..']', pos, size}
+end
+
 local function parse_primary_arithmetic(lexer, tok)
    tok = tok or lexer.next({maybe_arithmetic=true})
    if tok == '(' then
@@ -712,17 +733,10 @@ local function parse_primary_arithmetic(lexer, tok)
       return expr
    elseif tok == 'len' or type(tok) == 'number' then
       return tok
+   elseif allow_address_of and tok == '&' then
+      return { 'addr', parse_addressable(lexer) }
    elseif addressables[tok] then
-      lexer.consume('[')
-      local pos = parse_arithmetic(lexer)
-      local size = 1
-      if lexer.check(':') then
-         if lexer.check(1) then size = 1
-         elseif lexer.check(2) then size = 2
-         else lexer.consume(4); size = 4 end
-      end
-      lexer.consume(']')
-      return { '['..tok..']', pos, size}
+      return parse_addressable(lexer, tok)
    else
       -- 'tok' may be a constant
       local val = constants.protocol_header_field_offsets[tok] or

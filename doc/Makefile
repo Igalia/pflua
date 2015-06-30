@@ -43,7 +43,8 @@ EXAMPLES = \
 	packet-access-igrp.md \
 	packet-access-vrrp.md \
 	packet-access-sctp.md \
-	icmp6-or-ip.md
+	icmp6-or-ip.md \
+	tcp-address.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -186,3 +187,6 @@ packet-access-sctp.md: $(PFLUA)
 
 icmp6-or-ip.md: $(PFLUA)
 	../tools/dump-markdown "icmp6 or ip" > $@.tmp && mv $@.tmp $@
+
+tcp-address.md: $(PFLUA)
+	../tools/dump-markdown "ether[&tcp[0]] = tcp[0]" > $@.tmp && mv $@.tmp $@
