@@ -179,15 +179,24 @@ local function simplify(expr, is_tail)
       if type(lhs) == 'number' and type(rhs) == 'number' then
          return assert(folders[op])(lhs, rhs)
       elseif associative_binops[op] then
-         if type(rhs) == 'table' and rhs[1] == op and type(lhs) == 'number' then
+         -- Try to make the right operand a number.
+         if type(lhs) == 'number' then
             lhs, rhs = rhs, lhs
          end
-         if type(lhs) == 'table' and lhs[1] == op and type(rhs) == 'number' then
-            if type(lhs[2]) == 'number' then
-               return { op, assert(folders[op])(lhs[2], rhs), lhs[3] }
-            elseif type(lhs[3]) == 'number' then
+         if type(lhs) == 'table' and lhs[1] == op and type(lhs[3]) == 'number' then
+            if type(rhs) == 'number' then
+               -- (A op N1) op N2 -> A op (N1 op N2)
                return { op, lhs[2], assert(folders[op])(lhs[3], rhs) }
+            elseif type(rhs) == 'table' and rhs[1] == op and type(rhs[3]) == 'number' then
+               -- (A op N1) op (B op N2) -> (A op B) op (N1 op N2)
+               return { op, { op, lhs[2], rhs[2] }, assert(folders[op])(lhs[3], rhs[3]) }
+            else
+               -- (A op N) op X -> (A op X) op N
+               return { op, { op, lhs[2], rhs }, lhs[3] }
             end
+         elseif type(rhs) == 'table' and rhs[1] == op and type(rhs[3]) == 'number' then
+            -- X op (A op N) -> (X op A) op N
+            return { op, { op, lhs, rhs[2]}, rhs[3] }
          end
          if coerce_ops[op] then lhs, rhs = decoerce(lhs), decoerce(rhs) end
       end
@@ -766,6 +775,18 @@ function selftest ()
                    { '=', { '[]', 0, 1 }, 2 },
                    { 'fail' }},
       opt("ether[0] = 2"))
+   assert_equals({ 'if', { '>=', 'len', 7},
+                   { '<',
+                     { '+', { '+', { '[]', 5, 1 }, { '[]', 6, 1 } }, 3 },
+                     10 },
+                   { 'fail' }},
+      opt("(ether[5] + 1) + (ether[6] + 2) < 10"))
+   assert_equals({ 'if', { '>=', 'len', 7},
+                   { '<',
+                     { '+', { '+', { '[]', 5, 1 }, { '[]', 6, 1 } }, 3 },
+                     10 },
+                   { 'fail' }},
+      opt("ether[5] + 1 + ether[6] + 2 < 10"))
    assert_equals({ '>=', 'len', 2},
       opt("greater 1 and greater 2"))
    -- Could check this, but it's very large
