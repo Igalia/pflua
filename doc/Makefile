@@ -44,7 +44,8 @@ EXAMPLES = \
 	packet-access-vrrp.md \
 	packet-access-sctp.md \
 	icmp6-or-ip.md \
-	tcp-address.md
+	tcp-address.md \
+	fail-fail.md
 
 PFLUA = \
 	../src/pf.lua \
@@ -190,3 +191,6 @@ icmp6-or-ip.md: $(PFLUA)
 
 tcp-address.md: $(PFLUA)
 	../tools/dump-markdown "ether[&tcp[0]] = tcp[0]" > $@.tmp && mv $@.tmp $@
+
+fail-fail.md: $(PFLUA)
+	../tools/dump-markdown "tcp and tcp[100] == 1" > $@.tmp && mv $@.tmp $@
