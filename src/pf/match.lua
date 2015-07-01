@@ -286,10 +286,9 @@ function compile(str, opts)
    local expr = expand(parse(str), opts.dlt)
    if opts.optimize then expr = optimize.optimize(expr) end
    expr = anf.convert_anf(expr)
-   -- expr = ssa.convert_ssa(expr)
-   -- if opts.source then return backend.emit_match_lua(expr) end
-   -- return backend.emit_and_load_match(expr, filter_str)
-   return expr
+   expr = ssa.convert_ssa(expr)
+   if opts.source then return backend.emit_match_lua(expr) end
+   return backend.emit_and_load_match(expr, filter_str)
 end
 
 function selftest()
@@ -344,7 +343,7 @@ function selftest()
 
    local function test(str, expr)
       -- Just a test to see if it works without errors.
-      ssa.convert_ssa(anf.convert_anf(optimize.optimize(expand(parse(str), 'EN10MB'))))
+      compile(str)
    end
    test("match { tcp port 80 => pass }")
 
