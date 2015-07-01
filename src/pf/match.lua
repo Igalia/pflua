@@ -41,8 +41,8 @@ module(...,package.seeall)
 ---
 
 local utils = require('pf.utils')
-local set, assert_equals = utils.set, utils.assert_equals
 local parse_pflang = require('pf.parse').parse
+local expand_pflang = require('pf.expand').expand
 
 local function split(str, pat)
    pat = '()'..pat..'()'
@@ -198,6 +198,21 @@ local function parse_captures(scanner)
    return captures
 end
 
+local function subst(str, values)
+   local out, pos = '', 1
+   while true do
+      local before, after = str:match('()%$[%w_]+()', pos)
+      if not before then return out..str:sub(pos) end
+      out = out..str:sub(pos, before - 1)
+      local var = str:sub(before + 1, after - 1)
+      local val = values[var]
+      if not val then error('var not found: '..var) end
+      out = out..val
+      pos = after
+   end
+   return out
+end
+
 function parse(str)
    local scanner = scanner(str)
    scanner.consume('match')
@@ -207,9 +222,90 @@ function parse(str)
    return { 'match', captures, dispatch }
 end
 
+local function expand_arg(arg)
+   -- The argument is an arithmetic expression, but the pflang expander
+   -- expects a logical expression.  Wrap in a dummy comparison, then
+   -- tease apart the conditions and the arithmetic expression.
+   local expr = expand_pflang({ '=', arg, 0 })
+   local conditions = {}
+   while expr[1] == 'if' do
+      table.insert(conditions, expr[2])
+      assert(type(expr[4]) == 'table')
+      assert(expr[4][1] == 'fail' or expr[4][1] == 'false')
+      expr = expr[3]
+   end
+   assert(expr[1] == '=' and expr[3] == 0)
+   return conditions, expr[2]
+end
+
+local function expand_call(expr, dlt)
+   local conditions = {}
+   local res = { expr[1], expr[2] }
+   for i=3,#expr do
+      local arg_conditions, arg = expand_arg(expr[i], dlt)
+      conditions = utils.concat(conditions, arg_conditions)
+      table.insert(res, arg)
+   end
+   local test = { 'true' }
+   -- Preserve left-to-right order of conditions.
+   while #conditions ~= 0 do
+      test = { 'if', table.remove(conditions), test, { 'false' } }
+   end
+   return test, res
+end
+
+local expand_cond
+
+local function expand_clause(test, consequent, dlt)
+   test = expand_pflang(test)
+   if consequent[1] == 'call' then
+      local conditions, call = expand_call(consequent, dlt)
+      return { 'if', test, conditions, { 'false' } }, call
+   else
+      assert(consequent[1] == 'cond')
+      return test, expand_cond(consequent, dlt)
+   end
+end
+
+function expand_cond(expr, dlt)
+   local res = { 'false' }
+   for i=#expr,2,-1 do
+      local clause = expr[i]
+      local test, consequent = expand_clause(clause[1], clause[2], dlt)
+      res = { 'if', test, consequent, res }
+   end
+   return res
+end
+
+function expand(expr, dlt)
+   assert(type(expr) == 'table' and expr[1] == 'match', 'bad match expr')
+   local dispatch = expr[3]
+   assert(type(dispatch) == 'table', 'bad dispatch expr')
+   if dispatch[1] == 'call' then
+      local test, call = expand_call(dispatch, dlt)
+      dispatch = { 'if', test, call, { 'false' } }
+   else
+      assert(dispatch[1] == 'cond', 'bad dispatch expr')
+      dispatch = expand_cond(dispatch, dlt)
+   end
+   return { 'match', expr[2], dispatch }
+end
+
+local compile_defaults = {
+   dlt='EN10MB', optimize=true, source=false, subst=false
+}
+
+function compile(str, opts)
+   opts = utils.parse_opts(opts or {}, compile_defaults)
+   if opts.subst then str = subst(str, opts.subst) end
+   return expand(parse(str), opts.dlt)
+end
+
 function selftest()
    print("selftest: pf.match")
-   local function test(str, expr) assert_equals(expr, parse(str)) end
+   local function test(str, expr)
+      utils.assert_equals(expr, parse(str))
+   end
    test("match () {}", { 'match', {}, { 'cond' } })
    test("match (\n--comment\n) {}", { 'match', {}, { 'cond' } })
    test("match (x,y) {}", { 'match', { 'x', 'y' }, { 'cond' } })
@@ -227,5 +323,23 @@ function selftest()
         { 'match', { 'x', 'y' }, { 'call', 'x', { '[ip]', 42, 1 } } })
    test("match (x,y) x(ip[42], 10)",
         { 'match', { 'x', 'y' }, { 'call', 'x', { '[ip]', 42, 1 }, 10 } })
+   test(subst("match (x,y) x(ip[$loc], 10)", {loc=42}),
+        { 'match', { 'x', 'y' }, { 'call', 'x', { '[ip]', 42, 1 }, 10 } })
+
+   local function test(str, expr, opts)
+      utils.assert_equals(expr, expand(parse(str), 'EN10MB'))
+   end
+   test("match (x,y) x()",
+        { 'match', { 'x', 'y' },
+          { 'if', { 'true' }, { 'call', 'x' }, { 'false' } } })
+   test("match (x,y) x(1)",
+        { 'match', { 'x', 'y' },
+          { 'if', { 'true' }, { 'call', 'x', 1 }, { 'false' } } })
+   test("match (x,y) x(1/0)",
+        { 'match', { 'x', 'y' },
+          { 'if', { 'if', { '!=', 0, 0 }, { 'true' }, { 'false' } },
+            { 'call', 'x', { 'uint32', { '/', 1, 0 } } },
+            { 'false' } } })
+
    print("OK")
 end
