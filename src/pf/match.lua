@@ -7,13 +7,37 @@ module(...,package.seeall)
 --- Call := Identifier Args?
 --- Args := '(' [ ArithmeticExpression [ ',' ArithmeticExpression ] ] ')'
 --- Cond := '{' Clause... '}'
---- Clause := LogicalExpression '=>' Dispatch [ClauseTerminator]
+--- Clause := Test '=>' Dispatch [ClauseTerminator]
+--  Test := 'otherwise' | LogicalExpression
 --- ClauseTerminator := ',' | ';'
 ---
 --- LogicalExpression and ArithmeticExpression are embedded productions
---- of pflang.
+--- of pflang.  'otherwise' is a Test that always matches.
 ---
 --- Comments are prefixed by '--' and continue to the end of the line.
+---
+--- The result of evaluating a Program is either a tail call to a
+--- handler procedure, or nil if no dispatch matches.
+---
+--- A Call matches if all of the conditions necessary to evaluate the
+--- arithmetic expressions in its arguments are true.  (For example, the
+--- argument handle(ip[42]) is only valid if the packet is an IPv4
+--- packet of a sufficient length.)
+---
+--- A Cond always matches; once you enter a Cond, no clause outside the
+--- Cond will match.  If no clause in the Cond matches, the result is
+--- nil.
+---
+--- A Clause matches if the Test on the left-hand-side of the arrow is
+--- true.  If the right-hand-side is a call, the conditions from the
+--- call arguments (if any) are implicitly added to the Test on the
+--- left.  In this way it's possible for the Test to be true but some
+--- condition from the Call to be false, which causes the match to
+--- proceed with the next Clause.
+---
+--- Unlike pflang, attempting to access out-of-bounds packet data merely
+--- causes a clause not to match, instead of immediately aborting the
+--- match.
 ---
 
 local utils = require('pf.utils')
@@ -141,12 +165,20 @@ local function parse_call(scanner)
 end
 
 local function parse_cond(scanner)
-   if scanner.check('}') then return { 'false' } end
-   local pflang = scanner.consume_until('=>')
-   local dispatch = parse_dispatch(scanner)
-   scanner.check('[,;]')
-   local alternate = parse_cond(scanner)
-   return { 'if', parse_pflang(pflang), dispatch, alternate }
+   local res = { 'cond' }
+   while not scanner.check('}') do
+      local test
+      if scanner.check('otherwise') then
+         test = { 'true' }
+         scanner.consume('=>')
+      else
+         test = parse_pflang(scanner.consume_until('=>'))
+      end
+      local consequent = parse_dispatch(scanner)
+      scanner.check('[,;]')
+      table.insert(res, { test, consequent })
+   end
+   return res
 end
 
 function parse_dispatch(scanner)
@@ -178,13 +210,13 @@ end
 function selftest()
    print("selftest: pf.match")
    local function test(str, expr) assert_equals(expr, parse(str)) end
-   test("match () {}", { 'match', {}, { 'false' } })
-   test("match (\n--comment\n) {}", { 'match', {}, { 'false' } })
-   test("match (x,y) {}", { 'match', { 'x', 'y' }, { 'false' } })
+   test("match () {}", { 'match', {}, { 'cond' } })
+   test("match (\n--comment\n) {}", { 'match', {}, { 'cond' } })
+   test("match (x,y) {}", { 'match', { 'x', 'y' }, { 'cond' } })
    test(" match \n  (  x   , y   )   {  }   ",
-        { 'match', { 'x', 'y' }, { 'false' } })
+        { 'match', { 'x', 'y' }, { 'cond' } })
    test("match(x,y){}",
-        { 'match', { 'x', 'y' }, { 'false' } })
+        { 'match', { 'x', 'y' }, { 'cond' } })
    test("match (x,y) x()",
         { 'match', { 'x', 'y' }, { 'call', 'x' } })
    test("match (x,y) x(1)",
