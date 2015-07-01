@@ -47,6 +47,10 @@ module(...,package.seeall)
 local utils = require('pf.utils')
 local parse_pflang = require('pf.parse').parse
 local expand_pflang = require('pf.expand').expand
+local optimize = require('pf.optimize')
+local anf = require('pf.anf')
+local ssa = require('pf.ssa')
+local backend = require('pf.backend')
 
 local function split(str, pat)
    pat = '()'..pat..'()'
@@ -196,7 +200,7 @@ local function subst(str, values)
    return out
 end
 
-function parse(str)
+local function parse(str)
    local scanner = scanner(str)
    scanner.consume('match')
    scanner.consume('{')
@@ -260,7 +264,7 @@ function expand_cond(expr, dlt)
    return res
 end
 
-function expand(expr, dlt)
+local function expand(expr, dlt)
    return expand_cond(expr, dlt)
 end
 
@@ -271,7 +275,13 @@ local compile_defaults = {
 function compile(str, opts)
    opts = utils.parse_opts(opts or {}, compile_defaults)
    if opts.subst then str = subst(str, opts.subst) end
-   return expand(parse(str), opts.dlt)
+   local expr = expand(parse(str), opts.dlt)
+   if opts.optimize then expr = optimize.optimize(expr) end
+   -- expr = anf.convert_anf(expr)
+   -- expr = ssa.convert_ssa(expr)
+   -- if opts.source then return backend.emit_match_lua(expr) end
+   -- return backend.emit_and_load_match(expr, filter_str)
+   return expr
 end
 
 function selftest()
@@ -296,7 +306,7 @@ function selftest()
    test(subst("match { otherwise => x(ip[$loc], 10) }", {loc=42}),
         { 'cond', { { 'true' }, { 'call', 'x', { '[ip]', 42, 1 }, 10 } } })
 
-   local function test(str, expr, opts)
+   local function test(str, expr)
       utils.assert_equals(expr, expand(parse(str), 'EN10MB'))
    end
    test("match { otherwise => x() }",
@@ -313,6 +323,16 @@ function selftest()
                   { 'false' } },
           { 'call', 'x', { 'uint32', { '/', 1, 0 } } },
           { 'false' } })
+
+   local function test(str, expr)
+      utils.assert_equals(expr, optimize.optimize(expand(parse(str), 'EN10MB')))
+   end
+   test("match { otherwise => x() }",
+        { 'call', 'x' })
+   test("match { otherwise => x(1) }",
+        { 'call', 'x', 1 })
+   test("match { otherwise => x(1/0) }",
+        { 'fail' })
 
    print("OK")
 end
