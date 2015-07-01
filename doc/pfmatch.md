@@ -61,7 +61,7 @@ Of course, with pflang you could just match all of the clauses in order:
 
 ```lua
 not_ip = pf.compile('not ip')
-fragmented = pf.compile(ip[6:2] & 0x3fff != 0')
+fragmented = pf.compile('ip[6:2] & 0x3fff != 0')
 ...
 ...
 
@@ -106,12 +106,12 @@ end
 ```
 
 The result is an optimal dispatch.  There are always things to improve,
-but I submit that the compile Lua above is better than what you would
-write by hand.  When we write filtering code by hand, we inevitably end
-up writing /interpreters/ for some kind of filtering language.  Using
-pflua and pfmatch expressions, we can instead /compile/ a filter suited
-directly for the problem at hand -- and while we're at it, we can forget
-about worrying about pesky offsets and bit-shifts.
+but it's likely that the compiled Lua above is better than what you
+would write by hand.  When we write filtering code by hand, we
+inevitably end up writing _interpreters_ for some kind of filtering
+language.  Using pflua and pfmatch expressions, we can instead _compile_
+a filter suited directly for the problem at hand -- and while we're at
+it, we can forget about worrying about pesky offsets and bit-shifts.
 
 ## Syntax
 
