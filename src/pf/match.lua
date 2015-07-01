@@ -285,7 +285,7 @@ function compile(str, opts)
    if opts.subst then str = subst(str, opts.subst) end
    local expr = expand(parse(str), opts.dlt)
    if opts.optimize then expr = optimize.optimize(expr) end
-   -- expr = anf.convert_anf(expr)
+   expr = anf.convert_anf(expr)
    -- expr = ssa.convert_ssa(expr)
    -- if opts.source then return backend.emit_match_lua(expr) end
    -- return backend.emit_and_load_match(expr, filter_str)
@@ -341,6 +341,12 @@ function selftest()
         { 'call', 'x', 1 })
    test("match { otherwise => x(1/0) }",
         { 'fail' })
+
+   local function test(str, expr)
+      -- Just a test to see if it works without errors.
+      anf.convert_anf(optimize.optimize(expand(parse(str), 'EN10MB')))
+   end
+   test("match { tcp port 80 => pass }")
 
    print("OK")
 end

@@ -71,7 +71,7 @@ local function lower_bool(expr, k)
       return lower_bool(expr, have_bool)
    end
    local op = expr[1]
-   if (op == 'if') then
+   if op == 'if' then
       local test, t, f = expr[2], expr[3], expr[4]
       local function have_test(test)
          return k({ 'if', test, lower(t), lower(f) })
@@ -79,6 +79,17 @@ local function lower_bool(expr, k)
       return lower_bool(test, have_test)
    elseif simple[op] then
       return k(expr)
+   elseif op == 'call' then
+      local out = { 'call', expr[2] }
+      local function lower_arg(i)
+         if i > #expr then return k(out) end
+         local function have_arg(arg)
+            out[i] = arg
+            return lower_arg(i + 1)
+         end
+         return lower_arith(expr[i], have_arg)
+      end
+      return lower_arg(3)
    else
       return lower_comparison(expr, k)
    end
@@ -133,6 +144,10 @@ local function cse(expr)
          return { 'if', visit(expr[2], env), visit(expr[3], env), visit(expr[4], env) }
       elseif simple[op] then
          return expr
+      elseif op == 'call' then
+         local out = { 'call', expr[2] }
+         for i=3,#expr do table.insert(out, visit(expr[i], env)) end
+         return out
       else
          assert(relops[op])
          return { op, visit(expr[2], env), visit(expr[3], env) }
@@ -168,6 +183,8 @@ local function inline_single_use_variables(expr)
             count(expr[3])
          elseif simple[op] then
 
+         elseif op == 'call' then
+            for i=3,#expr do count(expr[i]) end
          else 
             assert(op == '[]')
             count(expr[2])
@@ -207,6 +224,10 @@ local function inline_single_use_variables(expr)
          return { 'if', subst(expr[2]), subst(expr[3]), subst(expr[4]) }
       elseif simple[op] then
          return expr
+      elseif op == 'call' then
+         local out = { 'call', expr[2] }
+         for i=3,#expr do table.insert(out, subst(expr[i])) end
+         return out
       else
          assert(relops[op])
          return { op, subst(expr[2]), subst(expr[3]) }
