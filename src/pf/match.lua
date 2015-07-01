@@ -130,6 +130,13 @@ local function scanner(str)
    local function consume(pat)
       if not check(pat) then error("expected pattern '%s'", pat) end
    end
+   local function consume_until(pat)
+      skip_whitespace()
+      local start_pos, end_pos, next_pos = pos, str:match("()"..pat.."()", pos)
+      if not next_pos then error("expected pattern '%s'") end
+      pos = next_pos
+      return str:sub(start_pos, end_pos - 1)
+   end
    local function done()
       skip_whitespace()
       return pos == #str + 1
@@ -141,6 +148,7 @@ local function scanner(str)
       next_identifier = next_identifier,
       next_balanced = next_balanced,
       consume = consume,
+      consume_until = consume_until,
       done = done
    }
 end
@@ -209,11 +217,11 @@ local function parse(str)
    return cond
 end
 
-local function expand_arg(arg)
+local function expand_arg(arg, dlt)
    -- The argument is an arithmetic expression, but the pflang expander
    -- expects a logical expression.  Wrap in a dummy comparison, then
    -- tease apart the conditions and the arithmetic expression.
-   local expr = expand_pflang({ '=', arg, 0 })
+   local expr = expand_pflang({ '=', arg, 0 }, dlt)
    local conditions = {}
    while expr[1] == 'if' do
       table.insert(conditions, expr[2])
@@ -244,7 +252,7 @@ end
 local expand_cond
 
 local function expand_clause(test, consequent, dlt)
-   test = expand_pflang(test)
+   test = expand_pflang(test, dlt)
    if consequent[1] == 'call' then
       local conditions, call = expand_call(consequent, dlt)
       return { 'if', test, conditions, { 'false' } }, call
