@@ -334,7 +334,7 @@ function parse_host_arg(lexer)
    if type(arg) == 'string' or arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       return arg
    end
-   lexer.error('invalid host %s', arg)
+   lexer.error('ethernet address used in non-ether expression')
 end
 
 function parse_int_arg(lexer, max_len)
@@ -374,6 +374,12 @@ function parse_net_arg(lexer)
    end
 
    local arg = lexer.next({address=true})
+   if type(arg) ~= 'table' then
+      lexer.error('named nets currently unsupported')
+   elseif arg[1] == 'ehost' then
+      lexer.error('ethernet address used in non-ether expression')
+   end
+
    -- IPv4 dotted triple, dotted pair or bare net addresses
    if arg[1] == 'ipv4' and #arg < 5 then
       local mask_len = 32
@@ -399,15 +405,15 @@ function parse_net_arg(lexer)
             lexer.error("Not valid syntax for IPv6")
          end
          local mask = lexer.next({address=true})
+         if type(mask) ~= 'table' or mask[1] ~= 'ipv4' then
+            lexer.error("Invalid IPv4 mask")
+         end
          check_non_network_bits_in_ipv4(arg, ipv4_to_int(mask),
             table.concat(mask, '.', 2))
-         assert(mask[1] == arg[1], 'bad mask', mask)
          return { arg[1]..'/mask', arg, mask }
       else
          return arg
       end
-   elseif type(arg) == 'string' then
-      lexer.error('named nets currently unsupported %s', arg)
    end
 end
 
@@ -1169,5 +1175,10 @@ function selftest ()
    parse_error_test("tcp src portrange 0x1-0x2", "error parsing portrange 0x1-0x2")
    parse_error_test("tcp src portrange ::1", "error parsing portrange :")
    parse_error_test("tcp src port ::1", "unsupported port :")
+   parse_error_test("host ff:ff:ff:ff:ff:ff", "ethernet address used in non-ether expression")
+   parse_error_test("net ff:ff:ff:ff:ff:ff", "ethernet address used in non-ether expression")
+   parse_error_test("net 192.168.1.0 mask foobar", "Invalid IPv4 mask")
+   parse_error_test("net 192.168.1.0 mask ::", "Invalid IPv4 mask")
+   parse_error_test("net 192.168.1.0 mask ff:ff:ff:ff:ff:ff", "Invalid IPv4 mask")
    print("OK")
 end
