@@ -1,23 +1,27 @@
 module(...,package.seeall)
 
 ---
---- Program := 'match' Captures Dispatch
---- Captures := '(' [ Identifier' [',' Identifier]... ] ')'
---- Dispatch := Call | Cond
---- Call := Identifier Args?
---- Args := '(' [ ArithmeticExpression [ ',' ArithmeticExpression ] ] ')'
+--- Program := 'match' Cond
 --- Cond := '{' Clause... '}'
 --- Clause := Test '=>' Dispatch [ClauseTerminator]
 --  Test := 'otherwise' | LogicalExpression
 --- ClauseTerminator := ',' | ';'
+--- Dispatch := Call | Cond
+--- Call := Identifier Args?
+--- Args := '(' [ ArithmeticExpression [ ',' ArithmeticExpression ] ] ')'
 ---
 --- LogicalExpression and ArithmeticExpression are embedded productions
 --- of pflang.  'otherwise' is a Test that always matches.
 ---
 --- Comments are prefixed by '--' and continue to the end of the line.
 ---
---- The result of evaluating a Program is either a tail call to a
---- handler procedure, or nil if no dispatch matches.
+--- Compiling a Program produces a Matcher.  A Matcher is a function of
+--- three arguments: a handlers table, the packet data as a uint8_t*,
+--- and the packet length in bytes.
+---
+--- Calling a Matcher will either result in a tail call to a member
+--- function of the handlers table, or return nil if no dispatch
+--- matches.
 ---
 --- A Call matches if all of the conditions necessary to evaluate the
 --- arithmetic expressions in its arguments are true.  (For example, the
@@ -109,18 +113,9 @@ local function scanner(str)
       pos = end_pos
       return str:sub(start_pos, end_pos - 1)
    end
-   local seen_identifiers = {}
-   local function next_identifier(opts)
-      opts = opts or {}
+   local function next_identifier()
       local id = check('%a%w*')
       if not id then error('expected an identifier') end
-      if opts.assert_free and seen_identifiers[id] then
-         error('duplicate identifier: %s', id)
-      end
-      if opts.assert_bound and not seen_identifiers[id] then
-         error('unbound identifier: %s', id)
-      end
-      seen_identifiers[id] = true
       return id
    end
    local function next_balanced(pair)
@@ -149,7 +144,7 @@ end
 local parse_dispatch
 
 local function parse_call(scanner)
-   local proc = scanner.next_identifier({assert_bound=true})
+   local proc = scanner.next_identifier()
    if not proc then scanner.error('expected a procedure call') end
    local result = { 'call', proc }
    if scanner.peek('%(') then
@@ -186,18 +181,6 @@ function parse_dispatch(scanner)
    return parse_call(scanner)
 end
 
-local function parse_captures(scanner)
-   local captures = {}
-   scanner.consume('%(')
-   if not scanner.check('%)') then
-      repeat
-         table.insert(captures, scanner.next_identifier({assert_free=true}))
-      until not scanner.check(',')
-      scanner.consume('%)')
-   end
-   return captures
-end
-
 local function subst(str, values)
    local out, pos = '', 1
    while true do
@@ -216,10 +199,10 @@ end
 function parse(str)
    local scanner = scanner(str)
    scanner.consume('match')
-   local captures = parse_captures(scanner)
-   local dispatch = parse_dispatch(scanner)
+   scanner.consume('{')
+   local cond = parse_cond(scanner)
    if not scanner.done() then scanner.error("unexpected token") end
-   return { 'match', captures, dispatch }
+   return cond
 end
 
 local function expand_arg(arg)
@@ -278,17 +261,7 @@ function expand_cond(expr, dlt)
 end
 
 function expand(expr, dlt)
-   assert(type(expr) == 'table' and expr[1] == 'match', 'bad match expr')
-   local dispatch = expr[3]
-   assert(type(dispatch) == 'table', 'bad dispatch expr')
-   if dispatch[1] == 'call' then
-      local test, call = expand_call(dispatch, dlt)
-      dispatch = { 'if', test, call, { 'false' } }
-   else
-      assert(dispatch[1] == 'cond', 'bad dispatch expr')
-      dispatch = expand_cond(dispatch, dlt)
-   end
-   return { 'match', expr[2], dispatch }
+   return expand_cond(expr, dlt)
 end
 
 local compile_defaults = {
@@ -306,40 +279,40 @@ function selftest()
    local function test(str, expr)
       utils.assert_equals(expr, parse(str))
    end
-   test("match () {}", { 'match', {}, { 'cond' } })
-   test("match (\n--comment\n) {}", { 'match', {}, { 'cond' } })
-   test("match (x,y) {}", { 'match', { 'x', 'y' }, { 'cond' } })
-   test(" match \n  (  x   , y   )   {  }   ",
-        { 'match', { 'x', 'y' }, { 'cond' } })
-   test("match(x,y){}",
-        { 'match', { 'x', 'y' }, { 'cond' } })
-   test("match (x,y) x()",
-        { 'match', { 'x', 'y' }, { 'call', 'x' } })
-   test("match (x,y) x(1)",
-        { 'match', { 'x', 'y' }, { 'call', 'x', 1 } })
-   test("match (x,y) x(1&1)",
-        { 'match', { 'x', 'y' }, { 'call', 'x', { '&', 1, 1 } } })
-   test("match (x,y) x(ip[42])",
-        { 'match', { 'x', 'y' }, { 'call', 'x', { '[ip]', 42, 1 } } })
-   test("match (x,y) x(ip[42], 10)",
-        { 'match', { 'x', 'y' }, { 'call', 'x', { '[ip]', 42, 1 }, 10 } })
-   test(subst("match (x,y) x(ip[$loc], 10)", {loc=42}),
-        { 'match', { 'x', 'y' }, { 'call', 'x', { '[ip]', 42, 1 }, 10 } })
+   test("match {}", { 'cond' })
+   test("match--comment\n{}", { 'cond' })
+   test(" match \n     {  }   ", { 'cond' })
+   test("match{}", { 'cond' })
+   test("match { otherwise => x() }",
+        { 'cond', { { 'true' }, { 'call', 'x' } } })
+   test("match { otherwise => x(1) }",
+        { 'cond', { { 'true' }, { 'call', 'x', 1 } } })
+   test("match { otherwise => x(1&1) }",
+        { 'cond', { { 'true' }, { 'call', 'x', { '&', 1, 1 } } } })
+   test("match { otherwise => x(ip[42]) }",
+        { 'cond', { { 'true' }, { 'call', 'x', { '[ip]', 42, 1 } } } })
+   test("match { otherwise => x(ip[42], 10) }",
+        { 'cond', { { 'true' }, { 'call', 'x', { '[ip]', 42, 1 }, 10 } } })
+   test(subst("match { otherwise => x(ip[$loc], 10) }", {loc=42}),
+        { 'cond', { { 'true' }, { 'call', 'x', { '[ip]', 42, 1 }, 10 } } })
 
    local function test(str, expr, opts)
       utils.assert_equals(expr, expand(parse(str), 'EN10MB'))
    end
-   test("match (x,y) x()",
-        { 'match', { 'x', 'y' },
-          { 'if', { 'true' }, { 'call', 'x' }, { 'false' } } })
-   test("match (x,y) x(1)",
-        { 'match', { 'x', 'y' },
-          { 'if', { 'true' }, { 'call', 'x', 1 }, { 'false' } } })
-   test("match (x,y) x(1/0)",
-        { 'match', { 'x', 'y' },
-          { 'if', { 'if', { '!=', 0, 0 }, { 'true' }, { 'false' } },
-            { 'call', 'x', { 'uint32', { '/', 1, 0 } } },
-            { 'false' } } })
+   test("match { otherwise => x() }",
+        { 'if', { 'if', { 'true' }, { 'true' }, { 'false' } },
+          { 'call', 'x' },
+          { 'false' } })
+   test("match { otherwise => x(1) }",
+        { 'if', { 'if', { 'true' }, { 'true' }, { 'false' } },
+          { 'call', 'x', 1 },
+          { 'false' } })
+   test("match { otherwise => x(1/0) }",
+        { 'if', { 'if', { 'true' },
+                  { 'if', { '!=', 0, 0 }, { 'true' }, { 'false' } },
+                  { 'false' } },
+          { 'call', 'x', { 'uint32', { '/', 1, 0 } } },
+          { 'false' } })
 
    print("OK")
 end
