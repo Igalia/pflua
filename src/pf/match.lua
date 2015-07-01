@@ -344,7 +344,7 @@ function selftest()
 
    local function test(str, expr)
       -- Just a test to see if it works without errors.
-      anf.convert_anf(optimize.optimize(expand(parse(str), 'EN10MB')))
+      ssa.convert_ssa(anf.convert_anf(optimize.optimize(expand(parse(str), 'EN10MB'))))
    end
    test("match { tcp port 80 => pass }")
 
