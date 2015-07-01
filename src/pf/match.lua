@@ -118,7 +118,7 @@ local function scanner(str)
       return str:sub(start_pos, end_pos - 1)
    end
    local function next_identifier()
-      local id = check('%a%w*')
+      local id = check('[%a_][%w_]*')
       if not id then error('expected an identifier') end
       return id
    end
