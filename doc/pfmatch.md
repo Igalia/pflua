@@ -30,8 +30,6 @@ and calls a handler on the rest of the traffic.
 ```lua
 match {
    not ip => forward
-   -- Drop fragmented packets.
-   ip[6:2] & 0x3fff != 0 => drop
    ip src 1.2.3.4 => incoming_ip
    ip dst 5.6.7.8 => outgoing_ip
    otherwise => drop
@@ -49,8 +47,6 @@ extension](https://github.com/Igalia/pflua/blob/master/doc/extensions.md):
 ```lua
 match {
    not ip => forward
-   -- Drop fragmented packets.
-   ip[6:2] & 0x3fff != 0 => drop
    ip src 1.2.3.4 => incoming_ip(&ip[0])
    ip dst 5.6.7.8 => outgoing_ip(&ip[0])
    otherwise => drop
@@ -61,21 +57,21 @@ Of course, with pflang you could just match all of the clauses in order:
 
 ```lua
 not_ip = pf.compile('not ip')
-fragmented = pf.compile('ip[6:2] & 0x3fff != 0')
-...
-...
+incoming = pf.compile('ip src 1.2.3.4')
+outgoing = pf.compile('ip dst 5.6.7.8)
 
 function handle(packet, len)
-   if not_ip(packet, len) then return forward(packet, len) end
-   if fragmented(packet, len) then return drop(packet, len) end
-   ...
+   if not_ip(packet, len) then return forward(packet, len)
+   elseif incoming(packet, len) then return incoming_ip(packet, len)
+   elseif outgoing(packet, len) then return outgoing_ip(packet, len)
+   else return drop(packet, len) end
 end
 ```
 
 But not only is this tedious, you don't get easy access to the packet
 itself, and you're missing out on opportunities for optimization.  For
 example, the if the packet fails the `not_ip` check, then we don't need
-to check if it's an IP packet in the `fragmented` check.  Compiling a
+to check if it's an IP packet in the `incoming` check.  Compiling a
 pfmatch program takes advantage of pflua's optimizer to produce optimal
 code for all clauses in your match expression.
 
@@ -83,27 +79,38 @@ Pflua compiles the pfmatch expression above into the nice, short code
 below:
 
 ```lua
-local band = require("bit").band
 local cast = require("ffi").cast
 return function(self,P,length)
-   if length < 14 then return false end
-   if cast("uint16_t*", P+12)[0] == 8 then
-      if length < 34 then return false end
-      if band(cast("uint16_t*", P+20)[0],65343) ~= 0 then
-         return self.drop(P, len)
-      end
-      if cast("uint32_t*", P+26)[0] == 67305985 then
+   if length < 14 then goto L5 end
+   do
+      if cast("uint16_t*", P+12)[0] ~= 8 then goto L5 end
+      if length < 14 then goto L9 end
+      do
+         if cast("uint16_t*", P+12)[0] ~= 8 then goto L9 end
+         if length < 34 then goto L9 end
+         if length < 30 then goto L9 end
+         if cast("uint32_t*", P+26)[0] ~= 67305985 then goto L9 end
+         if length < 15 then goto L9 end
          return self.incoming_ip(P, len, 14)
       end
-      if cast("uint32_t*", P+30)[0] == 134678021 then
+::L9::
+      if length < 14 then goto L21 end
+      do
+         if cast("uint16_t*", P+12)[0] ~= 8 then goto L21 end
+         if length < 34 then goto L21 end
+         if cast("uint32_t*", P+30)[0] ~= 134678021 then goto L21 end
+         if length < 15 then goto L21 end
          return self.outgoing_ip(P, len, 14)
       end
+::L21::
       return self.drop(P, len)
-   else
-      return self.forward(P, len)
    end
+::L5::
+   return self.forward(P, len)
 end
 ```
+
+[FIXME: above result needs some work!]
 
 The result is an optimal dispatch.  There are always things to improve,
 but it's likely that the compiled Lua above is better than what you

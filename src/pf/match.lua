@@ -251,8 +251,23 @@ end
 
 local expand_cond
 
+-- Unlike pflang, out-of-bounds and such just cause the clause to fail,
+-- not the whole program.
+local function replace_fail(expr)
+   if type(expr) ~= 'table' then return expr
+   elseif expr[1] == 'fail' then return { 'false' }
+   elseif expr[1] == 'if' then
+      local test = replace_fail(expr[2])
+      local consequent = replace_fail(expr[3])
+      local alternate = replace_fail(expr[4])
+      return { 'if', test, consequent, alternate }
+   else
+      return expr
+   end
+end
+
 local function expand_clause(test, consequent, dlt)
-   test = expand_pflang(test, dlt)
+   test = replace_fail(expand_pflang(test, dlt))
    if consequent[1] == 'call' then
       local conditions, call = expand_call(consequent, dlt)
       return { 'if', test, conditions, { 'false' } }, call
