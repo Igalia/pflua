@@ -34,7 +34,6 @@ local function lex_number(str, pos, base)
       local n = tonumber(chr, base)
       if n then
          res = res * base + n
-         assert(res <= 0xffffffff, 'integer too large: '..res)
          i = i + 1
       elseif not number_terminators:find(chr, 1, true) then
          return nil
@@ -69,6 +68,7 @@ local function lex_host_or_keyword(str, pos)
    local kind, number, number_next_pos = maybe_lex_number(str, pos)
    -- Only interpret name as a number as a whole.
    if number and number_next_pos == next_pos then
+      assert(number <= 0xffffffff, 'integer too large: '..name)
       return number, next_pos
    else
       return name, next_pos
@@ -241,6 +241,7 @@ local function lex(str, pos, opts)
       local kind, number, next_pos = maybe_lex_number(str, pos)
       if kind then
          assert(number, "unexpected end of "..kind.." literal at "..pos)
+         assert(number <= 0xffffffff, 'integer too large: '..str:sub(pos, next_pos-1))
          return number, next_pos
       end
    end
@@ -1013,6 +1014,10 @@ function selftest ()
               { 'host', '1.2.3.4foo.com' })
    parse_test("host 1.2.3.4.5.com",
               { 'host', '1.2.3.4.5.com' })
+   parse_test("host 0xffffffffffoo.com",
+              { 'host', '0xffffffffffoo.com' })
+   parse_test("host 0xffffffffff-oo.com",
+              { 'host', '0xffffffffff-oo.com' })
    parse_test("src host 127.0.0.1",
               { 'src_host', { 'ipv4', 127, 0, 0, 1 } })
    parse_test("src net 10.0.0.0/24",
@@ -1164,5 +1169,6 @@ function selftest ()
    parse_error_test("0 = 0x", "unexpected end of hexadecimal literal at 5")
    parse_error_test("0 = 08", "unexpected end of octal literal at 5")
    parse_error_test("0 = 09", "unexpected end of octal literal at 5")
+   parse_error_test("host 0xffffffffff and tcp", "integer too large: 0xffffffffff")
    print("OK")
 end
