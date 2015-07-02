@@ -81,27 +81,27 @@ below:
 ```lua
 local cast = require("ffi").cast
 return function(self,P,length)
-   if length < 14 then goto L5 end
-   do
-      if cast("uint16_t*", P+12)[0] ~= 8 then goto L5 end
-      if length < 34 then goto L9 end
-      do
-         if cast("uint16_t*", P+12)[0] ~= 8 then goto L9 end
-         if cast("uint32_t*", P+26)[0] ~= 67305985 then goto L9 end
-         return self.incoming_ip(P, len, 14)
+   if length >= 14 then
+      if cast("uint16_t*", P+12)[0] == 8 then
+         if length >= 34 then
+            if cast("uint32_t*", P+26)[0] == 67305985 then
+               return self.incoming_ip(P, len, 14)
+            else
+               if cast("uint32_t*", P+30)[0] == 134678021 then
+                  return self.outgoing_ip(P, len, 14)
+               else
+                  return self.drop(P, len)
+               end
+            end
+         else
+            return self.drop(P, len)
+         end
+      else
+         return self.forward(P, len)
       end
-::L9::
-      if length < 34 then goto L15 end
-      do
-         if cast("uint16_t*", P+12)[0] ~= 8 then goto L15 end
-         if cast("uint32_t*", P+30)[0] ~= 134678021 then goto L15 end
-         return self.outgoing_ip(P, len, 14)
-      end
-::L15::
-      return self.drop(P, len)
+   else
+      return self.forward(P, len)
    end
-::L5::
-   return self.forward(P, len)
 end
 ```
 

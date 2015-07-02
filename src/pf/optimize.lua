@@ -99,7 +99,10 @@ cfkey = memoize(function (expr)
    end
 end)
 
-local simple = set('true', 'false', 'match', 'fail')
+-- A simple expression can be duplicated.  FIXME: Some calls are simple,
+-- some are not.  For now our optimizations don't work very well if we
+-- don't allow duplication though.
+local simple = set('true', 'false', 'match', 'fail', 'call')
 local tailops = set('fail', 'match', 'call')
 local trueops = set('match', 'call', 'true')
 
@@ -256,12 +259,15 @@ function simplify_if(test, t, f)
    elseif t[1] == 'match' and f[1] == 'fail' then return test
    elseif t[1] == 'fail' and f[1] == 'fail' then return { 'fail' }
    elseif op == 'if' then
-      if test[3][1] == 'fail' then
-         -- if (if A fail B) C D -> if A fail (if B C D)
-         return simplify_if(test[2], {'fail'}, simplify_if(test[4], t, f))
-      elseif test[4][1] == 'fail' then
-         -- if (if A B fail) C D -> if A (if B C D) fail
-         return simplify_if(test[2], simplify_if(test[3], t, f), {'fail'})
+      if tailops[test[3][1]] then
+         -- if (if A tail B) C D -> if A tail (if B C D)
+         return simplify_if(test[2], test[3], simplify_if(test[4], t, f))
+      elseif tailops[test[4][1]] then
+         -- if (if A B tail) C D -> if A (if B C D) tail
+         return simplify_if(test[2], simplify_if(test[3], t, f), test[4])
+      elseif test[3][1] == 'false' and test[4][1] == 'true' then
+         -- if (if A false true) C D -> if A D C
+         return simplify_if(test[2], f, t)
       elseif test[3][1] == 'false' and test[4][1] == 'true' then
          -- if (if A false true) C D -> if A D C
          return simplify_if(test[2], f, t)
@@ -281,12 +287,22 @@ function simplify_if(test, t, f)
                                simplify_if(test[4], t[4], f))
          end
       end
-      if (f[1] == 'if' and cfkey(test[2]) == cfkey(f[2]) and simple[t[1]]) then
-         -- if (if A B C) D (if A E F)
-         -- -> if A (if B D E) (if C D F)
-         return simplify_if(test[2],
-                            simplify_if(test[3], t, f[3]),
-                            simplify_if(test[4], t, f[4]))
+      if f[1] == 'if' then
+         if cfkey(test[2]) == cfkey(f[2]) and simple[t[1]] then
+            -- if (if A B C) D (if A E F)
+            -- -> if A (if B D E) (if C D F)
+            return simplify_if(test[2],
+                               simplify_if(test[3], t, f[3]),
+                               simplify_if(test[4], t, f[4]))
+         elseif (test[4][1] == 'false'
+                 and f[2][1] == 'if' and f[2][4][1] == 'false'
+                 and simple[f[4][1]]
+                 and cfkey(test[2]) == cfkey(f[2][2])) then
+            -- if (if T A false) B (if (if T C false) D E)
+            -- -> if T (if A B (if C D E)) E
+            local T, A, B, C, D, E = test[2], test[3], t, f[2][3], f[3], f[4]
+            return simplify_if(T, simplify_if(A, B, simplify_if(C, D, E)), E)
+         end
       end
    end
    if f[1] == 'if' and cfkey(t) == cfkey(f[3]) and not simple[t[1]] then
