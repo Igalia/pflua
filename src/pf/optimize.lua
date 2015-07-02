@@ -479,13 +479,13 @@ local function infer_ranges(expr)
    local function push(db) return cons({}, db) end
    local function lookup(db, expr)
       if type(expr) == 'number' then return Range(expr, expr) end
-      if expr == 'len' then return Range(0, UINT16_MAX) end
       local key = cfkey(expr)
       while db do
          local range = car(db)[key]
          if range then return range end
          db = cdr(db)
       end
+      if expr == 'len' then return Range(0, UINT16_MAX) end
       return Range(INT_MIN, INT_MAX)
    end
    local function define(db, expr, range)
@@ -704,6 +704,8 @@ local function lhoist(expr, db)
             if f[1] == 'match' then f_min_f = t_min_f end
             if t[1] == 'fail' then return f_min_t, f_min_f end
             if f[1] == 'fail' then return t_min_t, t_min_f end
+            if t[1] == 'call' then t_min_f = f_min_f end
+            if f[1] == 'call' then f_min_f = t_min_f end
             if t[1] == 'true' then t_min_f = f_min_f end
             if f[1] == 'true' then f_min_f = t_min_f end
             if t[1] == 'false' then t_min_t = f_min_t end
