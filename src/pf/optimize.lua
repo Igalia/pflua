@@ -680,42 +680,74 @@ end
 -- Length assertion hoisting.
 local function lhoist(expr, db)
    -- Recursively annotate the logical expressions in EXPR, returning
-   -- tables of the form { MIN_T, MIN_F, EXPR }.  MIN_T indicates that
-   -- for this expression to be true, the packet must be at least as
-   -- long as MIN_T.  Similarly for MIN_F.
-   local function annotate(expr)
-      local function aexpr(min_t, min_f, expr) return { min_t, min_f, expr } end
-      local function branch_mins(abranch, min)
-         local branch_min_t, branch_min_f = abranch[1], abranch[2]
-         return math.max(branch_min_t, min), math.max(branch_min_f, min)
+   -- tables of the form { MIN_T, MIN_F, MIN_PASS, MAX_FAIL, EXPR }.
+   -- MIN_T indicates that for this expression to be true, the packet
+   -- must be at least as long as MIN_T.  Similarly for MIN_F.  MIN_PASS
+   -- means that if the packet is smaller than MIN_PASS then the filter
+   -- will definitely fail.  MAX_FAIL means that if the packet is
+   -- smaller than MAX_FAIL, there is a 'fail' call on some path.
+   local function annotate(expr, is_tail)
+      local function aexpr(min_t, min_f, min_pass, max_fail, expr)
+         if is_tail then
+            min_pass = math.max(min_pass, min_t)
+            min_t = min_pass
+         end
+         return { min_t, min_f, min_pass, max_fail, expr }
       end
       local op = expr[1]
       if (op == '>=' and expr[2] == 'len' and type(expr[3]) == 'number') then
-         return aexpr(expr[3], 0, expr)
+         return aexpr(expr[3], 0, 0, -1, expr)
       elseif op == 'if' then
          local test, t, f = expr[2], expr[3], expr[4]
-         local test_a = annotate(test)
-         local t_a, f_a = annotate(t), annotate(f)
+         local test_a = annotate(test, false)
+         local t_a, f_a = annotate(t, is_tail), annotate(f, is_tail)
          local test_min_t, test_min_f = test_a[1], test_a[2]
-         local t_min_t, t_min_f = branch_mins(t_a, test_min_t)
-         local f_min_t, f_min_f = branch_mins(f_a, test_min_f)
-         local function if_mins()
-            if t[1] == 'match' then t_min_f = f_min_f end
-            if f[1] == 'match' then f_min_f = t_min_f end
-            if t[1] == 'fail' then return f_min_t, f_min_f end
-            if f[1] == 'fail' then return t_min_t, t_min_f end
-            if t[1] == 'call' then t_min_f = f_min_f end
-            if f[1] == 'call' then f_min_f = t_min_f end
-            if t[1] == 'true' then t_min_f = f_min_f end
-            if f[1] == 'true' then f_min_f = t_min_f end
-            if t[1] == 'false' then t_min_t = f_min_t end
-            if f[1] == 'false' then f_min_t = t_min_t end
+         local test_min_pass, test_max_fail = test_a[3], test_a[4]
+         local function if_bool_mins()
+            local t, f = t[1], f[1]
+            local function branch_bool_mins(abranch, min)
+               local branch_min_t, branch_min_f = abranch[1], abranch[2]
+               return math.max(branch_min_t, min), math.max(branch_min_f, min)
+            end
+            local t_min_t, t_min_f = branch_bool_mins(t_a, test_min_t)
+            local f_min_t, f_min_f = branch_bool_mins(f_a, test_min_f)
+            if trueops[t] then t_min_f = f_min_f end
+            if trueops[f] then f_min_f = t_min_f end
+            if t == 'fail' then return f_min_t, f_min_f end
+            if f == 'fail' then return t_min_t, t_min_f end
+            if t == 'false' then t_min_t = f_min_t end
+            if f == 'false' then f_min_t = t_min_t end
             return math.min(t_min_t, f_min_t), math.min(t_min_f, f_min_f)
          end
-         local min_t, min_f = if_mins()
-         return aexpr(min_t, min_f, { op, test_a, t_a, f_a })
+         local function if_fail_mins()
+            local t, f = t[1], f[1]
+            local min_pass, max_fail
+            local t_min_pass, t_max_fail = t_a[3], t_a[4]
+            local f_min_pass, f_max_fail = f_a[3], f_a[4]
+            -- Four cases: both T and F branches are fail; one of them
+            -- is a fail; neither are fails.
+            if t == 'fail' then
+               if f == 'fail' then
+                  min_pass = test_min_pass
+                  max_fail = UINT16_MAX
+               else
+                  min_pass = math.max(test_min_f, f_min_pass, test_min_pass)
+                  max_fail = math.max(test_min_t, f_max_fail, test_max_fail)
+               end
+            elseif f == 'fail' then
+               min_pass = math.max(test_min_t, t_min_pass, test_min_pass)
+               max_fail = math.max(test_min_f, f_max_fail, test_max_fail)
+            else
+               min_pass = math.max(test_min_pass, math.min(t_min_pass, f_min_pass))
+               max_fail = math.max(t_max_fail, f_max_fail, test_max_fail)
+            end
+            return min_pass, max_fail
+         end
+         local min_t, min_f = if_bool_mins()
+         local min_pass, max_fail = if_fail_mins()
+         return aexpr(min_t, min_f, min_pass, max_fail, { op, test_a, t_a, f_a })
       else
-         return aexpr(0, 0, expr)
+         return aexpr(0, 0, 0, -1, expr)
       end
    end
 
@@ -723,19 +755,24 @@ local function lhoist(expr, db)
    -- be longer than the MIN argument, insert a length check and revisit
    -- with the new MIN.  Elide other length checks.
    local function reduce(aexpr, min, is_tail)
-      local min_t, min_f, expr = aexpr[1], aexpr[2], aexpr[3]
-      -- min_expr will be the minimum packet length for which this
-      -- expression may match.
-      local min_expr = min_t
-      -- In tail position, only min_t counts.  Otherwise, restrict also
-      -- by min_f.  min_f can be nonzero only if a "fail" side effect
-      -- causes a subexpression to bail out early.
-      if not is_tail then min_expr = math.min(min_expr, min_f) end
-      if min < min_expr then
-         min = min_expr
-         local expr = reduce(aexpr, min, is_tail)
-         return { 'if', { '>=', 'len', min }, expr, { 'fail' } }
+      local min_t, min_f, min_pass, max_fail, expr =
+         aexpr[1], aexpr[2], aexpr[3], aexpr[4], aexpr[5]
+
+      -- Reject any packets that are too short to pass.
+      if is_tail then min_pass = math.max(min_pass, min_t) end
+      if min < min_pass then
+         local expr = reduce(aexpr, min_pass, is_tail)
+         return { 'if', { '>=', 'len', min_pass }, expr, { 'fail' } }
       end
+
+      -- Hoist length checks if we know a packet must be of a certain
+      -- length for the expression to be true, and we are certain that
+      -- we aren't going to hit a "fail".
+      if min < min_t and max_fail < min then
+         local expr = reduce(aexpr, min_t, is_tail)
+         return { 'if', { '>=', 'len', min_t }, expr, { 'false' } }
+      end
+
       local op = expr[1]
       if op == 'if' then
          local t = reduce(expr[2], min, false)
@@ -752,7 +789,7 @@ local function lhoist(expr, db)
       end
    end
       
-   return reduce(annotate(expr, 'ACCEPT', 'REJECT'), 0, true)
+   return reduce(annotate(expr, true), 0, true)
 end
 
 function optimize_inner(expr)

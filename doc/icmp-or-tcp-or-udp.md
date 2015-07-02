@@ -71,17 +71,17 @@ return function(P,length)
       if var1 ~= 56710 then return false end
       local var6 = P[20]
       if var6 == 1 then return true end
-      if var6 ~= 44 then goto L19 end
+      if length < 55 then goto L19 end
       do
-         if length < 55 then return false end
+         if var6 ~= 44 then goto L19 end
          if P[54] == 1 then return true end
          goto L19
       end
 ::L19::
       if var6 == 6 then return true end
-      if var6 ~= 44 then goto L17 end
+      if length < 55 then goto L17 end
       do
-         if length < 55 then return false end
+         if var6 ~= 44 then goto L17 end
          if P[54] == 6 then return true end
          goto L17
       end
