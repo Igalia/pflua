@@ -85,50 +85,50 @@ local lshift = require("bit").lshift
 local band = require("bit").band
 return function(P,length)
    if length < 34 then return false end
-   local var1 = cast("uint16_t*", P+12)[0]
-   if var1 == 8 then
-      local var2 = P[23]
-      if var2 == 6 then goto L8 end
+   local v1 = cast("uint16_t*", P+12)[0]
+   if v1 == 8 then
+      local v2 = P[23]
+      if v2 == 6 then goto L8 end
       do
-         if var2 == 17 then goto L8 end
-         if var2 == 132 then goto L8 end
+         if v2 == 17 then goto L8 end
+         if v2 == 132 then goto L8 end
          return false
       end
 ::L8::
       if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
-      local var9 = lshift(band(P[14],15),2)
-      if (var9 + 18) > length then return false end
-      local var16 = rshift(bswap(cast("uint16_t*", P+(var9 + 16))[0]), 16)
-      if var16 < 80 then return false end
-      return var16 <= 90
+      local v3 = lshift(band(P[14],15),2)
+      if (v3 + 18) > length then return false end
+      local v4 = rshift(bswap(cast("uint16_t*", P+(v3 + 16))[0]), 16)
+      if v4 < 80 then return false end
+      return v4 <= 90
    else
       if length < 58 then return false end
-      if var1 ~= 56710 then return false end
-      local var24 = P[20]
-      if var24 == 6 then goto L24 end
+      if v1 ~= 56710 then return false end
+      local v5 = P[20]
+      if v5 == 6 then goto L24 end
       do
-         if var24 ~= 44 then goto L27 end
+         if v5 ~= 44 then goto L27 end
          do
             if P[54] == 6 then goto L24 end
             goto L27
          end
 ::L27::
-         if var24 == 17 then goto L24 end
-         if var24 ~= 44 then goto L33 end
+         if v5 == 17 then goto L24 end
+         if v5 ~= 44 then goto L33 end
          do
             if P[54] == 17 then goto L24 end
             goto L33
          end
 ::L33::
-         if var24 == 132 then goto L24 end
-         if var24 ~= 44 then return false end
+         if v5 == 132 then goto L24 end
+         if v5 ~= 44 then return false end
          if P[54] == 132 then goto L24 end
          return false
       end
 ::L24::
-      local var34 = rshift(bswap(cast("uint16_t*", P+56)[0]), 16)
-      if var34 < 80 then return false end
-      return var34 <= 90
+      local v6 = rshift(bswap(cast("uint16_t*", P+56)[0]), 16)
+      if v6 < 80 then return false end
+      return v6 <= 90
    end
 end
 

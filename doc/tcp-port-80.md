@@ -82,23 +82,23 @@ local band = require("bit").band
 local cast = require("ffi").cast
 return function(P,length)
    if length < 34 then return false end
-   local var1 = cast("uint16_t*", P+12)[0]
-   if var1 == 8 then
+   local v1 = cast("uint16_t*", P+12)[0]
+   if v1 == 8 then
       if P[23] ~= 6 then return false end
       if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
-      local var7 = lshift(band(P[14],15),2)
-      local var8 = (var7 + 16)
-      if var8 > length then return false end
-      if cast("uint16_t*", P+(var7 + 14))[0] == 20480 then return true end
-      if (var7 + 18) > length then return false end
-      return cast("uint16_t*", P+var8)[0] == 20480
+      local v2 = lshift(band(P[14],15),2)
+      local v3 = (v2 + 16)
+      if v3 > length then return false end
+      if cast("uint16_t*", P+(v2 + 14))[0] == 20480 then return true end
+      if (v2 + 18) > length then return false end
+      return cast("uint16_t*", P+v3)[0] == 20480
    else
       if length < 56 then return false end
-      if var1 ~= 56710 then return false end
-      local var24 = P[20]
-      if var24 == 6 then goto L22 end
+      if v1 ~= 56710 then return false end
+      local v4 = P[20]
+      if v4 == 6 then goto L22 end
       do
-         if var24 ~= 44 then return false end
+         if v4 ~= 44 then return false end
          if P[54] == 6 then goto L22 end
          return false
       end

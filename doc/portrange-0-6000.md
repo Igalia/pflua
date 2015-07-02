@@ -103,44 +103,44 @@ local lshift = require("bit").lshift
 local band = require("bit").band
 return function(P,length)
    if length < 34 then return false end
-   local var1 = cast("uint16_t*", P+12)[0]
-   if var1 == 8 then
-      local var2 = P[23]
-      if var2 == 6 then goto L8 end
+   local v1 = cast("uint16_t*", P+12)[0]
+   if v1 == 8 then
+      local v2 = P[23]
+      if v2 == 6 then goto L8 end
       do
-         if var2 == 17 then goto L8 end
-         if var2 == 132 then goto L8 end
+         if v2 == 17 then goto L8 end
+         if v2 == 132 then goto L8 end
          return false
       end
 ::L8::
       if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
-      local var9 = lshift(band(P[14],15),2)
-      local var10 = (var9 + 16)
-      if var10 > length then return false end
-      if rshift(bswap(cast("uint16_t*", P+(var9 + 14))[0]), 16) <= 6000 then return true end
-      if (var9 + 18) > length then return false end
-      return rshift(bswap(cast("uint16_t*", P+var10)[0]), 16) <= 6000
+      local v3 = lshift(band(P[14],15),2)
+      local v4 = (v3 + 16)
+      if v4 > length then return false end
+      if rshift(bswap(cast("uint16_t*", P+(v3 + 14))[0]), 16) <= 6000 then return true end
+      if (v3 + 18) > length then return false end
+      return rshift(bswap(cast("uint16_t*", P+v4)[0]), 16) <= 6000
    else
       if length < 56 then return false end
-      if var1 ~= 56710 then return false end
-      local var28 = P[20]
-      if var28 == 6 then goto L26 end
+      if v1 ~= 56710 then return false end
+      local v5 = P[20]
+      if v5 == 6 then goto L26 end
       do
-         if var28 ~= 44 then goto L29 end
+         if v5 ~= 44 then goto L29 end
          do
             if P[54] == 6 then goto L26 end
             goto L29
          end
 ::L29::
-         if var28 == 17 then goto L26 end
-         if var28 ~= 44 then goto L35 end
+         if v5 == 17 then goto L26 end
+         if v5 ~= 44 then goto L35 end
          do
             if P[54] == 17 then goto L26 end
             goto L35
          end
 ::L35::
-         if var28 == 132 then goto L26 end
-         if var28 ~= 44 then return false end
+         if v5 == 132 then goto L26 end
+         if v5 ~= 44 then return false end
          if P[54] == 132 then goto L26 end
          return false
       end

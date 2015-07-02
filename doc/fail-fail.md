@@ -61,9 +61,9 @@ return function(P,length)
    if cast("uint16_t*", P+12)[0] ~= 8 then return false end
    if P[23] ~= 6 then return false end
    if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
-   local var7 = lshift(band(P[14],15),2)
-   if (var7 + 115) > length then return false end
-   return P[(var7 + 114)] == 1
+   local v1 = lshift(band(P[14],15),2)
+   if (v1 + 115) > length then return false end
+   return P[(v1 + 114)] == 1
 end
 
 ```

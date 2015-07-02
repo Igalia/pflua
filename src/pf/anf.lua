@@ -237,8 +237,50 @@ local function inline_single_use_variables(expr)
    return subst(expr)
 end
 
+local function renumber(expr)
+   local count, substs = 0, {}
+   local function intern(var)
+      count = count + 1
+      local fresh = 'v'..count
+      substs[var] = fresh
+      return fresh
+   end
+   local function lookup(var)
+      if var == 'len' then return var end
+      return assert(substs[var], "unbound variable: "..var)
+   end
+   local function visit(expr)
+      if type(expr) == 'number' then return expr end
+      if type(expr) == 'string' then return lookup(expr) end
+      local op = expr[1]
+      if op == 'let' then
+         local var, val, body = expr[2], expr[3], expr[4]
+         local fresh = intern(var)
+         return { 'let', fresh, visit(val), visit(body) }
+      elseif op == 'if' then
+         return { 'if', visit(expr[2]), visit(expr[3]), visit(expr[4]) }
+      elseif simple[op] then
+         return expr
+      elseif op == 'call' then
+         local out = { 'call', expr[2] }
+         for i=3,#expr do table.insert(out, visit(expr[i])) end
+         return out
+      elseif relops[op] then
+         return { op, visit(expr[2]), visit(expr[3]) }
+      elseif unops[op] then
+         return { op, visit(expr[2]) }
+      elseif binops[op] then
+         return { op, visit(expr[2]), visit(expr[3]) }
+      else
+         assert(op == '[]')
+         return { op, visit(expr[2]), expr[3] }
+      end
+   end
+   return visit(expr)
+end
+
 function convert_anf(expr)
-   return inline_single_use_variables(cse(lower(expr)))
+   return renumber(inline_single_use_variables(cse(lower(expr))))
 end
 
 function selftest()

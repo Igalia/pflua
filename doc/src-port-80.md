@@ -81,41 +81,41 @@ local band = require("bit").band
 local cast = require("ffi").cast
 return function(P,length)
    if length < 34 then return false end
-   local var1 = cast("uint16_t*", P+12)[0]
-   if var1 == 8 then
-      local var2 = P[23]
-      if var2 == 6 then goto L8 end
+   local v1 = cast("uint16_t*", P+12)[0]
+   if v1 == 8 then
+      local v2 = P[23]
+      if v2 == 6 then goto L8 end
       do
-         if var2 == 17 then goto L8 end
-         if var2 == 132 then goto L8 end
+         if v2 == 17 then goto L8 end
+         if v2 == 132 then goto L8 end
          return false
       end
 ::L8::
       if band(cast("uint16_t*", P+20)[0],65311) ~= 0 then return false end
-      local var9 = lshift(band(P[14],15),2)
-      if (var9 + 16) > length then return false end
-      return cast("uint16_t*", P+(var9 + 14))[0] == 20480
+      local v3 = lshift(band(P[14],15),2)
+      if (v3 + 16) > length then return false end
+      return cast("uint16_t*", P+(v3 + 14))[0] == 20480
    else
       if length < 56 then return false end
-      if var1 ~= 56710 then return false end
-      local var17 = P[20]
-      if var17 == 6 then goto L22 end
+      if v1 ~= 56710 then return false end
+      local v4 = P[20]
+      if v4 == 6 then goto L22 end
       do
-         if var17 ~= 44 then goto L25 end
+         if v4 ~= 44 then goto L25 end
          do
             if P[54] == 6 then goto L22 end
             goto L25
          end
 ::L25::
-         if var17 == 17 then goto L22 end
-         if var17 ~= 44 then goto L31 end
+         if v4 == 17 then goto L22 end
+         if v4 ~= 44 then goto L31 end
          do
             if P[54] == 17 then goto L22 end
             goto L31
          end
 ::L31::
-         if var17 == 132 then goto L22 end
-         if var17 ~= 44 then return false end
+         if v4 == 132 then goto L22 end
+         if v4 ~= 44 then return false end
          if P[54] == 132 then goto L22 end
          return false
       end
