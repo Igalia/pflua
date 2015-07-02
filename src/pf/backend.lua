@@ -31,7 +31,7 @@ end
 
 -- Lua := Do | Return | Goto | If | Bind | Label
 -- Do := 'do' Lua+
--- Return := 'return' Bool
+-- Return := 'return' Bool|Call
 -- Goto := 'goto' Label
 -- If := 'if' Bool Lua Lua?
 -- Bind := 'bind' Name Expr
@@ -94,7 +94,7 @@ end
 
 -- Lua := Do | Return | Goto | If | Bind | Label
 -- Do := 'do' Lua+
--- Return := 'return' Bool
+-- Return := 'return' Bool|Call
 -- Goto := 'goto' Label
 -- If := 'if' Bool Lua Lua?
 -- Bind := 'bind' Name Expr
@@ -287,6 +287,12 @@ local function serialize(builder, stmt)
       end
    end
 
+   local function serialize_call(expr)
+      local args = { 'P', 'len' }
+      for i=3,#expr do table.insert(args, serialize_value(expr[i])) end
+      return 'self.'..expr[2]..'('..table.concat(args, ', ')..')'
+   end
+
    local serialize_statement
 
    local function serialize_sequence(stmts)
@@ -308,7 +314,11 @@ local function serialize(builder, stmt)
          if not is_last then
             return serialize_statement({ 'do', stmt }, false)
          end
-         builder.writeln('return '..serialize_bool(stmt[2]))
+         if stmt[2][1] == 'call' then
+            builder.writeln('return '..serialize_call(stmt[2]))
+         else
+            builder.writeln('return '..serialize_bool(stmt[2]))
+         end
       elseif op == 'goto' then
          builder.jump(stmt[2])
       elseif op == 'if' then
@@ -351,8 +361,20 @@ function emit_lua(ssa)
    return str
 end
 
+function emit_match_lua(ssa)
+   local builder = filter_builder('self', 'P', 'length')
+   serialize(builder, cleanup(residualize_lua(ssa), true))
+   local str = builder.finish()
+   if verbose then pp(str) end
+   return str
+end
+
 function emit_and_load(ssa, name)
    return assert(loadstring(emit_lua(ssa), name))()
+end
+
+function emit_and_load_match(ssa, name)
+   return assert(loadstring(emit_match_lua(ssa), name))()
 end
 
 function selftest()

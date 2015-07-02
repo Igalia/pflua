@@ -12,7 +12,7 @@ local relops = set('<', '<=', '=', '!=', '>=', '>')
 --- Label := string
 --- Block := { label=Label, bindings=[{name=Var, value=Expr},...], control=Control }
 --- Expr := UnaryOp | BinaryOp | PacketAccess
---- Control := ['return', Bool] | ['if', Bool, Label, Label] | ['goto',Label]
+--- Control := ['return', Bool|Call] | ['if', Bool, Label, Label] | ['goto',Label]
 --- Bool := true | false | Comparison
 
 local function print_ssa(ssa)
@@ -79,6 +79,8 @@ local function lower(expr)
          finish_return(block, { 'true' })
       elseif op == 'fail' then
          finish_return(block, { 'false' })
+      elseif op == 'call' then
+         finish_return(block, expr)
       else
          assert(relops[op])
          finish_if(block, expr, kt, kf)

@@ -44,3 +44,9 @@ from `udp[64]` on a short packet; such an access causes the whole filter
 to abort (see the
 [pflang](https://github.com/Igalia/pflua/blob/master/doc/pflang.md)
 documentation).
+
+## The pfmatch language
+
+See [the pfmatch
+page](https://github.com/Igalia/pflua/blob/master/doc/pfmatch.md), for
+more.

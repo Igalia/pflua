@@ -224,6 +224,12 @@ local function simplify(expr, is_tail)
       local test = simplify(expr[2])
       local t, f = simplify(expr[3], is_tail), simplify(expr[4], is_tail)
       return simplify_if(test, t, f)
+   elseif op == 'call' then
+      local ret = { 'call', expr[2] }
+      for i=3,#expr do
+         table.insert(ret, simplify(expr[i]))
+      end
+      return ret
    else
       if op == 'match' or op == 'fail' then return expr end
       if op == 'true' then
@@ -244,6 +250,7 @@ function simplify_if(test, t, f)
    if op == 'true' then return t
    elseif op == 'false' then return f
    elseif op == 'fail' then return test
+   elseif op == 'call' then error('call should only appear in tail position')
    elseif t[1] == 'true' and f[1] == 'false' then return test
    -- 'match' will only be residualized in tail position.
    elseif t[1] == 'match' and f[1] == 'fail' then return test
@@ -473,13 +480,13 @@ local function infer_ranges(expr)
    local function push(db) return cons({}, db) end
    local function lookup(db, expr)
       if type(expr) == 'number' then return Range(expr, expr) end
-      if expr == 'len' then return Range(0, UINT16_MAX) end
       local key = cfkey(expr)
       while db do
          local range = car(db)[key]
          if range then return range end
          db = cdr(db)
       end
+      if expr == 'len' then return Range(0, UINT16_MAX) end
       return Range(INT_MIN, INT_MAX)
    end
    local function define(db, expr, range)
@@ -625,6 +632,8 @@ local function infer_ranges(expr)
             union(db_f, head_t_f, head_f_f)
          end
          return { op, test, t, f }
+      elseif op == 'call' then
+         return expr
       else
          -- An arithmetic op, which interns into the fresh table pushed
          -- by the containing relop.
@@ -666,7 +675,7 @@ local function infer_ranges(expr)
          end
       end
    end
-   return visit(expr, push(), push(), 'ACCEPT', 'REJECT')
+   return visit(expr, push(), push())
 end
 
 -- Length assertion hoisting.
@@ -696,6 +705,8 @@ local function lhoist(expr, db)
             if f[1] == 'match' then f_min_f = t_min_f end
             if t[1] == 'fail' then return f_min_t, f_min_f end
             if f[1] == 'fail' then return t_min_t, t_min_f end
+            if t[1] == 'call' then t_min_f = f_min_f end
+            if f[1] == 'call' then f_min_f = t_min_f end
             if t[1] == 'true' then t_min_f = f_min_f end
             if f[1] == 'true' then f_min_f = t_min_f end
             if t[1] == 'false' then t_min_t = f_min_t end

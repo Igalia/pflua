@@ -16,4 +16,5 @@ check:
 	luajit -l pf.anf -e 'pf.anf.selftest()'
 	luajit -l pf.ssa -e 'pf.ssa.selftest()'
 	luajit -l pf.backend -e 'pf.backend.selftest()'
+	luajit -l pf.match -e 'pf.match.selftest()'
 	luajit -l pf -e 'pf.selftest()'
