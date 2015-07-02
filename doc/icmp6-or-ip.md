@@ -53,10 +53,10 @@ return function(P,length)
    if length < 54 then goto L7 end
    do
       if cast("uint16_t*", P+12)[0] ~= 56710 then goto L7 end
-      local var2 = P[20]
-      if var2 == 58 then return true end
+      local v1 = P[20]
+      if v1 == 58 then return true end
       if length < 55 then goto L7 end
-      if var2 ~= 44 then goto L7 end
+      if v1 ~= 44 then goto L7 end
       if P[54] == 58 then return true end
       goto L7
    end
