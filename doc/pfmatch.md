@@ -58,7 +58,7 @@ Of course, with pflang you could just match all of the clauses in order:
 ```lua
 not_ip = pf.compile('not ip')
 incoming = pf.compile('ip src 1.2.3.4')
-outgoing = pf.compile('ip dst 5.6.7.8)
+outgoing = pf.compile('ip dst 5.6.7.8')
 
 function handle(packet, len)
    if not_ip(packet, len) then return forward(packet, len)
