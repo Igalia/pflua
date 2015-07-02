@@ -60,13 +60,13 @@ return function(P,length)
       if cast("uint32_t*", P+26)[0] == 16860352 then goto L6 end
       goto L7
    else
-      if var1 == 1544 then goto L10 end
+      if length < 42 then return false end
+      if var1 == 1544 then goto L12 end
       do
-         if var1 == 13696 then goto L10 end
+         if var1 == 13696 then goto L12 end
          return false
       end
-::L10::
-      if length < 42 then return false end
+::L12::
       if cast("uint32_t*", P+28)[0] == 16860352 then goto L6 end
       goto L7
    end

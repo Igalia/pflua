@@ -14,6 +14,8 @@ local relop_inversions = {
    ['<']='>=', ['<=']='>', ['=']='!=', ['!=']='=', ['>=']='<', ['>']='<='
 }
 
+local simple_results = set('true', 'false', 'call')
+
 local function invert_bool(expr)
    if expr[1] == 'true' then return { 'false' } end
    if expr[1] == 'false' then return { 'true' } end
@@ -22,10 +24,8 @@ local function invert_bool(expr)
 end
 
 local function is_simple_expr(expr)
-   -- Simple := return true | return false | goto Label
-   if expr[1] == 'return' then
-      return expr[2][1] == 'true' or expr[2][1] == 'false'
-   end
+   -- Simple := return true | return false | return call | goto Label
+   if expr[1] == 'return' then return simple_results[expr[2][1]] end
    return expr[1] == 'goto'
 end
 
@@ -326,7 +326,10 @@ local function serialize(builder, stmt)
          local test_str = 'if '..serialize_bool(test)..' then'
          if is_simple_expr(t) then
             if t[1] == 'return' then
-               builder.writeln(test_str..' return '..t[2][1]..' end')
+               local result
+               if t[2][1] == 'call' then result = serialize_call(t[2])
+               else result = serialize_bool(t[2]) end
+               builder.writeln(test_str..' return '..result..' end')
             else
                assert(t[1] == 'goto')
                builder.writeln(test_str..' goto '..t[2]..' end')
