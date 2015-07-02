@@ -88,9 +88,16 @@ return function(self,P,length)
       do
          if cast("uint16_t*", P+12)[0] ~= 8 then goto L9 end
          if cast("uint32_t*", P+26)[0] ~= 67305985 then goto L9 end
-         return self.incoming_ip(P, len)
+         return self.incoming_ip(P, len, 14)
       end
 ::L9::
+      if length < 34 then goto L15 end
+      do
+         if cast("uint16_t*", P+12)[0] ~= 8 then goto L15 end
+         if cast("uint32_t*", P+30)[0] ~= 134678021 then goto L15 end
+         return self.outgoing_ip(P, len, 14)
+      end
+::L15::
       return self.drop(P, len)
    end
 ::L5::
