@@ -88,21 +88,18 @@ return function(self,P,length)
       do
          if cast("uint16_t*", P+12)[0] ~= 8 then goto L9 end
          if length < 34 then goto L9 end
-         if length < 30 then goto L9 end
          if cast("uint32_t*", P+26)[0] ~= 67305985 then goto L9 end
-         if length < 15 then goto L9 end
          return self.incoming_ip(P, len, 14)
       end
 ::L9::
-      if length < 14 then goto L21 end
+      if length < 14 then goto L17 end
       do
-         if cast("uint16_t*", P+12)[0] ~= 8 then goto L21 end
-         if length < 34 then goto L21 end
-         if cast("uint32_t*", P+30)[0] ~= 134678021 then goto L21 end
-         if length < 15 then goto L21 end
+         if cast("uint16_t*", P+12)[0] ~= 8 then goto L17 end
+         if length < 34 then goto L17 end
+         if cast("uint32_t*", P+30)[0] ~= 134678021 then goto L17 end
          return self.outgoing_ip(P, len, 14)
       end
-::L21::
+::L17::
       return self.drop(P, len)
    end
 ::L5::
@@ -110,15 +107,16 @@ return function(self,P,length)
 end
 ```
 
-[FIXME: above result needs some work!]
+The result is a pretty good dispatcher.  There are always things to
+improve, but it's likely that the compiled Lua above is better than what
+you would write by hand, and it will continue to get better as pflua
+improves.
 
-The result is an optimal dispatch.  There are always things to improve,
-but it's likely that the compiled Lua above is better than what you
-would write by hand.  When we write filtering code by hand, we
-inevitably end up writing _interpreters_ for some kind of filtering
-language.  Using pflua and pfmatch expressions, we can instead _compile_
-a filter suited directly for the problem at hand -- and while we're at
-it, we can forget about worrying about pesky offsets and bit-shifts.
+When we write filtering code by hand, we inevitably end up writing
+_interpreters_ for some kind of filtering language.  Using pflua and
+pfmatch expressions, we can instead _compile_ a filter suited directly
+for the problem at hand -- and while we're at it, we can forget about
+worrying about pesky offsets and bit-shifts.
 
 ## Syntax
 
