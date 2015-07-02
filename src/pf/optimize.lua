@@ -268,9 +268,6 @@ function simplify_if(test, t, f)
       elseif test[3][1] == 'false' and test[4][1] == 'true' then
          -- if (if A false true) C D -> if A D C
          return simplify_if(test[2], f, t)
-      elseif test[3][1] == 'false' and test[4][1] == 'true' then
-         -- if (if A false true) C D -> if A D C
-         return simplify_if(test[2], f, t)
       end
       if t[1] == 'if' and cfkey(test[2]) == cfkey(t[2]) then
          if f[1] == 'if' and cfkey(test[2]) == cfkey(f[2]) then
