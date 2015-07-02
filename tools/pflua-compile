@@ -5,16 +5,18 @@ package.path = package.path .. ";../src/?.lua"
 
 local pf = require("pf")
 local bpf = require("pf.bpf")
+local match = require("pf.match")
 local utils = require("pf.utils")
 
 function usage()
    local content = [=[
-Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua] <pflang-expression>
+Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua] <expression>
 
 Options:
-   --bpf-asm   Print libpcap-generated BPF asm code for <pflang-expression>
-   --bpf-lua   Print Lua code compiled from BPF for <pflang-expression>
-   --lua       Print Lua code compiled directly for <pflang-expression> (DEFAULT)
+   --bpf-asm   Print libpcap-generated BPF asm code for the pflang <expression>
+   --bpf-lua   Print Lua code compiled from BPF for the pflang <expression>
+   --lua       Print Lua code compiled directly for the pflang <expression> (DEFAULT)
+   --match     Print Lua code compiled from the pfmatch <expression>
 
    -O0         Disable optimizations. (Optimizations are on by default) ]=]
    print(content);
@@ -34,7 +36,7 @@ if flags["--help"] or flags["-h"] then
 end
 
 -- No code-generation flag defined
-if (not(flags["--bpf-asm"] or flags["--bpf-lua"] or flags["--lua"])) then
+if (not(flags["--bpf-asm"] or flags["--bpf-lua"] or flags["--lua"] or flags['--match'])) then
    -- Default action
    flags["--lua"] = true
 end
@@ -54,4 +56,7 @@ if flags["--bpf-lua"] then
 end
 if flags["--lua"] then
    print(pf.compile_filter(filter, {source=true, optimize=optimize}))
+end
+if flags["--match"] then
+   print(match.compile(filter, {source=true, optimize=optimize}))
 end
