@@ -100,6 +100,8 @@ cfkey = memoize(function (expr)
 end)
 
 local simple = set('true', 'false', 'match', 'fail')
+local tailops = set('fail', 'match', 'call')
+local trueops = set('match', 'call', 'true')
 
 local commute = {
    ['<']='>', ['<=']='>=', ['=']='=', ['!=']='!=', ['>=']='<=', ['>']='<'
@@ -249,13 +251,10 @@ function simplify_if(test, t, f)
    local op = test[1]
    if op == 'true' then return t
    elseif op == 'false' then return f
-   elseif op == 'fail' then return test
-   elseif op == 'call' then error('call should only appear in tail position')
+   elseif tailops[op] then return test
    elseif t[1] == 'true' and f[1] == 'false' then return test
-   -- 'match' will only be residualized in tail position.
    elseif t[1] == 'match' and f[1] == 'fail' then return test
    elseif t[1] == 'fail' and f[1] == 'fail' then return { 'fail' }
-   -- FIXME: Memoize cfkey to avoid O(n^2) badness.
    elseif op == 'if' then
       if test[3][1] == 'fail' then
          -- if (if A fail B) C D -> if A fail (if B C D)
@@ -321,8 +320,8 @@ local function cfold(expr, db)
          if db[key] then return cfold(expr[3], db) end
          return cfold(expr[4], db)
       else
-         local db_kt = expr[4][1] == 'fail' and db or dup(db)
-         local db_kf = expr[3][1] == 'fail' and db or dup(db)
+         local db_kt = tailops[expr[4][1]] and db or dup(db)
+         local db_kf = tailops[expr[3][1]] and db or dup(db)
          db_kt[key] = true
          db_kf[key] = false
          return { op, test, cfold(expr[3], db_kt), cfold(expr[4], db_kf) }
@@ -610,14 +609,14 @@ local function infer_ranges(expr)
          t = visit(t, kt_db_t, kt_db_f)
          f = visit(f, kf_db_t, kf_db_f)
 
-         if t[1] == 'fail' then
+         if tailops[t[1]] then
             local head_t, head_f = car(kf_db_t), car(kf_db_f)
             local assertions = cadr(kf_db_t)
             merge(db_t, assertions)
             merge(db_t, head_t)
             merge(db_f, assertions)
             merge(db_f, head_f)
-         elseif f[1] == 'fail' then
+         elseif tailops[f[1]] then
             local head_t, head_f = car(kt_db_t), car(kt_db_f)
             local assertions = cadr(kt_db_t)
             merge(db_t, assertions)
