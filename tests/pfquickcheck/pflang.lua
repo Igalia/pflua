@@ -28,6 +28,16 @@ local function hexByte() return tohex(math.random(0, 0xff)) end
 
 local function hexWord() return tohex(math.random(0, 0xffff)) end
 
+local function decimal(n) return string.format("%i", n) end
+
+local function hexOctalDec(n)
+   local r = math.random()
+   if r < 1/3 then return string.format("%i", n) -- decimal
+   elseif r < 2/3 then return '0x' .. string.format("%x", n) --hex
+   else return '0' .. string.format("%o", n) -- octal
+   end
+end
+
 -- Boundary numbers are often particularly interesting; test them often
 local function uint32()
    if math.random() < 0.2
@@ -86,13 +96,15 @@ local function portNumber()
    return math.random(1, 2^16 - 1)
 end
 
+-- Port can take hex, octal, or decimal arguments
 local function Port()
-   return { "port", portNumber() }
+   return { "port", hexOctalDec(portNumber()) }
 end
 
+-- Portrange can take octal or decimal, but not hex, arguments.
 local function PortRange()
    local port1, port2 = portNumber(), portNumber()
-   return { "portrange", port1 .. '-' .. port2 }
+   return { "portrange", decimal(port1) .. '-' .. decimal(port2) }
 end
 
 local function ProtocolWithPort()
