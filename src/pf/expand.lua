@@ -847,10 +847,12 @@ local function expand_psnp(expr)
 end
 
 local primitive_expanders = {
+   dst = expand_dst_host,
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
    dst_port = expand_dst_port,
    dst_portrange = expand_dst_portrange,
+   src = expand_src_host,
    src_host = expand_src_host,
    src_net = expand_src_net,
    src_port = expand_src_port,
@@ -1232,6 +1234,8 @@ function selftest ()
                    { '=', { '[]', { '+', 0, 0 }, 1 }, 2 },
                    { 'fail' } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
+   assert_equals(expand(parse("src 1::ff11"), 'EN10MB'),
+      expand(parse("src host 1::ff11"), 'EN10MB'))
    -- Could check this, but it's very large
    expand(parse("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)"),
           "EN10MB")
