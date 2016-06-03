@@ -776,8 +776,8 @@ function parse_arithmetic(lexer, tok, max_precedence, parsed_exp)
 end
 
 local primitives = {
-   dst = table_parser(src_or_dst_types),
-   src = table_parser(src_or_dst_types),
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
    ether = table_parser(ether_types),
    fddi = table_parser(ether_types),
@@ -1046,6 +1046,10 @@ function selftest ()
               { 'host', '0xffffffffff-oo.com' })
    parse_test("src host 127.0.0.1",
               { 'src_host', { 'ipv4', 127, 0, 0, 1 } })
+   parse_test("src 127.0.0.1",
+              { 'src', { 'ipv4', 127, 0, 0, 1 } })
+   parse_test("dst 1::ff11",
+              { 'dst', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 65297 } })
    parse_test("src net 10.0.0.0/24",
               { 'src_net',
                 { 'ipv4/len', { 'ipv4', 10, 0, 0, 0 }, 24 }})
