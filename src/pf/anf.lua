@@ -279,8 +279,12 @@ local function renumber(expr)
    return visit(expr)
 end
 
-function convert_anf(expr)
-   return renumber(inline_single_use_variables(cse(lower(expr))))
+function convert_anf(expr, opts)
+   local defaults = {optimize = true}
+   local opts = utils.parse_opts(opts or {}, defaults)
+   local anf = lower(expr)
+   if opts.optimize then anf = inline_single_use_variables(cse(anf)) end
+   return renumber(anf)
 end
 
 function selftest()

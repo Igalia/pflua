@@ -36,8 +36,8 @@ function compile_filter(filter_str, opts)
       local expr = parse.parse(filter_str)
       expr = expand.expand(expr, dlt)
       if opts.optimize then expr = optimize.optimize(expr) end
-      expr = anf.convert_anf(expr)
-      expr = ssa.convert_ssa(expr)
+      expr = anf.convert_anf(expr, {optimize=opts.optimize})
+      expr = ssa.convert_ssa(expr, {optimize=opts.optimize})
       if opts.source then return backend.emit_lua(expr) end
       return backend.emit_and_load(expr, filter_str)
    end

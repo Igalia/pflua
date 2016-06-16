@@ -15,7 +15,7 @@ local relops = set('<', '<=', '=', '!=', '>=', '>')
 --- Control := ['return', Bool|Call] | ['if', Bool, Label, Label] | ['goto',Label]
 --- Bool := true | false | Comparison
 
-local function print_ssa(ssa)
+function print_ssa(ssa)
    local function block_repr(block)
       local bindings = { 'bindings' }
       for _,binding in ipairs(block.bindings) do
@@ -300,8 +300,11 @@ local function compute_doms(ssa)
    end
 end
 
-function convert_ssa(anf)
-   local ssa = optimize_ssa(lower(anf))
+function convert_ssa(anf, opts)
+   local defaults = {optimize = true}
+   local opts = utils.parse_opts(opts or {}, defaults)
+   local ssa = lower(anf)
+   if opts.optimize then ssa = optimize_ssa(ssa) end
    order_blocks(ssa)
    add_predecessors(ssa)
    compute_idoms(ssa)
