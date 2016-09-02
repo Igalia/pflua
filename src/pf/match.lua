@@ -303,7 +303,7 @@ function compile(str, opts)
    expr = anf.convert_anf(expr)
    expr = ssa.convert_ssa(expr)
    if opts.source then return backend.emit_match_lua(expr) end
-   return backend.emit_and_load_match(expr, filter_str)
+   return backend.emit_and_load_match(expr, str)
 end
 
 function selftest()
