@@ -356,7 +356,7 @@ function selftest()
    test("match { otherwise => x(1/0) }",
         { 'fail' })
 
-   local function test(str, expr)
+   local function test(str)
       -- Just a test to see if it works without errors.
       compile(str)
    end
