@@ -290,7 +290,7 @@ local function serialize(builder, stmt)
    local function serialize_call(expr)
       local args = { 'P', 'length' }
       for i=3,#expr do table.insert(args, serialize_value(expr[i])) end
-      return 'self.'..expr[2]..'('..table.concat(args, ', ')..')'
+      return 'self:'..expr[2]..'('..table.concat(args, ', ')..')'
    end
 
    local serialize_statement
