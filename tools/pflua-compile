@@ -10,7 +10,7 @@ local utils = require("pf.utils")
 
 function usage()
    local content = [=[
-Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua] <expression>
+Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua | --match] <expression>
 
 Options:
    --bpf-asm   Print libpcap-generated BPF asm code for the pflang <expression>
