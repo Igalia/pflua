@@ -88,5 +88,7 @@ function selftest ()
    assert_count('tcp', v4, 41)
    assert_count('tcp port 80', v4, 41)
 
+   compile_filter("ip[0] * ip[1] = 4", { bpf=true })
+
    print("OK")
 end
