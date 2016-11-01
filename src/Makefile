@@ -17,4 +17,7 @@ check:
 	luajit -l pf.ssa -e 'pf.ssa.selftest()'
 	luajit -l pf.backend -e 'pf.backend.selftest()'
 	luajit -l pf.match -e 'pf.match.selftest()'
+	luajit -l pf.regalloc -e 'pf.regalloc.selftest()'
+	luajit -l pf.selection -e 'pf.selection.selftest()'
+	luajit -l pf.codegen -e 'pf.codegen.selftest()'
 	luajit -l pf -e 'pf.selftest()'
