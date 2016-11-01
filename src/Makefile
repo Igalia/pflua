@@ -1,11 +1,19 @@
 TOP_SRCDIR:=..
 include $(TOP_SRCDIR)/common.mk
 
+DYNASM = $(ABS_TOP_SRCDIR)/deps/dynasm/dynasm.lua
+CODEGEN = pf/codegen
+
 all:
 
 clean:
 
-check:
+preprocess: $(CODEGEN).lua
+
+$(CODEGEN).lua: $(CODEGEN).dasl
+	luajit $(DYNASM) $(CODEGEN).dasl > $(CODEGEN).lua
+
+check: preprocess
 	luajit -l pf.types -e 'pf.types.selftest()'
 	luajit -l pf.utils -e 'pf.utils.selftest()'
 	luajit -l pf.libpcap -e 'pf.libpcap.selftest()'
