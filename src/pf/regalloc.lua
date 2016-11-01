@@ -36,7 +36,7 @@ local utils = require('pf.utils')
 local verbose = os.getenv("PF_VERBOSE");
 
 -- ops that don't read from registers and don't contribute to liveness
-local non_read_ops = utils.set("ret-true", "ret-false", "label", "cjmp", "noop")
+local non_read_ops = utils.set("jmp", "label", "cjmp", "noop")
 
 -- Update the ends of intervals based on variable occurrences in
 -- the "control" ast

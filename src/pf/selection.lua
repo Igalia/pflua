@@ -10,8 +10,6 @@
 --     { "add", "r1", "r3" } }
 --
 -- The instructions available are:
---   * ret-true
---   * ret-false
 --   * cmp
 --   * mov
 --   * mov64
@@ -51,12 +49,47 @@ end
 --
 -- Virtual registers are given names prefixed with "r" as in "r1".
 -- SSA variables remain prefixed with "v"
-local function select_block(block, new_register, instructions, next_label)
-   local control  = block.control
-   local bindings = block.bindings
+local function select_block(blocks, block, new_register, instructions, next_label)
+   local this_label = block.label
+   local control    = block.control
+   local bindings   = block.bindings
 
    local function emit(instr)
       table.insert(instructions, instr)
+   end
+
+   -- emit a jmp, looking up the next block and replace the jump target if
+   -- the next block would immediately jmp anyway (via a return statement)
+   local function emit_jmp(target_label, condition)
+      local target_block = blocks[target_label]
+
+      if target_block.control[1] == "return" then
+         if target_block.control[2][1] == "true" then
+            if condition then
+               emit({ "cjmp", condition, "true-label" })
+            else
+               emit({ "jmp", "true-label" })
+            end
+            return
+         elseif target_block.control[2][1] == "false" then
+            if condition then
+               emit({ "cjmp", condition, "false-label" })
+            else
+               emit({ "jmp", "false-label" })
+            end
+            return
+         end
+      end
+
+      if condition then
+         emit({ "cjmp", condition, label_num(target_label) })
+      else
+         emit({ "jmp", label_num(target_label) })
+      end
+   end
+
+   local function emit_cjmp(condition, target_label)
+      emit_jmp(target_label, condition)
    end
 
    -- do instruction selection on an arithmetic expression
@@ -239,38 +272,48 @@ local function select_block(block, new_register, instructions, next_label)
       emit({ "cmp", reg1, reg2 })
    end
 
-   emit({ "label", label_num(block.label) })
-
-   for _, binding in ipairs(bindings) do
-      local rhs = binding.value
-      local reg = select_arith(rhs)
-      emit({ "mov", binding.name, reg })
+   local function select_bindings()
+     for _, binding in ipairs(bindings) do
+        local rhs = binding.value
+        local reg = select_arith(rhs)
+        emit({ "mov", binding.name, reg })
+     end
    end
 
    if control[1] == "return" then
       local result = control[2]
 
-      if result[1] == "false" then
-         emit({ "ret-false" })
-      elseif result[1] == "true" then
-         emit({ "ret-true" })
+      if result[1] == "false" or result[1] == "true" then
+         -- do nothing and don't output a label, these blocks are just
+         -- dropped since these returns can just be replaced by directly
+         -- jumping to the true or false return labels at the end
       else
+         emit({ "label", label_num(this_label) })
+         select_bindings()
          select_bool(result)
          emit({ "cjmp", result[1], "true-label" })
-         emit({ "ret-false" })
+         emit({ "jmp", "false-label" })
       end
 
    elseif control[1] == "if" then
       local cond = control[2]
+      local then_label = control[3]
+      local else_label = control[4]
+
+      emit({ "label", label_num(this_label) })
+      select_bindings()
       select_bool(cond)
-      if control[3] ~= next_label and control[4] ~= next_label then
-         emit({ "cjmp", cond[1], label_num(control[3]) })
-         emit({ "jmp", label_num(control[4]) })
-      elseif control[3] == next_label then
-         emit({ "cjmp", negate_op[cond[1]], label_num(control[4]) })
-      elseif control[4] == next_label then
-         emit({ "cjmp", cond[1], label_num(control[3]) })
+
+      if next_label == then_label then
+         emit_cjmp(negate_op[cond[1]], else_label)
+         emit_jmp(then_label)
+      else
+         emit_cjmp(cond[1], then_label)
+         emit_jmp(else_label)
       end
+
+   else
+      error(string.format("NYI op %s", control[1]))
    end
 end
 
@@ -297,7 +340,7 @@ function select(ssa)
 
    for idx, label in pairs(ssa.order) do
       local next_label = ssa.order[idx+1]
-      select_block(blocks[label], new_register, instructions, next_label)
+      select_block(blocks, blocks[label], new_register, instructions, next_label)
    end
 
    if verbose then
@@ -310,175 +353,131 @@ end
 function selftest()
    local utils = require("pf.utils")
 
-   -- tests of simplification/instruction selection pass on arithmetic
-   -- and boolean expressions
-   local function test(block, expected, next_label)
-      local instructions = {}
-      local counter = 1
-      local new_register = make_new_register(counter)
-      -- next_label parameter only matters if there's an `if`
-      select_block(block, new_register, instructions, next_label)
-      utils.assert_equals(instructions, expected)
-   end
-
-   test({ label = "L1",
-          bindings = {},
-          control = { "if", { ">=", "len", 14 }, "L4", "L5" } },
-        {  { "label", 0 },
-           { "cmp", "len", 14 },
-           { "cjmp", "<", 4 } },
-        "L4")
-
-   test({ label = "L4",
-          bindings = {},
-          control = { "return", { "=", { "[]", 12, 2 }, 1544 } } },
-        { { "label", 3 },
-          { "load", "r1", 12, 2 },
-          { "cmp", "r1", 1544 },
-          { "cjmp", "=", "true-label" },
-          { "ret-false" } })
-
-   test({ label = "L2",
-          bindings = {},
-          control = { "return",
-                      { "=", { "+", { "[]", 12, 2 }, 5 }, 1 } } },
-        {  { "label", 1 },
-           { "load", "r1", 12, 2 },
-           { "mov", "r2", "r1" },
-           { "add-i", "r2", 5 },
-           { "cmp", "r2", 1 },
-           { "cjmp", "=", "true-label"},
-           { "ret-false" } })
-
-   test({ label = "L2",
-          bindings = {},
-          control = { "return",
-                      { "=", { "*", { "[]", 12, 2 }, 5 }, 1 } } },
-        { { "label", 1 },
-          { "load", "r1", 12, 2 },
-          { "mov", "r2", "r1" },
-          { "mul-i", "r2", 5 },
-          { "cmp", "r2", 1 },
-          { "cjmp", "=", "true-label" },
-          { "ret-false" } })
-
-   test({ label = "L2",
-          bindings = {},
-          control = { "return", { "=", { "*", { "[]", 12, 2 }, { "[]", 14, 2 } }, 1 } } },
-        { { "label", 1 },
-          { "load", "r1", 12, 2 },
-          { "load", "r2", 14, 2 },
-          { "mov", "r3", "r1" },
-          { "mul", "r3", "r2" },
-          { "cmp", "r3", 1 },
-          { "cjmp", "=", "true-label" },
-          { "ret-false" } })
-
-   test({ label = "L2",
-          bindings = {},
-          control = { "if",
-                      { "=", { "+", { "[]", 12, 2 }, 5 }, 1 },
-                      "L4", "L5" } },
-        { { "label", 1 },
-          { "load", "r1", 12, 2 },
-          { "mov", "r2", "r1" },
-          { "add-i", "r2", 5 },
-          { "cmp", "r2", 1 },
-          { "cjmp", "!=", 4 } },
-        "L4")
-
-   test({ label = "L2",
-          bindings = {},
-          control = { "if",
-                      { "=", { "*", { "[]", 12, 2 }, 5 }, 1 },
-                      "L4", "L5" } },
-        { { "label", 1 },
-          { "load", "r1", 12, 2 },
-          { "mov", "r2", "r1" },
-          { "mul-i", "r2", 5 },
-          { "cmp", "r2", 1 },
-          { "cjmp", "!=", 4 } },
-         "L4")
-
-   test({ label = "L2",
-          bindings = {},
-          control = { "if",
-                      { "=", { "*", { "[]", 12, 2 }, { "[]", 14, 2 } }, 1 },
-                      "L4", "L5" } },
-        { { "label", 1 },
-          { "load", "r1", 12, 2 },
-          { "load", "r2", 14, 2 },
-          { "mov", "r3", "r1" },
-          { "mul", "r3", "r2" },
-          { "cmp", "r3", 1 },
-          { "cjmp", "!=", 4 } },
-        "L4")
-
-   test({ label = "L10",
-          bindings = { { name = "v2", value = { "[]", 20, 1 } } },
-          control = { "if", { "=", "v2", 6 }, "L12", "L13" } },
-        { { "label", 9 },
-          { "load", "r1", 20, 1 },
-          { "mov", "v2", "r1" },
-          { "cmp", "v2", 6 },
-          { "cjmp", "!=", 12 } },
-        "L12")
-
    -- test on a whole set of blocks
    local function test(block, expected)
       local instructions = select(block)
       utils.assert_equals(instructions, expected)
    end
 
-   test(-- this is the first few blocks of the `tcp` filter
+   test(-- `arp`
         { start = "L1",
-          order = { "L1", "L4", "L6", "L7", "L8", "L10", "L12" },
+          order = { "L1", "L4", "L5" },
           blocks =
              { L1 = { label = "L1",
-	              bindings = {},
-	              control = { "if", { ">=", "len", 34 }, "L4", "L5" } },
-	       L4 = { label = "L4",
-	              bindings = { { name = "v1", value = { "[]", 12, 2 } } },
-	              control = { "if", { "=", "v1", 8 }, "L6", "L7" } },
-	       L6 = { label = "L6",
-	              bindings = {},
-	              control = { "return", { "=", { "[]", 23, 1 }, 6 } } },
-	       L7 = { label = "L7",
-	              bindings = {},
-	              control = { "if", { ">=", "len", 54 }, "L8", "L9" } },
+                      bindings = {},
+                      control = { "if", { ">=", "len", 14}, "L4", "L5" } },
+               L4 = { label = "L4",
+                      bindings = {},
+                      control = { "return", { "=", { "[]", 12, 2}, 1544 } } },
+               L5 = { label = "L5",
+                      bindings = {},
+                      control = { "return", { "false" } } } } },
+        { { "label", 0 },
+          { "cmp", "len", 14 },
+          { "cjmp", "<", "false-label"},
+          { "jmp", 3 },
+          { "label", 3 },
+          { "load", "r1", 12, 2 },
+          { "cmp", "r1", 1544 },
+          { "cjmp", "=", "true-label" },
+          { "jmp", "false-label" } })
+
+   test(-- `tcp`
+        { start = "L1",
+          order = { "L1", "L4", "L6", "L7", "L8", "L10", "L12", "L13",
+                    "L14", "L16", "L17", "L15", "L11", "L9", "L5" },
+          blocks =
+             { L1 = { label = "L1",
+                      bindings = {},
+                      control = { "if", { ">=", "len", 34 }, "L4", "L5" } },
+               L4 = { label = "L4",
+                      bindings = { { name = "v1", value = { "[]", 12, 2 } } },
+                      control = { "if", { "=", "v1", 8 }, "L6", "L7" },
+                      idom = "L1" },
+               L6 = { label = "L6",
+                      bindings = {},
+                      control = { "return", { "=", { "[]", 23, 1 }, 6 } },
+                      idom = "L4" },
+               L7 = { label = "L7",
+                      bindings = {},
+                      control = { "if", { ">=", "len", 54 }, "L8", "L9" },
+                      idom = "L7" },
                L8 = { label = "L8",
-	              bindings = {},
-	              control = { "if", { "=", "v1", 56710 }, "L10", "L11" } },
+                      bindings = {},
+                      control = { "if", { "=", "v1", 56710 }, "L10", "L11" },
+                      idom = "L7" },
                L10 = { label = "L10",
                        bindings = { { name = "v2", value = { "[]", 20, 1 } } },
-                       control = { "if", { "=", "v2", 6 }, "L12", "L13" } },
+                       control = { "if", { "=", "v2", 6 }, "L12", "L13" },
+                       idom = "L9" },
                L12 = { label = "L12",
                        bindings = {},
-                       control = { "return", { "true" } } } } },
+                       control = { "return", { "true" } },
+                       idom = "L10" },
+	       L13 = { label = "L13",
+	               bindings = {},
+	               control = { "if", { ">=", "len", 55 }, "L14", "L15" } },
+	       L14 = { label = "L14",
+	               bindings = {},
+	               control = { "if", { "=", "v2", 44 }, "L16", "L17" } },
+	       L16 = { label = "L16",
+	               bindings = {},
+	               control = { "return", { "=", { "[]", 54, 1 }, 6 } } },
+	       L17 = { label = "L17",
+	               bindings = {},
+	               control = { "return", { "false" } } },
+	       L15 = { label = "L15",
+	               bindings = {},
+	               control = { "return", { "false" } } },
+	       L11 = { label = "L11",
+	               bindings = {},
+	               control = { "return", { "false" } } },
+	       L9 = { label = "L9",
+	              bindings = {},
+	              control = { "return", { "false" } } },
+	       L5 = { label = "L5",
+	              bindings = {},
+	              control = { "return", { "false" } } } } },
         { { "label", 0 },
           { "cmp", "len", 34 },
-          { "cjmp", "<", 4 },
+          { "cjmp", "<", "false-label" },
+          { "jmp", 3 },
           { "label", 3 },
           { "load", "r1", 12, 2 },
           { "mov", "v1", "r1" },
           { "cmp", "v1", 8 },
           { "cjmp", "!=", 6 },
+          { "jmp", 5 },
           { "label", 5 },
           { "load", "r2", 23, 1 },
           { "cmp", "r2", 6 },
           { "cjmp", "=", "true-label" },
-          { "ret-false" },
+          { "jmp", "false-label" },
           { "label", 6 },
           { "cmp", "len", 54 },
-          { "cjmp", "<", 8 },
+          { "cjmp", "<", "false-label" },
+          { "jmp", 7 },
           { "label", 7 },
           { "cmp", "v1", 56710 },
-          { "cjmp", "!=", 10 },
+          { "cjmp", "!=", "false-label" },
+          { "jmp", 9 },
           { "label", 9 },
           { "load", "r3", 20, 1 },
           { "mov", "v2", "r3" },
           { "cmp", "v2", 6 },
           { "cjmp", "!=", 12 },
-          { "label", 11 },
-          { "ret-true" } })
+          { "jmp", "true-label" },
+          { "label", 12 },
+          { "cmp", "len", 55 },
+          { "cjmp", "<", "false-label" },
+          { "jmp", 13 },
+          { "label", 13 },
+          { "cmp", "v2", 44 },
+          { "cjmp", "!=", "false-label" },
+          { "jmp", 15 },
+          { "label", 15 },
+          { "load", "r4", 54, 1 },
+          { "cmp", "r4", 6 },
+          { "cjmp", "=", "true-label" },
+          { "jmp", "false-label" } })
 end

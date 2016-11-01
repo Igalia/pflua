@@ -18,8 +18,10 @@ local anchor = {}
 local debug = false
 
 local function compile_cjmp(Dst, op, target)
-   if (target == "true-label") then
+   if target == "true-label" then
       target = 0
+   elseif target == "false-label" then
+      target = 1
    else
       target = target + 3
    end
@@ -45,6 +47,7 @@ local function compile(instructions, alloc, dump)
    -- number of =>(...) style labels
    -- reserve three labels 0-2 for return cases
    local maxpc = 3
+   Dst:growpc(maxpc)
 
    -- allocate space for all spilled vars
    --local spilled_space = alloc.num_spilled * 32
@@ -76,7 +79,22 @@ local function compile(instructions, alloc, dump)
          compile_cjmp(Dst, instr[2], instr[3])
 
       elseif itype == "jmp" then
-         | jmp =>(instr[2] + 3)
+         local next_instr = instructions[idx+1]
+         -- if the jump target is immediately after this in the instruction
+         -- sequence then don't generate the jump
+         if (type(instr[2]) == "number" and
+             next_instr[1] == "label" and
+             next_instr[2] == instr[2]) then
+            -- don't output anything
+         else
+            if instr[2] == "true-label" then
+               | jmp =>(0)
+            elseif instr[2] == "false-label" then
+               | jmp =>(1)
+            else
+               | jmp =>(instr[2] + 3)
+            end
+         end
 
       elseif itype == "cmp" then
          -- the lhs should never be an immediate so this should be non-nil
@@ -211,29 +229,6 @@ local function compile(instructions, alloc, dump)
       elseif itype == "uint32" then
          local reg = alloc[instr[2]]
          | mov Rd(reg), Rd(reg)
-
-      elseif itype == "ret-true" then
-         | jmp =>(0)
-
-      elseif itype == "ret-false" then
-         | nop
-         | jmp =>(1)
-         -- there tend to be a lot of duplicated
-         --   { "return", { "false" } }
-         -- forms so optimize them out here by peeking to
-         -- find repeats only separated by a label and only
-         -- generate the last one
-         --local next_instr = instructions[idx + 1]
-         --local next_next_instr = instructions[idx + 2]
-         --if next_instr and next_instr[1] == "label" and
-         --   next_next_instr and next_next_instr[1] == "ret-false" then
-         --   -- TODO: if we don't insert nops, bad things happen.
-         --   --       so the right place to do this optimization is
-         --   --       in an earlier phase of compilation...
-         --   | nop
-         --else
-         --   | jmp =>(1)
-         --end
 
       elseif itype == "noop" then
          -- don't output anything
