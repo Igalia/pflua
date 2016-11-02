@@ -226,6 +226,16 @@ local function select_block(block, new_register, instructions, next_label)
    local function select_bool(expr)
       local reg1 = select_arith(expr[2])
       local reg2 = select_arith(expr[3])
+
+      -- cmp can't have an immediate on the lhs, but sometimes unoptimized
+      -- pf expressions will have such a comparison which requires an extra
+      -- mov instruction
+      if type(reg1) == "number" then
+         local tmp = new_register()
+         emit({ "mov", tmp, reg1 })
+         reg1 = tmp
+      end
+
       emit({ "cmp", reg1, reg2 })
    end
 
