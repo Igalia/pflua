@@ -246,10 +246,10 @@ local function compile(instructions, alloc, dump)
    -- return true, false
    -- TODO: do this more cleverly
    |=>(0):
-   | mov rax, 0x1
+   | mov al, 0x1
    | jmp =>(2)
    |=>(1):
-   | mov rax, 0x0
+   | mov al, 0x0
    |=>(2):
 
    -- fix stack
