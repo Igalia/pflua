@@ -116,8 +116,12 @@ local function compile(instructions, alloc, dump)
 
       elseif itype == "mov" then
          local dst = alloc[instr[2]]
-         local src = alloc[instr[3]]
-         | mov Rq(dst), Rq(src)
+
+         if type(instr[3]) == "number" then
+            | mov Rq(dst), instr[3]
+         else
+            | mov Rq(dst), Rq(alloc[instr[3]])
+         end
 
       elseif itype == "mov64" then
          local dst = alloc[instr[2]]
