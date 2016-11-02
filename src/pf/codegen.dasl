@@ -79,7 +79,8 @@ local function compile(instructions, alloc, dump)
          | jmp =>(instr[2] + 3)
 
       elseif itype == "cmp" then
-         local lhs_reg = alloc[instr[2]]
+         -- the lhs should never be an immediate so this should be non-nil
+         local lhs_reg = assert(alloc[instr[2]])
          local rhs = instr[3]
 
          if type(rhs) == "number" then
@@ -182,12 +183,16 @@ local function compile(instructions, alloc, dump)
          | shl Rq(reg), instr[3]
 
       elseif itype == "add-3" then
-         local reg1 = alloc[instr[2]]
+         -- expr2 must always a register
+         local reg1 = assert(alloc[instr[2]])
 
-         -- expr2 is always a register
-         -- due to constant folding, only at most one of expr3
-         -- or expr4 can be a constant
-         if type(instr[3]) == "number" then
+         -- with optimization on, the first branch doesn't happen but
+         -- it can happen with the -O0 flag
+         -- TODO: maybe the first branch should be classified differently
+         --       at instruction selection time
+         if type(instr[3]) == "number" and type(instr[4] == "number") then
+            | add Rq(reg1), (instr[3] + instr[4])
+         elseif type(instr[3]) == "number" then
             local reg2 = alloc[instr[4]]
             | lea Rq(reg1), [Rq(reg2)+instr[3]]
          elseif type(instr[4]) == "number" then
