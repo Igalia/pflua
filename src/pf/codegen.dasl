@@ -102,9 +102,9 @@ local function compile(instructions, alloc, dump)
 
          if type(offset) == "number" then
             if bytes == 1 then
-               | movzx Rq(target), byte [rdi + offset]
+               | movzx Rw(target), byte [rdi + offset]
             elseif bytes == 2 then
-               | movzx Rq(target), word [rdi + offset]
+               | movzx Rd(target), word [rdi + offset]
             else
                | mov   Rd(target), dword [rdi + offset]
             end
