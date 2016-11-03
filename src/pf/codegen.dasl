@@ -23,7 +23,7 @@ local function compile_cjmp(Dst, op, target)
    elseif target == "false-label" then
       target = 1
    else
-      target = target + 3
+      target = target + 2
    end
 
    if op == "=" then
@@ -46,7 +46,7 @@ local function compile(instructions, alloc, dump)
 
    -- number of =>(...) style labels
    -- reserve three labels 0-2 for return cases
-   local maxpc = 3
+   local maxpc = 3 + instructions.max_label
    Dst:growpc(maxpc)
 
    -- allocate space for all spilled vars
@@ -55,24 +55,11 @@ local function compile(instructions, alloc, dump)
    --   | sub rsp, spilled_space
    --end
 
-   -- first go find the max number of labels
-   for _, instr in ipairs(instructions) do
-      if instr[1] == "label" then
-         -- offset for reserved labels
-         local lnum = instr[2] + 3
-
-         if lnum + 1 > maxpc then
-            maxpc = lnum + 1
-            Dst:growpc(maxpc)
-         end
-      end
-   end
-
    for idx, instr in ipairs(instructions) do
       local itype = instr[1]
 
       if itype == "label" then
-         local lnum = instr[2] + 3
+         local lnum = instr[2] + 2
          |=>(lnum):
 
       elseif itype == "cjmp" then
@@ -92,7 +79,7 @@ local function compile(instructions, alloc, dump)
             elseif instr[2] == "false-label" then
                | jmp =>(1)
             else
-               | jmp =>(instr[2] + 3)
+               | jmp =>(instr[2] + 2)
             end
          end
 

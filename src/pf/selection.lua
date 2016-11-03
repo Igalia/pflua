@@ -40,9 +40,8 @@ local negate_op = { ["="] = "!=", ["!="] = "=",
                     [">="] = "<", ["<="] = ">" }
 
 -- extract a number from an SSA IR label
--- decrement by 1 since codegen labels start at 0
 function label_num(label)
-   return tonumber(string.match(label, "L(%d+)")) - 1
+   return tonumber(string.match(label, "L(%d+)"))
 end
 
 -- Convert a block to a sequence of pseudo-instructions
@@ -90,6 +89,17 @@ local function select_block(blocks, block, new_register, instructions, next_labe
 
    local function emit_cjmp(condition, target_label)
       emit_jmp(target_label, condition)
+   end
+
+   local function emit_label()
+      local max = instructions.max_label
+      local num = label_num(this_label)
+
+      if num > max then
+         instructions.max_label = num
+      end
+
+      emit({ "label", num })
    end
 
    -- do instruction selection on an arithmetic expression
@@ -288,7 +298,7 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          -- dropped since these returns can just be replaced by directly
          -- jumping to the true or false return labels at the end
       else
-         emit({ "label", label_num(this_label) })
+         emit_label()
          select_bindings()
          select_bool(result)
          emit({ "cjmp", result[1], "true-label" })
@@ -300,7 +310,7 @@ local function select_block(blocks, block, new_register, instructions, next_labe
       local then_label = control[3]
       local else_label = control[4]
 
-      emit({ "label", label_num(this_label) })
+      emit_label()
       select_bindings()
       select_bool(cond)
 
@@ -333,7 +343,7 @@ end
 
 function select(ssa)
    local blocks = ssa.blocks
-   local instructions = {}
+   local instructions = { max_label = 0 }
 
    local reg_num = 1
    local new_register = make_new_register(reg_num)
@@ -372,15 +382,16 @@ function selftest()
                L5 = { label = "L5",
                       bindings = {},
                       control = { "return", { "false" } } } } },
-        { { "label", 0 },
+        { { "label", 1 },
           { "cmp", "len", 14 },
           { "cjmp", "<", "false-label"},
-          { "jmp", 3 },
-          { "label", 3 },
+          { "jmp", 4 },
+          { "label", 4 },
           { "load", "r1", 12, 2 },
           { "cmp", "r1", 1544 },
           { "cjmp", "=", "true-label" },
-          { "jmp", "false-label" } })
+          { "jmp", "false-label" },
+          max_label = 4 })
 
    test(-- `tcp`
         { start = "L1",
@@ -438,46 +449,47 @@ function selftest()
 	       L5 = { label = "L5",
 	              bindings = {},
 	              control = { "return", { "false" } } } } },
-        { { "label", 0 },
+        { { "label", 1 },
           { "cmp", "len", 34 },
           { "cjmp", "<", "false-label" },
-          { "jmp", 3 },
-          { "label", 3 },
+          { "jmp", 4 },
+          { "label", 4 },
           { "load", "r1", 12, 2 },
           { "mov", "v1", "r1" },
           { "cmp", "v1", 8 },
-          { "cjmp", "!=", 6 },
-          { "jmp", 5 },
-          { "label", 5 },
+          { "cjmp", "!=", 7 },
+          { "jmp", 6 },
+          { "label", 6 },
           { "load", "r2", 23, 1 },
           { "cmp", "r2", 6 },
           { "cjmp", "=", "true-label" },
           { "jmp", "false-label" },
-          { "label", 6 },
+          { "label", 7 },
           { "cmp", "len", 54 },
           { "cjmp", "<", "false-label" },
-          { "jmp", 7 },
-          { "label", 7 },
+          { "jmp", 8 },
+          { "label", 8 },
           { "cmp", "v1", 56710 },
           { "cjmp", "!=", "false-label" },
-          { "jmp", 9 },
-          { "label", 9 },
+          { "jmp", 10 },
+          { "label", 10 },
           { "load", "r3", 20, 1 },
           { "mov", "v2", "r3" },
           { "cmp", "v2", 6 },
-          { "cjmp", "!=", 12 },
+          { "cjmp", "!=", 13 },
           { "jmp", "true-label" },
-          { "label", 12 },
+          { "label", 13 },
           { "cmp", "len", 55 },
           { "cjmp", "<", "false-label" },
-          { "jmp", 13 },
-          { "label", 13 },
+          { "jmp", 14 },
+          { "label", 14 },
           { "cmp", "v2", 44 },
           { "cjmp", "!=", "false-label" },
-          { "jmp", 15 },
-          { "label", 15 },
+          { "jmp", 16 },
+          { "label", 16 },
           { "load", "r4", 54, 1 },
           { "cmp", "r4", 6 },
           { "cjmp", "=", "true-label" },
-          { "jmp", "false-label" } })
+          { "jmp", "false-label" },
+          max_label = 16 })
 end
