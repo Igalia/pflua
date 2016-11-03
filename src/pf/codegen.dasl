@@ -65,6 +65,30 @@ local function compile(instructions, alloc, dump)
       elseif itype == "cjmp" then
          compile_cjmp(Dst, instr[2], instr[3])
 
+      elseif itype == "cret" then
+         local op = instr[2]
+
+         -- since we're going to return immediately, we can trash
+         -- any registers we want to at this point
+         | mov al, 0
+         | mov cl, 1
+
+         if op == "=" then
+            | cmove  ax, cx
+         elseif op == "!=" then
+            | cmovne ax, cx
+         elseif op == ">=" then
+            | cmovge ax, cx
+         elseif op == "<=" then
+            | cmovle ax, cx
+         elseif op == ">" then
+            | cmovg  ax, cx
+         elseif op == "<" then
+            | cmovl  ax, cx
+         end
+
+         | ret
+
       elseif itype == "jmp" then
          local next_instr = instructions[idx+1]
          -- if the jump target is immediately after this in the instruction

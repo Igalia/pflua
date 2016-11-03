@@ -332,8 +332,9 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          emit_label()
          select_bindings()
          select_bool(result)
-         emit({ "cjmp", result[1], "true-label" })
-         emit({ "jmp", "false-label" })
+         -- a conditional return, basically outputs a pair of a cmov and
+         -- a ret / jmp at this point (depending on if cleanup code runs)
+         emit({ "cret", result[1] })
       end
 
    elseif control[1] == "if" then
@@ -420,8 +421,7 @@ function selftest()
           { "label", 4 },
           { "load", "r1", 12, 2 },
           { "cmp", "r1", 1544 },
-          { "cjmp", "=", "true-label" },
-          { "jmp", "false-label" },
+          { "cret", "=" },
           max_label = 4 })
 
    test(-- `tcp`
@@ -493,8 +493,7 @@ function selftest()
           { "label", 6 },
           { "load", "r2", 23, 1 },
           { "cmp", "r2", 6 },
-          { "cjmp", "=", "true-label" },
-          { "jmp", "false-label" },
+          { "cret", "=" },
           { "label", 7 },
           { "cmp", "len", 54 },
           { "cjmp", "<", "false-label" },
@@ -520,7 +519,6 @@ function selftest()
           { "label", 16 },
           { "load", "r4", 54, 1 },
           { "cmp", "r4", 6 },
-          { "cjmp", "=", "true-label" },
-          { "jmp", "false-label" },
+          { "cret", "=" },
           max_label = 16 })
 end
