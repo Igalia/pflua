@@ -138,6 +138,10 @@ local function compile(instructions, alloc, dump)
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          | add Rq(reg1), Rq(reg2)
 
+      elseif itype == "sub" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | sub Rq(reg1), Rq(reg2)
+
       elseif itype == "mul" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          | imul Rq(reg1), Rq(reg2)
@@ -156,6 +160,10 @@ local function compile(instructions, alloc, dump)
       elseif itype == "add-i" then
          local reg = alloc[instr[2]]
          | add Rq(reg), instr[3]
+
+      elseif itype == "sub-i" then
+         local reg = alloc[instr[2]]
+         | sub Rq(reg), instr[3]
 
       elseif itype == "mul-i" then
          local r = alloc[instr[2]]
@@ -453,6 +461,10 @@ function selftest()
    assert(not test("net 178.79.150.233", v4_pkts[1]))
    assert(test("net 145.254.160.0/24", v4_pkts[1]))
    assert(not test("net 178.79.150.0/24", v4_pkts[1]))
+
+   assert(test("ip[0:1] - 100 = 4294967265", v4_pkts[1]))
+   assert(test("ip[0:1] - 68 = 1", v4_pkts[1]))
+   assert(not test("ip[0:1] - 68 = 2", v4_pkts[1]))
 
    print("OK")
 end

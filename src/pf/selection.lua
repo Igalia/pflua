@@ -171,6 +171,31 @@ local function select_block(blocks, block, new_register, instructions, next_labe
             return tmp
          end
 
+      elseif expr[1] == "-" then
+         -- need an extra mov for this case
+         if type(expr[2]) == "number" then
+            local reg3 = select_arith(expr[3])
+            local tmp = new_register()
+            emit({ "mov", tmp, expr[2] })
+            emit({ "sub", tmp, reg3 })
+            return tmp
+         elseif type(expr[3]) == "number" then
+            local reg2 = select_arith(expr[2])
+            local tmp = new_register()
+            emit({ "mov", tmp, reg2 })
+            emit({ "sub-i", tmp, expr[3] })
+            return tmp
+
+         -- generic subtraction
+         else
+            local reg2 = select_arith(expr[2])
+            local reg3 = select_arith(expr[3])
+            local tmp = new_register()
+            emit({ "mov", tmp, reg2 })
+            emit({ "sub", tmp, reg3 })
+            return tmp
+         end
+
       elseif expr[1] == "*" then
          -- multiplication with constant
          if type(expr[2]) == "number" then
