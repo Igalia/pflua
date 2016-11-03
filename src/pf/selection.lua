@@ -332,7 +332,7 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          emit_label()
          select_bindings()
          select_bool(result)
-         -- a conditional return, basically outputs a pair of a set and
+         -- a conditional return, basically outputs a pair of a cmov and
          -- a ret / jmp at this point (depending on if cleanup code runs)
          emit({ "cret", result[1] })
       end
