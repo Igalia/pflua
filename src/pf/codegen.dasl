@@ -68,23 +68,19 @@ local function compile(instructions, alloc, dump)
       elseif itype == "cret" then
          local op = instr[2]
 
-         -- since we're going to return immediately, we can trash
-         -- any registers we want to at this point
-         | mov al, 0
-         | mov cl, 1
-
+         -- we can trash ax since we're going to ret immediately
          if op == "=" then
-            | cmove  ax, cx
+            | sete   al
          elseif op == "!=" then
-            | cmovne ax, cx
+            | setne  al
          elseif op == ">=" then
-            | cmovge ax, cx
+            | setge  al
          elseif op == "<=" then
-            | cmovle ax, cx
+            | setle  al
          elseif op == ">" then
-            | cmovg  ax, cx
+            | setg   al
          elseif op == "<" then
-            | cmovl  ax, cx
+            | setl   al
          end
 
          | ret
