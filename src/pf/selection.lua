@@ -196,7 +196,7 @@ local function select_block(blocks, block, new_register, instructions, next_labe
             return tmp
          end
 
-      elseif expr[1] == "*" then
+      elseif expr[1] == "*" or expr[1] == "*64" then
          -- multiplication with constant
          if type(expr[2]) == "number" then
             local reg3 = select_arith(expr[3])

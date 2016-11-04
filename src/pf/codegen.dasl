@@ -476,6 +476,9 @@ function selftest()
    assert(test("ip[0:1] - 68 = 1", v4_pkts[1]))
    assert(not test("ip[0:1] - 68 = 2", v4_pkts[1]))
 
+   assert(test("ip[0:1] * 2 == 0x8A", v4_pkts[1]))
+   assert(not test("ip[0] * 2 == 0x8B", v4_pkts[1]))
+
    -- test to make sure that callee-save registers work properly
    local function test(expr)
       local Dst = dasm.new(actions)
