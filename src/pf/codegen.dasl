@@ -55,6 +55,11 @@ local function compile(instructions, alloc, dump)
    --   | sub rsp, spilled_space
    --end
 
+   -- push callee-save registers if we use any
+   for _, reg in ipairs(alloc.callee_saves) do
+      | push Rq(reg)
+   end
+
    for idx, instr in ipairs(instructions) do
       local itype = instr[1]
 
@@ -246,6 +251,11 @@ local function compile(instructions, alloc, dump)
    --if spilled_space > 0 then
    --   | add rsp, spilled_space
    --end
+
+   -- pop callee-save registers if we use any
+   for _, reg in ipairs(alloc.callee_saves) do
+      | pop Rq(reg)
+   end
    | ret
 
    local mcode, size = Dst:build()
