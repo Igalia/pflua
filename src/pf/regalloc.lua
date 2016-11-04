@@ -1,34 +1,32 @@
 -- Implements register allocation for pflua's native backend
 --
--- Register allocation operates on a post-SSA pflua IR form.
---
 -- The result of register allocation is a table that describes
--- the max spills/number of stack slots needed and the registers
--- for all variables in each basic block.
+-- the register allocated for the given virtual registers, e.g.:
 --
---   { num_spilled = 1
---     v1 = 1, -- %rcx
---     v2 = 2, -- %rdx
---     v3 = { spill = 0 },
---     L4 = {
---            r1 = 0, -- %rax
---            r2 = 8, -- %r8
---          } }
+--   { v1  = 1, -- %rcx
+--     v2  = 2, -- %rdx
+--     r3  = 0, -- %rax
+--     len = 6, -- %rsi
+--     callee_saves = {}
+--   }
 --
--- The tables for each block have a metatable set to look up in
--- the outer table for v? variables.
+-- The callee_saves field lists the callee-save registers that are
+-- used in the allocation. This lets the code generation pass easily
+-- generate any push/pops that are needed.
 --
 -- Register numbers are based on DynASM's Rq() register mapping.
 --
 -- The following registers are reserved and not allocated:
 --   * %rdi to store the packet pointer argument
---   * %rsi to store the length argument
 --
 -- The allocator should first prioritize using caller-save registers
 --   * %rax, %rcx, %rdx, %r8-%r11
 --
 -- before using callee-save registers
 --   * %rbx, %r12-%r15
+--
+-- Currently spilling doesn't work (it complicates code generation) and
+-- a spill case will just error.
 
 module(...,package.seeall)
 
