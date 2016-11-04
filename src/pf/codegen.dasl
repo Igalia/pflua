@@ -466,5 +466,44 @@ function selftest()
    assert(test("ip[0:1] - 68 = 1", v4_pkts[1]))
    assert(not test("ip[0:1] - 68 = 2", v4_pkts[1]))
 
+   -- test to make sure that callee-save registers work properly
+   local function test(expr)
+      local Dst = dasm.new(actions)
+
+      local ssa = convert_ssa(convert_anf(optimize(expand(parse(expr), "EN10MB"))))
+      local instr = sel.select(ssa)
+      local alloc = ra.allocate(instr)
+      local f = compile(instr, alloc)
+      local pkt = v4_pkts[1]
+
+      | push rbx
+      -- we want to make sure %rbx still contains this later
+      | mov rbx, 0xdeadbeef
+      -- args to 'f'
+      | mov64 rdi, ffi.cast(ffi.typeof("uint64_t"), pkt.packet)
+      | mov rsi, pkt.len
+      -- call 'f'
+      | mov64 rax, ffi.cast(ffi.typeof("uint64_t"), f)
+      | call rax
+      -- make sure it's still there
+      | cmp rbx, 0xdeadbeef
+      -- put a bool in return register
+      | sete al
+      | pop rbx
+      | ret
+
+      local mcode, size = Dst:build()
+      table.insert(anchor, mcode)
+      local f = ffi.cast(ffi.typeof("bool(*)()"), mcode)
+      return f()
+   end
+
+   assert(test('ip[0]+ip[1]+ip[2]+ip[3]+ip[4]+ip[5]+ip[6] =\
+                ip[0]-ip[1]-ip[2]-ip[3]-ip[4]-ip[5]-ip[6]'))
+   -- if this fails, it likely means we aren't handling callee-save
+   -- registers properly
+   assert(test('ip[0]+ip[1]+ip[2]+ip[3]+ip[4]+ip[5]+ip[6]+ip[7] =\
+                ip[0]-ip[1]-ip[2]-ip[3]-ip[4]-ip[5]-ip[6]-ip[7]'))
+
    print("OK")
 end
