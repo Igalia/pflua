@@ -27,6 +27,7 @@
 --   * uint32
 --   * cjmp
 --   * jmp
+--   * ret-true, ret-false
 --   * noop (inserted by register allocation)
 
 module(...,package.seeall)
@@ -53,6 +54,11 @@ local function select_block(blocks, block, new_register, instructions, next_labe
    local control    = block.control
    local bindings   = block.bindings
 
+   -- these control whether to emit pseudo-instructions for doing
+   -- 'return true' or 'return false' at the very end.
+   -- (since they may not be needed if the result is always true or false)
+   local emit_true, emit_false
+
    local function emit(instr)
       table.insert(instructions, instr)
    end
@@ -69,6 +75,7 @@ local function select_block(blocks, block, new_register, instructions, next_labe
             else
                emit({ "jmp", "true-label" })
             end
+            emit_true = true
             return
          elseif target_block.control[2][1] == "false" then
             if condition then
@@ -76,6 +83,7 @@ local function select_block(blocks, block, new_register, instructions, next_labe
             else
                emit({ "jmp", "false-label" })
             end
+            emit_false = true
             return
          end
       end
@@ -324,16 +332,21 @@ local function select_block(blocks, block, new_register, instructions, next_labe
    if control[1] == "return" then
       local result = control[2]
 
-      if result[1] == "false" or result[1] == "true" then
-         -- do nothing and don't output a label, these blocks are just
-         -- dropped since these returns can just be replaced by directly
-         -- jumping to the true or false return labels at the end
+      -- For the first two branches, only record necessity of constructing the
+      -- label. The blocks are dropped since these returns can just be replaced
+      -- by directly jumping to the true or false return labels at the end
+      if result[1] == "false" then
+         emit_false = true
+      elseif result[1] == "true" then
+         emit_true = true
       else
          emit_label()
          select_bindings()
          select_bool(result)
          emit({ "cjmp", result[1], "true-label" })
          emit({ "jmp", "false-label" })
+         emit_true = true
+         emit_false = true
       end
 
    elseif control[1] == "if" then
@@ -356,6 +369,8 @@ local function select_block(blocks, block, new_register, instructions, next_labe
    else
       error(string.format("NYI op %s", control[1]))
    end
+
+   return emit_true, emit_false
 end
 
 local function make_new_register(reg_num)
@@ -375,17 +390,29 @@ end
 function select(ssa)
    local blocks = ssa.blocks
    local instructions = { max_label = 0 }
+   local emit_true, emit_false
 
    local reg_num = 1
    local new_register = make_new_register(reg_num)
 
    for idx, label in pairs(ssa.order) do
       local next_label = ssa.order[idx+1]
-      select_block(blocks, blocks[label], new_register, instructions, next_label)
+      local et, ef =
+         select_block(blocks, blocks[label], new_register,
+                      instructions, next_label)
+      emit_true = et or emit_true
+      emit_false = ef or emit_false
    end
 
    if verbose then
       print_selection(instructions)
+   end
+
+   if emit_true then
+      table.insert(instructions, { "ret-true" })
+   end
+   if emit_false then
+      table.insert(instructions, { "ret-false" })
    end
 
    return instructions
@@ -422,6 +449,8 @@ function selftest()
           { "cmp", "r1", 1544 },
           { "cjmp", "=", "true-label" },
           { "jmp", "false-label" },
+          { "ret-true" },
+          { "ret-false" },
           max_label = 4 })
 
    test(-- `tcp`
@@ -522,5 +551,7 @@ function selftest()
           { "cmp", "r4", 6 },
           { "cjmp", "=", "true-label" },
           { "jmp", "false-label" },
+          { "ret-true" },
+          { "ret-false" },
           max_label = 16 })
 end
