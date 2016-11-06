@@ -253,6 +253,30 @@ local function select_block(blocks, block, new_register, instructions, next_labe
             return tmp
          end
 
+      elseif expr[1] == "|" then
+         -- with immediate
+         if type(expr[2]) == "number" then
+            local reg3 = select_arith(expr[3])
+            local tmp = new_register()
+            emit({ "mov", tmp, reg3 })
+            emit({ "or-i", tmp, expr[2] })
+            return tmp
+         elseif type(expr[3]) == "number" then
+            local reg2 = select_arith(expr[2])
+            local tmp = new_register()
+            emit({ "mov", tmp, reg2 })
+            emit({ "or-i", tmp, expr[3] })
+            return tmp
+
+         else
+            local reg2 = select_arith(expr[2])
+            local reg3 = select_arith(expr[3])
+            local tmp = new_register()
+            emit({ "mov", tmp, reg2 })
+            emit({ "or", tmp, reg3 })
+            return tmp
+         end
+
       elseif expr[1] == "<<" then
          -- with immediate
          if type(expr[2]) == "number" then
