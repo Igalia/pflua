@@ -166,6 +166,12 @@ local function compile(instructions, alloc, dump)
          --| shlx Rq(reg1), Rq(reg1), Rq(reg2)
          error("Unsupported instruction shlx")
 
+      elseif itype == "shr" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         -- TODO: see comment above
+         --| shrx Rq(reg1), Rq(reg1), Rq(reg2)
+         error("Unsupported instruction shrx")
+
       elseif itype == "add-i" then
          local reg = alloc[instr[2]]
          | add Rq(reg), instr[3]
@@ -209,6 +215,10 @@ local function compile(instructions, alloc, dump)
       elseif itype == "shl-i" then
          local reg = alloc[instr[2]]
          | shl Rq(reg), instr[3]
+
+      elseif itype == "shr-i" then
+         local reg = alloc[instr[2]]
+         | shr Rq(reg), instr[3]
 
       elseif itype == "add-3" then
          -- expr2 must always a register
@@ -499,6 +509,9 @@ function selftest()
 
    assert(test("ip[0:1] | 2 == 0x47", v4_pkts[1]))
    assert(not test("ip[0] | 2 == 0x48", v4_pkts[1]))
+
+   assert(test("ip[0:1] >> 1 == 0x22", v4_pkts[1]))
+   assert(not test("ip[0:1] >> 1 == 0x21", v4_pkts[1]))
 
    assert(test("", v4_pkts[1]))
    assert(test("", arp_pkts[1]))

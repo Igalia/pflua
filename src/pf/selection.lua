@@ -310,6 +310,39 @@ local function select_block(blocks, block, new_register, instructions, next_labe
             return tmp
          end
 
+      elseif expr[1] == ">>" then
+         -- with immediate
+         if type(expr[2]) == "number" then
+            local reg3 = select_arith(expr[3])
+            local tmp = new_register()
+            local tmp2 = new_register()
+            emit({ "mov", tmp, reg3 })
+            emit({ "mov", tmp2, expr[2] })
+            emit({ "shr", tmp, tmp2 })
+            return tmp
+         elseif type(expr[3]) == "number" then
+            local reg2 = select_arith(expr[2])
+            local imm = expr[3]
+            local tmp = new_register()
+            if imm <= 8 then
+               emit({ "mov", tmp, reg2 })
+               emit({ "shr-i", tmp, imm })
+            else
+               local tmp2 = new_register()
+               emit({ "mov", tmp2, imm })
+               emit({ "shr", tmp, tmp2 })
+            end
+            return tmp
+
+         else
+            local reg2 = select_arith(expr[2])
+            local reg3 = select_arith(expr[3])
+            local tmp = new_register()
+            emit({ "mov", tmp, reg2 })
+            emit({ "shr", tmp, reg3 })
+            return tmp
+         end
+
       elseif expr[1] == "ntohs" then
          local reg = select_arith(expr[2])
          local tmp = new_register()
