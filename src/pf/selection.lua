@@ -21,8 +21,14 @@
 --   * mul-i
 --   * and
 --   * and-i
+--   * or
+--   * or-i
+--   * xor
+--   * xor-i
 --   * shl
 --   * shl-i
+--   * shr
+--   * shr-i
 --   * ntohs
 --   * uint32
 --   * cjmp
