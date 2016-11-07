@@ -159,6 +159,10 @@ local function compile(instructions, alloc, dump)
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          | or Rq(reg1), Rq(reg2)
 
+      elseif itype == "or" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | xor Rq(reg1), Rq(reg2)
+
       elseif itype == "shl" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          -- TODO: we want to emit shlx here but dynasm doesn't
@@ -211,6 +215,12 @@ local function compile(instructions, alloc, dump)
          assert(type(reg) == "number")
          assert(type(instr[3]) == "number")
          | or Rq(reg), instr[3]
+
+      elseif itype == "xor-i" then
+         local reg = alloc[instr[2]]
+         assert(type(reg) == "number")
+         assert(type(instr[3]) == "number")
+         | xor Rq(reg), instr[3]
 
       elseif itype == "shl-i" then
          local reg = alloc[instr[2]]
@@ -509,6 +519,9 @@ function selftest()
 
    assert(test("ip[0:1] | 2 == 0x47", v4_pkts[1]))
    assert(not test("ip[0] | 2 == 0x48", v4_pkts[1]))
+
+   assert(test("ip[0:1] ^ 3 == 0x46", v4_pkts[1]))
+   assert(not test("ip[0:1] ^ 3 == 0x45", v4_pkts[1]))
 
    assert(test("ip[0:1] << 1 == 0x8A", v4_pkts[1]))
    assert(not test("ip[0:1] << 1 == 0x8B", v4_pkts[1]))
