@@ -94,10 +94,10 @@ local function compile(instructions, alloc, dump)
          local rhs = instr[3]
 
          if type(rhs) == "number" then
-            | cmp Rq(lhs_reg), rhs
+            | cmp Rd(lhs_reg), rhs
          else
             local rhs_reg = alloc[rhs]
-            | cmp Rq(lhs_reg), Rq(rhs_reg)
+            | cmp Rd(lhs_reg), Rd(rhs_reg)
          end
 
       elseif itype == "load" then
@@ -107,9 +107,9 @@ local function compile(instructions, alloc, dump)
 
          if type(offset) == "number" then
             if bytes == 1 then
-               | movzx Rq(target), byte [rdi + offset]
+               | movzx Rd(target), byte [rdi + offset]
             elseif bytes == 2 then
-               | movzx Rq(target), word [rdi + offset]
+               | movzx Rd(target), word [rdi + offset]
             else
                | mov   Rd(target), dword [rdi + offset]
             end
@@ -117,11 +117,11 @@ local function compile(instructions, alloc, dump)
             local reg = alloc[offset]
 
             if bytes == 1 then
-               | movzx Rq(target), byte [rdi + Rq(reg)]
+               | movzx Rd(target), byte [rdi + Rd(reg)]
             elseif bytes == 2 then
-               | movzx Rq(target), word [rdi + Rq(reg)]
+               | movzx Rd(target), word [rdi + Rd(reg)]
             else
-               | mov   Rd(target), dword [rdi + Rq(reg)]
+               | mov   Rd(target), dword [rdi + Rd(reg)]
             end
          end
 
@@ -129,9 +129,9 @@ local function compile(instructions, alloc, dump)
          local dst = alloc[instr[2]]
 
          if type(instr[3]) == "number" then
-            | mov Rq(dst), instr[3]
+            | mov Rd(dst), instr[3]
          else
-            | mov Rq(dst), Rq(alloc[instr[3]])
+            | mov Rd(dst), Rd(alloc[instr[3]])
          end
 
       elseif itype == "mov64" then
@@ -141,11 +141,11 @@ local function compile(instructions, alloc, dump)
 
       elseif itype == "add" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | add Rq(reg1), Rq(reg2)
+         | add Rd(reg1), Rd(reg2)
 
       elseif itype == "sub" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | sub Rq(reg1), Rq(reg2)
+         | sub Rd(reg1), Rd(reg2)
 
       elseif itype == "mul" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
@@ -153,15 +153,15 @@ local function compile(instructions, alloc, dump)
 
       elseif itype == "and" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | and Rq(reg1), Rq(reg2)
+         | and Rd(reg1), Rd(reg2)
 
       elseif itype == "or" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | or Rq(reg1), Rq(reg2)
+         | or Rd(reg1), Rd(reg2)
 
       elseif itype == "or" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | xor Rq(reg1), Rq(reg2)
+         | xor Rd(reg1), Rd(reg2)
 
       elseif itype == "shl" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
@@ -178,11 +178,11 @@ local function compile(instructions, alloc, dump)
 
       elseif itype == "add-i" then
          local reg = alloc[instr[2]]
-         | add Rq(reg), instr[3]
+         | add Rd(reg), instr[3]
 
       elseif itype == "sub-i" then
          local reg = alloc[instr[2]]
-         | sub Rq(reg), instr[3]
+         | sub Rd(reg), instr[3]
 
       elseif itype == "mul-i" then
          local r = alloc[instr[2]]
@@ -208,26 +208,28 @@ local function compile(instructions, alloc, dump)
          local reg = alloc[instr[2]]
          assert(type(reg) == "number")
          assert(type(instr[3]) == "number")
-         | and Rq(reg), instr[3]
+         | and Rd(reg), instr[3]
 
       elseif itype == "or-i" then
          local reg = alloc[instr[2]]
          assert(type(reg) == "number")
          assert(type(instr[3]) == "number")
-         | or Rq(reg), instr[3]
+         | or Rd(reg), instr[3]
 
       elseif itype == "xor-i" then
          local reg = alloc[instr[2]]
          assert(type(reg) == "number")
          assert(type(instr[3]) == "number")
-         | xor Rq(reg), instr[3]
+         | xor Rd(reg), instr[3]
 
       elseif itype == "shl-i" then
          local reg = alloc[instr[2]]
-         | shl Rq(reg), instr[3]
+         | shl Rd(reg), instr[3]
 
       elseif itype == "shr-i" then
          local reg = alloc[instr[2]]
+         -- NB: have to use Rq here because we use shr to implement division
+         --     using 64-bit arithmetic
          | shr Rq(reg), instr[3]
 
       elseif itype == "add-3" then
@@ -239,25 +241,27 @@ local function compile(instructions, alloc, dump)
          -- TODO: maybe the first branch should be classified differently
          --       at instruction selection time
          if type(instr[3]) == "number" and type(instr[4] == "number") then
-            | add Rq(reg1), (instr[3] + instr[4])
+            | add Rd(reg1), (instr[3] + instr[4])
          elseif type(instr[3]) == "number" then
             local reg2 = alloc[instr[4]]
-            | lea Rq(reg1), [Rq(reg2)+instr[3]]
+            | lea Rd(reg1), [Rd(reg2)+instr[3]]
          elseif type(instr[4]) == "number" then
             local reg2 = alloc[instr[3]]
-            | lea Rq(reg1), [Rq(reg2)+instr[4]]
+            | lea Rd(reg1), [Rd(reg2)+instr[4]]
          else
             local reg2, reg3 = alloc[instr[3]], alloc[instr[4]]
-            | lea Rq(reg1), [Rq(reg2)+Rq(reg3)]
+            | lea Rd(reg1), [Rd(reg2)+Rd(reg3)]
          end
 
       elseif itype == "ntohs" then
          local reg = alloc[instr[2]]
          | ror Rw(reg), 8
-         | movzx Rq(reg), Rw(reg)
+         | movzx Rd(reg), Rw(reg)
 
       elseif itype == "uint32" then
          local reg = alloc[instr[2]]
+         -- TODO: is this operation necessary if we just use 32-bit
+         --       registers for most other operations?
          | mov Rd(reg), Rd(reg)
 
       elseif itype == "ret-true" then
