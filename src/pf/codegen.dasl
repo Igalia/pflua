@@ -510,6 +510,9 @@ function selftest()
    assert(test("ip[0:1] | 2 == 0x47", v4_pkts[1]))
    assert(not test("ip[0] | 2 == 0x48", v4_pkts[1]))
 
+   assert(test("ip[0:1] << 1 == 0x8A", v4_pkts[1]))
+   assert(not test("ip[0:1] << 1 == 0x8B", v4_pkts[1]))
+
    assert(test("ip[0:1] >> 1 == 0x22", v4_pkts[1]))
    assert(not test("ip[0:1] >> 1 == 0x21", v4_pkts[1]))
 
