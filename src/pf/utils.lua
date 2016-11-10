@@ -121,7 +121,12 @@ function pp(expr, indent, suffix)
        local new_indent = indent..'  '
        for k, v in pairs(expr) do
           if type(k) == "string" then
-             pp(v, new_indent..k..' = ', ',')
+             if type(v) == "table" then
+                print(new_indent..k..' = ')
+                pp(v, new_indent..string.rep(" ", string.len(k))..'   ', ',')
+             else
+                pp(v, new_indent..k..' = ', ',')
+             end
           else
              pp(k, new_indent..'[', '] = ')
              pp(v, new_indent, ',')
