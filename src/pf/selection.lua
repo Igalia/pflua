@@ -15,7 +15,6 @@
 --   * mov64
 --   * load
 --   * add
---   * add-3
 --   * add-i
 --   * sub
 --   * sub-i
@@ -145,26 +144,8 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          return reg
 
       elseif expr[1] == "+" then
-         -- three register addition
-         if type(expr[2]) == "table" and expr[2][1] == "+" then
-            local reg1 = select_arith(expr[2][2])
-            local reg2 = select_arith(expr[2][3])
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg1 })
-            emit({ "add-3", tmp, reg2, reg3 })
-            return tmp
-         elseif type(expr[3]) == "table" and expr[3][1] == "+" then
-            local reg1 = select_arith(expr[3][2])
-            local reg2 = select_arith(expr[3][3])
-            local reg3 = select_arith(expr[2])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg1 })
-            emit({ "add-3", tmp, reg2, reg3 })
-            return tmp
-
          -- addition with immediate
-         elseif type(expr[2]) == "number" then
+         if type(expr[2]) == "number" then
             local reg3 = select_arith(expr[3])
             local tmp = new_register()
             emit({ "mov", tmp, reg3 })

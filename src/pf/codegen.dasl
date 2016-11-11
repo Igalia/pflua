@@ -317,27 +317,6 @@ local function compile(instructions, alloc, dump)
          --     using 64-bit arithmetic
          | shr Rq(reg), instr[3]
 
-      elseif itype == "add-3" then
-         -- expr2 must always a register
-         local reg1 = assert(alloc[instr[2]])
-
-         -- with optimization on, the first branch doesn't happen but
-         -- it can happen with the -O0 flag
-         -- TODO: maybe the first branch should be classified differently
-         --       at instruction selection time
-         if type(instr[3]) == "number" and type(instr[4] == "number") then
-            | add Rd(reg1), (instr[3] + instr[4])
-         elseif type(instr[3]) == "number" then
-            local reg2 = alloc[instr[4]]
-            | lea Rd(reg1), [Rd(reg2)+instr[3]]
-         elseif type(instr[4]) == "number" then
-            local reg2 = alloc[instr[3]]
-            | lea Rd(reg1), [Rd(reg2)+instr[4]]
-         else
-            local reg2, reg3 = alloc[instr[3]], alloc[instr[4]]
-            | lea Rd(reg1), [Rd(reg2)+Rd(reg3)]
-         end
-
       elseif itype == "ntohs" then
          local reg = alloc[instr[2]]
          | ror Rw(reg), 8
@@ -607,6 +586,10 @@ function selftest()
    assert(not test("net 178.79.150.233", v4_pkts[1]))
    assert(test("net 145.254.160.0/24", v4_pkts[1]))
    assert(not test("net 178.79.150.0/24", v4_pkts[1]))
+
+   -- make sure addition of three registers is handled
+   -- correctly
+   assert(test('ip[0]+ip[1]+ip[3]=0x75', v4_pkts[1]))
 
    assert(test("ip[0:1] - 100 = 4294967265", v4_pkts[1]))
    assert(test("ip[0:1] - 68 = 1", v4_pkts[1]))
