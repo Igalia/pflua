@@ -57,8 +57,14 @@ local function compile(instructions, alloc, dump)
    Dst:growpc(maxpc)
 
    -- push callee-save registers if we use any
+   local to_pop = {}
    for reg, _ in pairs(alloc.callee_saves) do
       | push Rq(reg)
+      -- we need to record the order in which to pop
+      -- b/c while the push order doesn't matter, the
+      -- pop order must be reverse (and callee_saves
+      -- is an unordered set)
+      table.insert(to_pop, reg)
    end
 
    -- allocate space for all spilled vars
@@ -357,14 +363,14 @@ local function compile(instructions, alloc, dump)
    -- cleanup code & return
    |=>(2):
 
-   -- pop callee-save registers if we use any
-   for reg, _ in pairs(alloc.callee_saves) do
-      | pop Rq(reg)
-   end
-
    -- fix stack
    if spilled_space > 0 then
       | add rsp, spilled_space
+   end
+
+   -- pop callee-save registers if we use any
+   for i=1, #to_pop do
+      | pop Rq(to_pop[#to_pop - i + 1])
    end
 
    | ret
