@@ -32,7 +32,6 @@
 --   * shr-i
 --   * ntohs
 --   * ntohl
---   * uint32
 --   * cjmp
 --   * jmp
 --   * ret-true, ret-false
@@ -391,11 +390,10 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          return tmp
 
       elseif expr[1] == "uint32" then
-         local reg = select_arith(expr[2])
-         local tmp = new_register()
-         emit({ "mov", tmp, reg })
-         emit({ "uint32", tmp })
-         return tmp
+         -- this operation doesn't do anything in this backend
+         -- because it isn't necessary if we only do comparisons
+         -- on 32-bit registers
+         return select_arith(expr[2])
 
       else
 	 error(string.format("NYI op %s", expr[1]))
