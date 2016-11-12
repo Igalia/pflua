@@ -31,6 +31,7 @@
 --   * shr
 --   * shr-i
 --   * ntohs
+--   * ntohl
 --   * uint32
 --   * cjmp
 --   * jmp
@@ -380,6 +381,13 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          local tmp = new_register()
          emit({ "mov", tmp, reg })
          emit({ "ntohs", tmp })
+         return tmp
+
+      elseif expr[1] == "ntohl" then
+         local reg = select_arith(expr[2])
+         local tmp = new_register()
+         emit({ "mov", tmp, reg })
+         emit({ "ntohl", tmp })
          return tmp
 
       elseif expr[1] == "uint32" then

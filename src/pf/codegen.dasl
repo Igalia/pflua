@@ -22,7 +22,7 @@ local debug = false
 local handle_spill = utils.set("cmp", "add", "add-i", "sub", "sub-i",
                                "mul", "mul-i", "and", "and-i", "or", "or-i",
                                "xor", "xor-i", "shl", "shl-i", "shr", "shr-i",
-                               "ntohs", "uint32")
+                               "ntohs", "ntohl", "uint32")
 
 local function compile_cjmp(Dst, op, target)
    if target == "true-label" then
@@ -332,6 +332,10 @@ local function compile(instructions, alloc, dump)
          | ror Rw(reg), 8
          | movzx Rd(reg), Rw(reg)
 
+      elseif itype == "ntohl" then
+         local reg = alloc[instr[2]]
+         | bswap Rd(reg)
+
       elseif itype == "uint32" then
          local reg = alloc[instr[2]]
          -- TODO: is this operation necessary if we just use 32-bit
@@ -596,6 +600,9 @@ function selftest()
    assert(not test("net 178.79.150.233", v4_pkts[1]))
    assert(test("net 145.254.160.0/24", v4_pkts[1]))
    assert(not test("net 178.79.150.0/24", v4_pkts[1]))
+
+   -- test ntohl
+   assert(test('ip[0:4] + 1 = 0x45000031', v4_pkts[1]))
 
    -- make sure addition of three registers is handled
    -- correctly
