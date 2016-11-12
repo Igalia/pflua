@@ -147,10 +147,7 @@ end
 local function delete_useless_movs(ir, alloc)
    for idx, instr in ipairs(ir) do
       if instr[1] == "mov" then
-         local reg1 = alloc[instr[2]]
-         local reg2 = alloc[instr[3]]
-         if reg1 ~= nil and reg2 ~= nil and
-            reg1 == reg2 then
+         if alloc[instr[2]] == alloc[instr[3]] then
             -- It's faster just to convert these to
             -- noops than to re-number the table
             ir[idx] = { "noop" }
