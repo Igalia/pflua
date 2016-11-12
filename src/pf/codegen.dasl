@@ -86,20 +86,24 @@ local function compile(instructions, alloc, dump)
       -- is that it happens rarely. Implementing it in a cheaper way with
       -- memory operands is hard due to the extreme boilerplate that it requires
       -- for each instruction type.
-      local for_spill = {}
+      local spill_post_reg, spill_post_slot
       if spilled_space > 0 and handle_spill[itype] then
          for i = 2, #instr do
             if type(instr[i]) == "string" then
                if alloc.spills[instr[i]] then
-                  local reg2 = alloc.spill_registers[i - 1]
-                  table.insert(for_spill, { reg2, alloc.spills[instr[i]] })
-                  alloc[instr[i]] = reg2
+                  local reg  = alloc.spill_registers[i - 1]
+                  local slot = alloc.spills[instr[i]]
+
+                  | mov Rq(reg), [rsp + slot * 4]
+                  -- if we need to write, record that and do it later
+                  if i == 2 then
+                     spill_post_reg, spill_post_slot = reg, slot
+                  end
+                  -- so that code generation below uses the right register
+                  alloc[instr[i]] = reg
                end
             end
          end
-      end
-      for _, val in ipairs(for_spill) do
-         | mov Rq(val[1]), [rsp + val[2] * 4]
       end
 
       -- the core code generation logic starts here
@@ -355,8 +359,8 @@ local function compile(instructions, alloc, dump)
 	 error(string.format("NYI instruction %s", itype))
       end
 
-      if spilled_space > 0 and #for_spill > 1 then
-         | mov [rsp + for_spill[1][2] * 4], Rq(for_spill[1][1])
+      if spill_post_slot then
+         | mov [rsp + spill_post_slot * 4], Rq(spill_post_reg)
       end
    end
 

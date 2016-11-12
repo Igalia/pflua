@@ -203,25 +203,23 @@ function allocate(ir)
    end
 
    local function spill_at(interval)
-      -- when there's a first spill, pick three additional variables
+      -- when there's a first spill, pick two additional variables
       -- to spill to the stack and reserve their registers for accessing
       -- spilled variables via movs
       if next_spill == 0 then
-         local i1, i2, i3 = active[#active], active[#active-1], active[#active-2]
-         for i=1,3 do table.remove(active) end
+         local i1, i2 = active[#active], active[#active-1]
          local reg1 = allocation[i1.name]
          local reg2 = allocation[i2.name]
-         local reg3 = allocation[i3.name]
+
+         table.remove(active); table.remove(active)
          allocation[i1.name] = nil
          allocation[i2.name] = nil
-         allocation[i3.name] = nil
 
          allocation.spills[i1.name] = 0
          allocation.spills[i2.name] = 1
-         allocation.spills[i3.name] = 2
-         allocation.spill_registers = { reg1, reg2, reg3 }
+         allocation.spill_registers = { reg1, reg2 }
 
-         next_spill = next_spill + 3
+         next_spill = next_spill + 2
       end
 
       local to_spill = active[#active]
@@ -507,10 +505,10 @@ function selftest()
 
    test(example_7,
         { r1 = 6, r2 = 0, r3 = 1, r4 = 2, r5 = 8, r6 = 9,
-          r7 = 10, r8 = 11, r9 = 3, r10 = 12,
-          spills = { r11 = 2, r12 = 1, r13 = 0, r14 = 3 },
+          r7 = 10, r8 = 11, r9 = 3, r10 = 12, r11 = 13,
+          spills = { r12 = 1, r13 = 0, r14 = 2 },
           len = 6, callee_saves = utils.set(3, 12, 13, 14, 15),
-          spill_registers = { 15, 14, 13 } })
+          spill_registers = { 15, 14 } })
 
    local function test(instrs, expected)
       utils.assert_equals(expected, allocate(instrs))
