@@ -208,21 +208,21 @@ function allocate(ir)
       -- because we prefill some registers, check first if
       -- we need to allocate for this interval
       if not allocation[name] then
-        if #free_caller == 0 and #free_callee == 0 then
-           -- TODO: do a spill
-           error("No spilling yet")
-        -- newly freed registers are put at the end, so allocating from
-        -- the end will tend to produce better results since we want to
-        -- try eliminate movs with the same destination/source register
-        elseif #free_caller ~= 0 then
-           allocation[name] = free_caller[#free_caller]
-           table.remove(free_caller)
-        else
-           local idx = #free_callee
-           allocation[name] = free_callee[idx]
-           table.insert(allocation.callee_saves, free_callee[idx])
-           table.remove(free_callee)
-        end
+         if #free_caller == 0 and #free_callee == 0 then
+            -- TODO: do a spill
+            error("No spilling yet")
+         -- newly freed registers are put at the end, so allocating from
+         -- the end will tend to produce better results since we want to
+         -- try eliminate movs with the same destination/source register
+         elseif #free_caller ~= 0 then
+            allocation[name] = free_caller[#free_caller]
+            table.remove(free_caller)
+         else
+            local idx = #free_callee
+            allocation[name] = free_callee[idx]
+            table.insert(allocation.callee_saves, free_callee[idx])
+            table.remove(free_callee)
+         end
       end
 
       insert_active(active, interval)
