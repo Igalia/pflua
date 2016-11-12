@@ -17,6 +17,8 @@
 --   * add
 --   * add-3
 --   * add-i
+--   * sub
+--   * sub-i
 --   * mul
 --   * mul-i
 --   * and

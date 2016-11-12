@@ -147,7 +147,10 @@ end
 local function delete_useless_movs(ir, alloc)
    for idx, instr in ipairs(ir) do
       if instr[1] == "mov" then
-         if alloc[instr[2]] == alloc[instr[3]] then
+         local reg1 = alloc[instr[2]]
+         local reg2 = alloc[instr[3]]
+         if reg1 ~= nil and reg2 ~= nil and
+            reg1 == reg2 then
             -- It's faster just to convert these to
             -- noops than to re-number the table
             ir[idx] = { "noop" }
@@ -162,6 +165,7 @@ end
 function allocate(ir)
    local intervals = live_intervals(ir)
    local active = {}
+   local next_spill = 0
 
    -- caller-save registers, use these first
    local free_caller = utils.dup(caller_regs)
@@ -169,7 +173,8 @@ function allocate(ir)
    local free_callee = utils.dup(callee_regs)
 
    local allocation = { len = 6, -- %rsi
-                        callee_saves = {} }
+                        callee_saves = {},
+                        spills = {} }
    remove_free(free_caller, 6)
 
    local function expire_old(interval)
@@ -200,6 +205,43 @@ function allocate(ir)
       end
    end
 
+   local function spill_at(interval)
+      -- when there's a first spill, pick three additional variables
+      -- to spill to the stack and reserve their registers for accessing
+      -- spilled variables via movs
+      if next_spill == 0 then
+         local i1, i2, i3 = active[#active], active[#active-1], active[#active-2]
+         for i=1,3 do table.remove(active) end
+         local reg1 = allocation[i1.name]
+         local reg2 = allocation[i2.name]
+         local reg3 = allocation[i3.name]
+         allocation[i1.name] = nil
+         allocation[i2.name] = nil
+         allocation[i3.name] = nil
+
+         allocation.spills[i1.name] = 0
+         allocation.spills[i2.name] = 1
+         allocation.spills[i3.name] = 2
+         allocation.spill_registers = { reg1, reg2, reg3 }
+
+         next_spill = next_spill + 3
+      end
+
+      local to_spill = active[#active]
+
+      if to_spill.finish > interval.finish then
+         allocation[interval.name] = allocation[to_spill.name]
+         allocation[to_spill.name] = nil
+         allocation.spills[to_spill.name] = next_spill
+         table.remove(active)
+         insert_active(active, interval)
+      else
+         allocation.spills[interval.name] = next_spill
+      end
+
+      next_spill = next_spill + 1
+   end
+
    for _, interval in pairs(intervals) do
       local name = interval.name
 
@@ -209,23 +251,24 @@ function allocate(ir)
       -- we need to allocate for this interval
       if not allocation[name] then
          if #free_caller == 0 and #free_callee == 0 then
-            -- TODO: do a spill
-            error("No spilling yet")
+            spill_at(interval)
          -- newly freed registers are put at the end, so allocating from
          -- the end will tend to produce better results since we want to
          -- try eliminate movs with the same destination/source register
          elseif #free_caller ~= 0 then
             allocation[name] = free_caller[#free_caller]
             table.remove(free_caller)
+            insert_active(active, interval)
          else
             local idx = #free_callee
             allocation[name] = free_callee[idx]
-            table.insert(allocation.callee_saves, free_callee[idx])
+            allocation.callee_saves[free_callee[idx]] = true
             table.remove(free_callee)
+            insert_active(active, interval)
          end
+      else
+         insert_active(active, interval)
       end
-
-      insert_active(active, interval)
    end
 
    delete_useless_movs(ir, allocation)
@@ -369,6 +412,39 @@ function selftest()
         { "cmp", "v1", 1 },
         { "cmp", "v2", 2 } }
 
+   -- another test with high register pressure, should be high enough
+   -- to require spilling
+   local example_7 =
+      { { "label", 1 },
+        { "load", "r1",  12, 2 },
+        { "load", "r2",  14, 2 },
+        { "load", "r3",  15, 2 },
+        { "load", "r4",  16, 2 },
+        { "load", "r5",  17, 2 },
+        { "load", "r6",  18, 2 },
+        { "load", "r7",  19, 2 },
+        { "load", "r8",  20, 2 },
+        { "load", "r9",  21, 2 },
+        { "load", "r10", 22, 2 },
+        { "load", "r11", 23, 2 },
+        { "load", "r12", 24, 2 },
+        { "load", "r13", 25, 2 },
+        { "load", "r14", 26, 2 },
+        { "cmp", "r1", 1 },
+        { "cmp", "r2", 1 },
+        { "cmp", "r3", 1 },
+        { "cmp", "r4", 1 },
+        { "cmp", "r5", 1 },
+        { "cmp", "r6", 1 },
+        { "cmp", "r7", 1 },
+        { "cmp", "r8", 1 },
+        { "cmp", "r9", 1 },
+        { "cmp", "r10", 1 },
+        { "cmp", "r11", 1 },
+        { "cmp", "r12", 1 },
+        { "cmp", "r13", 1 },
+        { "cmp", "r14", 1 } }
+
    test(example_1,
         { { name = "len", start = 1, finish = 14 },
           { name = "v1", start = 5, finish = 17 },
@@ -401,11 +477,13 @@ function selftest()
    end
 
    test(example_1,
-        { v1 = 0, r1 = 1, len = 6, v2 = 0, callee_saves = {} })
+        { v1 = 0, r1 = 1, len = 6, v2 = 0,
+          callee_saves = {}, spills = {} })
 
    -- mutates example_2
    test(example_2,
-        { r1 = 0, r2 = 1, r3 = 0, len = 6, callee_saves = {} })
+        { r1 = 0, r2 = 1, r3 = 0, len = 6,
+          callee_saves = {}, spills = {} })
    utils.assert_equals(example_2,
                        { { "label", 1 },
                          { "load", "r1", 12, 2 },
@@ -419,14 +497,23 @@ function selftest()
    test(example_3,
         { r1 = 6, r2 = 0, r3 = 1, r4 = 2, r5 = 8, r6 = 9,
           r7 = 10, r8 = 11, r9 = 3, len = 6,
-          callee_saves = { 3 } })
+          callee_saves = utils.set(3), spills = {} })
 
    test(example_4,
-        { v1 = 0, r1 = 0, len = 6, r2 = 0, callee_saves = {} })
+        { v1 = 0, r1 = 0, len = 6, r2 = 0, callee_saves = {},
+          spills = {} })
 
    test(example_5,
         { len = 6, r1 = 0, v1 = 0, r2 = 1, r3 = 0,
-          v2 = 0, r4 = 0, callee_saves = {} })
+          v2 = 0, r4 = 0, callee_saves = {},
+          spills = {} })
+
+   test(example_7,
+        { r1 = 6, r2 = 0, r3 = 1, r4 = 2, r5 = 8, r6 = 9,
+          r7 = 10, r8 = 11, r9 = 3, r10 = 12,
+          spills = { r11 = 2, r12 = 1, r13 = 0, r14 = 3 },
+          len = 6, callee_saves = utils.set(3, 12, 13, 14, 15),
+          spill_registers = { 15, 14, 13 } })
 
    local function test(instrs, expected)
       utils.assert_equals(expected, allocate(instrs))
