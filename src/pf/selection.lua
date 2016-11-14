@@ -336,10 +336,12 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          else
             local reg2 = select_arith(expr[2])
             local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "shl", tmp, reg3 })
-            return tmp
+            local tmp1 = new_register()
+            local tmp2 = new_register()
+            emit({ "mov", tmp1, reg2 })
+            emit({ "mov", tmp2, reg3 })
+            emit({ "shl", tmp1, tmp2 })
+            return tmp1
          end
 
       elseif expr[1] == ">>" then
@@ -369,10 +371,12 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          else
             local reg2 = select_arith(expr[2])
             local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "shr", tmp, reg3 })
-            return tmp
+            local tmp1 = new_register()
+            local tmp2 = new_register()
+            emit({ "mov", tmp1, reg2 })
+            emit({ "mov", tmp2, reg3 })
+            emit({ "shr", tmp1, tmp2 })
+            return tmp1
          end
 
       elseif expr[1] == "ntohs" then
