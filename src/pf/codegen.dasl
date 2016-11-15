@@ -274,19 +274,25 @@ local function compile(instructions, alloc, dump)
          -- TODO: we want to emit shlx here but dynasm doesn't
          --       support it, so for now we emit this loop code
          --| shlx Rd(reg1), Rd(reg1), Rd(reg2)
+         | cmp Rd(reg2), 0
+         | jz >2
          |1:
          | shl Rd(reg1), 1
          | sub Rd(reg2), 1
          | jnz <1
+         |2:
 
       elseif itype == "shr" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          -- TODO: see comment above
          --| shrx Rd(reg1), Rd(reg1), Rd(reg2)
+         | cmp Rd(reg2), 0
+         | jz >2
          |1:
          | shr Rd(reg1), 1
          | sub Rd(reg2), 1
          | jnz <1
+         |2:
 
       elseif itype == "add-i" then
          local reg = alloc[instr[2]]
@@ -652,6 +658,7 @@ function selftest()
    -- tests for >>/<< with register args
    assert(test("ip[0] << ip[9] == 4416", v4_pkts[1]))
    assert(test("ip[0] >> ip[9] == 0x1", v4_pkts[1]))
+   assert(test("ip[0] >> ip[1] == 0x45", v4_pkts[1]))
 
    assert(test("", v4_pkts[1]))
    assert(test("", arp_pkts[1]))
