@@ -220,21 +220,30 @@ local function select_block(blocks, block, new_register, instructions, next_labe
 
       elseif expr[1] == "/" then
          local reg2 = select_arith(expr[2])
-         local reg3 = select_arith(math.ceil(2 ^ 32 / expr[3]))
+         local rhs = expr[3]
          local tmp = new_register()
 
-         -- Use a trick to avoid the need to use the 'div' instruction
-         -- and therefore require a special case for %eax affinity in
-         -- register allocation.
-         emit({ "mov", tmp, reg2 })
-         -- TODO: the way select_arith works maybe should change so
-         --       we don't need to do this?
-         if type(reg3) == "number" then
-            emit({ "mul-i", tmp, reg3 })
+         if type(rhs) == "number" then
+            -- call select_arith in case we need a mov64 here
+            local reg3 = select_arith(math.ceil(2 ^ 32 / rhs))
+
+            -- Use a trick to avoid the need to use the 'div' instruction
+            -- and therefore require a special case for %eax affinity in
+            -- register allocation.
+            emit({ "mov", tmp, reg2 })
+            if type(reg3) == "number" then
+               emit({ "mul-i", tmp, reg3 })
+            else
+               emit({ "mul", tmp, reg3 })
+            end
+            emit({ "shr-i", tmp, 32 })
          else
-            emit({ "mul", tmp, reg3 })
+            -- fall back to using floating point instructions
+            local reg3 = select_arith(expr[3])
+            emit({ "mov", tmp, reg2 })
+            emit({ "div", tmp, reg3 })
          end
-         emit({ "shr-i", tmp, 32 })
+
          return tmp
 
       elseif expr[1] == "&" then
