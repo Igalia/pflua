@@ -24,6 +24,9 @@ local handle_spill = utils.set("cmp", "add", "add-i", "sub", "sub-i",
                                "xor", "xor-i", "shl", "shl-i", "shr", "shr-i",
                                "ntohs", "ntohl", "uint32")
 
+-- in bytes
+local stack_slot_size = 8
+
 local function compile_cjmp(Dst, op, target)
    if target == "true-label" then
       target = 0
@@ -70,7 +73,7 @@ local function compile(instructions, alloc, dump)
    -- allocate space for all spilled vars
    local spilled_space = 0
    for _, _ in pairs(alloc.spills) do
-      spilled_space = spilled_space + 4
+      spilled_space = spilled_space + stack_slot_size
    end
    if spilled_space > 0 then
       | sub rsp, spilled_space
@@ -94,7 +97,7 @@ local function compile(instructions, alloc, dump)
                   local reg  = alloc.spill_registers[i - 1]
                   local slot = alloc.spills[instr[i]]
 
-                  | mov Rq(reg), [rsp + slot * 4]
+                  | mov Rq(reg), [rsp + slot * stack_slot_size]
                   -- if we need to write, record that and do it later
                   if i == 2 then
                      spill_post_reg, spill_post_slot = reg, slot
@@ -138,10 +141,10 @@ local function compile(instructions, alloc, dump)
          local rhs = instr[3]
 
          if type(rhs) == "number" then
-            | cmp Rd(lhs_reg), rhs
+            | cmp Rq(lhs_reg), rhs
          else
             local rhs_reg = alloc[rhs]
-            | cmp Rd(lhs_reg), Rd(rhs_reg)
+            | cmp Rq(lhs_reg), Rq(rhs_reg)
          end
 
       elseif itype == "load" then
@@ -165,7 +168,7 @@ local function compile(instructions, alloc, dump)
 
                if spill_offset then
                   local sreg = alloc.spill_registers[1]
-                  | mov Rd(sreg), [rsp + spill_offset * 4]
+                  | mov Rq(sreg), [rsp + spill_offset * stack_slot_size]
                   reg = sreg
                end
 
@@ -189,14 +192,14 @@ local function compile(instructions, alloc, dump)
                else
                   | mov   Rd(reg), dword [rdi + offset]
                end
-               | mov [rsp + spill * 4], Rd(reg)
+               | mov [rsp + spill * stack_slot_size], Rd(reg)
             else
                local off_reg = alloc[offset]
                local spill_offset = alloc.spills[offset]
 
                if spill_offset then
                   local sreg = alloc.spill_registers[2]
-                  | mov Rd(sreg), [rsp + spill_offset * 4]
+                  | mov Rq(sreg), [rsp + spill_offset * stack_slot_size]
                   off_reg = sreg
                end
 
@@ -207,7 +210,7 @@ local function compile(instructions, alloc, dump)
                else
                   | mov   Rd(reg), dword [rdi + Rd(off_reg)]
                end
-               | mov [rsp + spill * 4], Rd(reg)
+               | mov [rsp + spill * stack_slot_size], Rd(reg)
             end
          end
 
@@ -223,9 +226,9 @@ local function compile(instructions, alloc, dump)
             end
          else
             if type(instr[3]) == "number" then
-               | mov [rsp + spill * 4], dword instr[3]
+               | mov [rsp + spill * stack_slot_size], dword instr[3]
             else
-               | mov [rsp + spill * 4], Rd(alloc[instr[3]])
+               | mov [rsp + spill * stack_slot_size], Rq(alloc[instr[3]])
             end
          end
 
@@ -236,11 +239,11 @@ local function compile(instructions, alloc, dump)
 
       elseif itype == "add" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | add Rd(reg1), Rd(reg2)
+         | add Rq(reg1), Rq(reg2)
 
       elseif itype == "sub" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | sub Rd(reg1), Rd(reg2)
+         | sub Rq(reg1), Rq(reg2)
 
       elseif itype == "mul" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
@@ -252,55 +255,55 @@ local function compile(instructions, alloc, dump)
       -- common case.
       elseif itype == "div" then
          local reg0, reg1 = alloc[instr[2]], alloc[instr[3]]
-         | cvtsi2ss xmm(0), Rd(reg0)
-         | cvtsi2ss xmm(1), Rd(reg1)
+         | cvtsi2ss xmm(0), Rq(reg0)
+         | cvtsi2ss xmm(1), Rq(reg1)
          | divss xmm(0), xmm(1)
-         | cvttss2si Rd(reg0), xmm(0)
+         | cvttss2si Rq(reg0), xmm(0)
 
       elseif itype == "and" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | and Rd(reg1), Rd(reg2)
+         | and Rq(reg1), Rq(reg2)
 
       elseif itype == "or" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | or Rd(reg1), Rd(reg2)
+         | or Rq(reg1), Rq(reg2)
 
       elseif itype == "or" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         | xor Rd(reg1), Rd(reg2)
+         | xor Rq(reg1), Rq(reg2)
 
       elseif itype == "shl" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          -- TODO: we want to emit shlx here but dynasm doesn't
          --       support it, so for now we emit this loop code
-         --| shlx Rd(reg1), Rd(reg1), Rd(reg2)
-         | cmp Rd(reg2), 0
+         --| shlx Rq(reg1), Rq(reg1), Rq(reg2)
+         | cmp Rq(reg2), 0
          | jz >2
          |1:
-         | shl Rd(reg1), 1
-         | sub Rd(reg2), 1
+         | shl Rq(reg1), 1
+         | sub Rq(reg2), 1
          | jnz <1
          |2:
 
       elseif itype == "shr" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          -- TODO: see comment above
-         --| shrx Rd(reg1), Rd(reg1), Rd(reg2)
-         | cmp Rd(reg2), 0
+         --| shrx Rq(reg1), Rq(reg1), Rq(reg2)
+         | cmp Rq(reg2), 0
          | jz >2
          |1:
-         | shr Rd(reg1), 1
-         | sub Rd(reg2), 1
+         | shr Rq(reg1), 1
+         | sub Rq(reg2), 1
          | jnz <1
          |2:
 
       elseif itype == "add-i" then
          local reg = alloc[instr[2]]
-         | add Rd(reg), instr[3]
+         | add Rq(reg), instr[3]
 
       elseif itype == "sub-i" then
          local reg = alloc[instr[2]]
-         | sub Rd(reg), instr[3]
+         | sub Rq(reg), instr[3]
 
       elseif itype == "mul-i" then
          local r = alloc[instr[2]]
@@ -326,23 +329,23 @@ local function compile(instructions, alloc, dump)
          local reg = alloc[instr[2]]
          assert(type(reg) == "number")
          assert(type(instr[3]) == "number")
-         | and Rd(reg), instr[3]
+         | and Rq(reg), instr[3]
 
       elseif itype == "or-i" then
          local reg = alloc[instr[2]]
          assert(type(reg) == "number")
          assert(type(instr[3]) == "number")
-         | or Rd(reg), instr[3]
+         | or Rq(reg), instr[3]
 
       elseif itype == "xor-i" then
          local reg = alloc[instr[2]]
          assert(type(reg) == "number")
          assert(type(instr[3]) == "number")
-         | xor Rd(reg), instr[3]
+         | xor Rq(reg), instr[3]
 
       elseif itype == "shl-i" then
          local reg = alloc[instr[2]]
-         | shl Rd(reg), instr[3]
+         | shl Rq(reg), instr[3]
 
       elseif itype == "shr-i" then
          local reg = alloc[instr[2]]
@@ -353,7 +356,7 @@ local function compile(instructions, alloc, dump)
       elseif itype == "ntohs" then
          local reg = alloc[instr[2]]
          | ror Rw(reg), 8
-         | movzx Rd(reg), Rw(reg)
+         | movzx Rq(reg), Rw(reg)
 
       elseif itype == "ntohl" then
          local reg = alloc[instr[2]]
@@ -387,7 +390,7 @@ local function compile(instructions, alloc, dump)
       end
 
       if spill_post_slot then
-         | mov [rsp + spill_post_slot * 4], Rq(spill_post_reg)
+         | mov [rsp + spill_post_slot * stack_slot_size], Rq(spill_post_reg)
       end
    end
 
