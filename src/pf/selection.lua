@@ -134,13 +134,8 @@ local function select_block(blocks, block, new_register, instructions, next_labe
 
       elseif expr[1] == "[]" then
          local reg = new_register()
-         local offset = expr[2]
-         if type(offset) == "table" then
-            local reg2 = select_arith(offset)
-            emit({ "load", reg, reg2, expr[3] })
-         else
-            emit({ "load", reg, offset, expr[3] })
-         end
+         local reg2 = select_arith(expr[2])
+         emit({ "load", reg, reg2, expr[3] })
          return reg
 
       elseif expr[1] == "+" then
