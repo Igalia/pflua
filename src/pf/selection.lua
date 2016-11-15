@@ -144,18 +144,19 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          return reg
 
       elseif expr[1] == "+" then
+         local reg2 = select_arith(expr[2])
+         local reg3 = select_arith(expr[3])
+
          -- addition with immediate
-         if type(expr[2]) == "number" then
-            local reg3 = select_arith(expr[3])
+         if type(reg2) == "number" then
             local tmp = new_register()
             emit({ "mov", tmp, reg3 })
-            emit({ "add-i", tmp, expr[2] })
+            emit({ "add-i", tmp, reg2 })
             return tmp
-         elseif type(expr[3]) == "number" then
-            local reg2 = select_arith(expr[2])
+         elseif type(reg3) == "number" then
             local tmp = new_register()
             emit({ "mov", tmp, reg2 })
-            emit({ "add-i", tmp, expr[3] })
+            emit({ "add-i", tmp, reg3 })
             return tmp
 
          -- generic addition
