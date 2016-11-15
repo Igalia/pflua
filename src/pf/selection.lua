@@ -48,6 +48,12 @@ local negate_op = { ["="] = "!=", ["!="] = "=",
                     [">"] = "<=", ["<"] = ">=",
                     [">="] = "<", ["<="] = ">" }
 
+-- this maps numeric operations that we handle in a generic way
+-- because the instruction selection is very similar
+local numop_map = { ["+"] = "add", ["-"] = "sub", ["*"] = "mul",
+                    ["*64"] = "mul", ["&"] = "and", ["|"] = "or",
+                    ["^"] = "xor" }
+
 -- extract a number from an SSA IR label
 function label_num(label)
    return tonumber(string.match(label, "L(%d+)"))
@@ -139,79 +145,38 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          emit({ "load", reg, reg2, expr[3] })
          return reg
 
-      elseif expr[1] == "+" then
+      elseif numop_map[expr[1]] then
          local reg2 = select_arith(expr[2])
          local reg3 = select_arith(expr[3])
+         local op   = numop_map[expr[1]]
+         local op_i = string.format("%s-i", op)
 
-         -- addition with immediate
-         if type(reg2) == "number" then
+         -- both arguments in registers
+         if type(reg2) ~= "number" and type(reg3) ~= "number" then
             local tmp = new_register()
-            emit({ "mov", tmp, reg3 })
-            emit({ "add-i", tmp, reg2 })
+            emit({ "mov", tmp, reg2 })
+            emit({ op, tmp, reg3 })
             return tmp
+
+         -- cases with one or more immediate arguments
+         elseif type(reg2) == "number" then
+            local tmp3 = new_register()
+            -- if op is commutative, we can re-arrange to save registers
+            if op ~= "sub" then
+               emit({ "mov", tmp3, reg3 })
+               emit({ op_i, tmp3, reg2 })
+               return tmp3
+            else
+               local tmp2 = new_register()
+               emit({ "mov", tmp2, reg2 })
+               emit({ "mov", tmp3, reg3 })
+               emit({ op, tmp2, tmp3 })
+               return tmp2
+            end
          elseif type(reg3) == "number" then
             local tmp = new_register()
             emit({ "mov", tmp, reg2 })
-            emit({ "add-i", tmp, reg3 })
-            return tmp
-
-         -- generic addition
-         else
-            local reg2 = select_arith(expr[2])
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "add", tmp, reg3 })
-            return tmp
-         end
-
-      elseif expr[1] == "-" then
-         -- need an extra mov for this case
-         if type(expr[2]) == "number" then
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, expr[2] })
-            emit({ "sub", tmp, reg3 })
-            return tmp
-         elseif type(expr[3]) == "number" then
-            local reg2 = select_arith(expr[2])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "sub-i", tmp, expr[3] })
-            return tmp
-
-         -- generic subtraction
-         else
-            local reg2 = select_arith(expr[2])
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "sub", tmp, reg3 })
-            return tmp
-         end
-
-      elseif expr[1] == "*" or expr[1] == "*64" then
-         -- multiplication with constant
-         if type(expr[2]) == "number" then
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg3 })
-            emit({ "mul-i", tmp, expr[2] })
-            return tmp
-         elseif type(expr[3]) == "number" then
-            local reg2 = select_arith(expr[2])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "mul-i", tmp, expr[3] })
-            return tmp
-
-         -- generic multiplication
-         else
-            local reg2 = select_arith(expr[2])
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "mul", tmp, reg3 })
+            emit({ op_i, tmp, reg3 })
             return tmp
          end
 
@@ -242,78 +207,6 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          end
 
          return tmp
-
-      elseif expr[1] == "&" then
-         -- with immediate
-         if type(expr[2]) == "number" then
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg3 })
-            emit({ "and-i", tmp, expr[2] })
-            return tmp
-         elseif type(expr[3]) == "number" then
-            local reg2 = select_arith(expr[2])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "and-i", tmp, expr[3] })
-            return tmp
-
-         else
-            local reg2 = select_arith(expr[2])
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "and", tmp, reg3 })
-            return tmp
-         end
-
-      elseif expr[1] == "|" then
-         -- with immediate
-         if type(expr[2]) == "number" then
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg3 })
-            emit({ "or-i", tmp, expr[2] })
-            return tmp
-         elseif type(expr[3]) == "number" then
-            local reg2 = select_arith(expr[2])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "or-i", tmp, expr[3] })
-            return tmp
-
-         else
-            local reg2 = select_arith(expr[2])
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "or", tmp, reg3 })
-            return tmp
-         end
-
-      elseif expr[1] == "^" then
-         -- with immediate
-         if type(expr[2]) == "number" then
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg3 })
-            emit({ "xor-i", tmp, expr[2] })
-            return tmp
-         elseif type(expr[3]) == "number" then
-            local reg2 = select_arith(expr[2])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "xor-i", tmp, expr[3] })
-            return tmp
-
-         else
-            local reg2 = select_arith(expr[2])
-            local reg3 = select_arith(expr[3])
-            local tmp = new_register()
-            emit({ "mov", tmp, reg2 })
-            emit({ "xor", tmp, reg3 })
-            return tmp
-         end
 
       elseif expr[1] == "<<" then
          -- with immediate

@@ -592,8 +592,17 @@ function selftest()
    local convert_anf = require('pf.anf').convert_anf
    local convert_ssa = require('pf.ssa').convert_ssa
 
-   local function test(expr, pkt)
-      local ssa = convert_ssa(convert_anf(optimize(expand(parse(expr), "EN10MB"))))
+   local function test(expr, pkt, no_optimize)
+      local expanded = expand(parse(expr), "EN10MB")
+      local optimized
+
+      if no_optimize ~= nil then
+         optimized = expanded
+      else
+         optimized = optimize(expanded)
+      end
+
+      local ssa = convert_ssa(convert_anf(optimized))
       local instr = sel.select(ssa)
       local alloc = ra.allocate(instr)
       local f = compile(instr, alloc)
@@ -637,6 +646,8 @@ function selftest()
    assert(test("ip[0:1] - 100 = 4294967265", v4_pkts[1]))
    assert(test("ip[0:1] - 68 = 1", v4_pkts[1]))
    assert(not test("ip[0:1] - 68 = 2", v4_pkts[1]))
+   assert(test("35 - 20 = 15", v4_pkts[1], "no optimize"))
+   assert(not test("124124 - 12412 = 15", v4_pkts[1], "no optimize"))
 
    assert(test("ip[0:1] * 2 == 0x8A", v4_pkts[1]))
    assert(not test("ip[0] * 2 == 0x8B", v4_pkts[1]))
