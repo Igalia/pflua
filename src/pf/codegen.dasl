@@ -22,7 +22,7 @@ local debug = false
 local handle_spill = utils.set("cmp", "add", "add-i", "sub", "sub-i",
                                "mul", "mul-i", "and", "and-i", "or", "or-i",
                                "xor", "xor-i", "shl", "shl-i", "shr", "shr-i",
-                               "ntohs", "ntohl")
+                               "ntohs", "ntohl", "uint32")
 
 local function compile_cjmp(Dst, op, target)
    if target == "true-label" then
@@ -352,6 +352,12 @@ local function compile(instructions, alloc, dump)
       elseif itype == "ntohl" then
          local reg = alloc[instr[2]]
          | bswap Rd(reg)
+
+      elseif itype == "uint32" then
+         local reg = alloc[instr[2]]
+         -- TODO: is this operation necessary if we just use 32-bit
+         --       registers for most other operations?
+         | mov Rd(reg), Rd(reg)
 
       elseif itype == "ret-true" then
          | =>(0):
