@@ -588,7 +588,7 @@ function selftest()
                -- this one is also a TCP packet
                v6_pkts[16]))
 
-   test(example_4, arp_pkts[1])
+   assert(not test(example_4, arp_pkts[1]))
 
    -- test starting with results of instruction selection
    local function test(instructions, pkt)
@@ -612,7 +612,7 @@ function selftest()
                  { "ret-false" } }
    example_5.max_label = 4
 
-   test(example_5, arp_pkts[1])
+   assert(test(example_5, arp_pkts[1]))
 
    -- test starting with expression IR (this is helpful for testing
    -- the outputs of random test generation)
