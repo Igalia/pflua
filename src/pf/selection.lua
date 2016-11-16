@@ -185,13 +185,20 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          local rhs = expr[3]
          local tmp = new_register()
 
+         -- Use a trick to avoid the need to use the 'div' instruction
+         -- and therefore require a special case for %eax affinity in
+         -- register allocation.
          if type(rhs) == "number" then
-            -- call select_arith in case we need a mov64 here
-            local reg3 = select_arith(math.ceil(2 ^ 32 / rhs))
+            local imm  = 2 ^ 32 / rhs
+            if imm < 2 then
+               imm = math.floor(imm)
+            else
+               imm = math.ceil(imm)
+            end
 
-            -- Use a trick to avoid the need to use the 'div' instruction
-            -- and therefore require a special case for %eax affinity in
-            -- register allocation.
+            -- call select_arith in case we need a mov64 here
+            local reg3 = select_arith(imm)
+
             emit({ "mov", tmp, reg2 })
             if type(reg3) == "number" then
                emit({ "mul-i", tmp, reg3 })
@@ -199,8 +206,8 @@ local function select_block(blocks, block, new_register, instructions, next_labe
                emit({ "mul", tmp, reg3 })
             end
             emit({ "shr-i", tmp, 32 })
+         -- fall back to using floating point instructions
          else
-            -- fall back to using floating point instructions
             local reg3 = select_arith(expr[3])
             emit({ "mov", tmp, reg2 })
             emit({ "div", tmp, reg3 })
