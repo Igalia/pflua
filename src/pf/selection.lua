@@ -410,15 +410,15 @@ function select(ssa)
       emit_false = ef or emit_false
    end
 
-   if verbose then
-      print_selection(instructions)
-   end
-
    if emit_true then
       table.insert(instructions, { "ret-true" })
    end
    if emit_false then
       table.insert(instructions, { "ret-false" })
+   end
+
+   if verbose then
+      print_selection(instructions)
    end
 
    return instructions
