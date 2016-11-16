@@ -585,6 +585,30 @@ function selftest()
 
    test(example_4, arp_pkts[1])
 
+   -- test starting with results of instruction selection
+   local function test(instructions, pkt)
+      local alloc = ra.allocate(instructions)
+      local f = compile(instructions, alloc)
+      return f(pkt.packet, pkt.len)
+   end
+
+   example_5 = { { "label", 1 },
+                 { "cmp", "len", 4 },
+                 { "cjmp", "<", "false-label" },
+                 { "jmp", 4 },
+                 { "label", 4 },
+                 { "load", "r1", 0, 4 },
+                 { "mov", "r2", "r1" },
+                 { "ntohs", "r2" },
+                 { "cmp", "r2", 0 },
+                 { "cjmp", ">", "true-label" },
+                 { "jmp", "false-label" },
+                 { "ret-true" },
+                 { "ret-false" } }
+   example_5.max_label = 4
+
+   test(example_5, arp_pkts[1])
+
    -- test starting from parsing all the way to codegen
    local parse = require('pf.parse').parse
    local expand = require('pf.expand').expand
