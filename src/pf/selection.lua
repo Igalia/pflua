@@ -185,28 +185,25 @@ local function select_block(blocks, block, new_register, instructions, next_labe
          local rhs = expr[3]
          local tmp = new_register()
 
-         -- Use a trick to avoid the need to use the 'div' instruction
-         -- and therefore require a special case for %eax affinity in
-         -- register allocation.
          if type(rhs) == "number" then
-            local imm  = 2 ^ 32 / rhs
-            if imm < 2 then
-               imm = math.floor(imm)
-            else
-               imm = math.ceil(imm)
-            end
+            -- if dividing by a power of 2, do a shift
+            if rhs ~= 0 and bit.band(rhs, rhs-1) == 0 then
+               local imm = 0
+               rhs = bit.rshift(rhs, 1)
+               while rhs ~= 0 do
+                  rhs = bit.rshift(rhs, 1)
+                  imm = imm + 1
+               end
 
-            -- call select_arith in case we need a mov64 here
-            local reg3 = select_arith(imm)
-
-            emit({ "mov", tmp, reg2 })
-            if type(reg3) == "number" then
-               emit({ "mul-i", tmp, reg3 })
+               emit({ "mov", tmp, reg2 })
+               emit({ "shr-i", tmp, imm })
             else
-               emit({ "mul", tmp, reg3 })
+               local tmp3 = new_register()
+               local reg3 = select_arith(expr[3])
+               emit({ "mov", tmp, reg2 })
+               emit({ "mov", tmp3, reg3 })
+               emit({ "div", tmp, tmp3 })
             end
-            emit({ "shr-i", tmp, 32 })
-         -- fall back to using floating point instructions
          else
             local reg3 = select_arith(expr[3])
             emit({ "mov", tmp, reg2 })
