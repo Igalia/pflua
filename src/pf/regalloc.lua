@@ -33,8 +33,30 @@ module(...,package.seeall)
 local utils = require('pf.utils')
 local verbose = os.getenv("PF_VERBOSE");
 
--- ops that don't read from registers and don't contribute to liveness
-local non_read_ops = utils.set("jmp", "label", "cjmp", "noop")
+-- returns the registers that a given instruction reads
+local function reads_from(instr)
+   local itype = instr[1]
+
+   local function maybe_reg(reg)
+      if type(reg) == "number" then
+         return nil
+      else
+         return reg
+      end
+   end
+
+   if itype == "mov" or itype == "mov64" then
+      return { maybe_reg(instr[3]) }
+   elseif itype == "ntohs" or itype == "ntohl" or itype == "uint32" then
+      return { instr[2] }
+   elseif itype == "cjmp" or itype == "jmp" or itype == "ret-true" or
+          itype == "ret-false" or itype == "nop" or itype == "label" then
+      return {}
+   else
+      -- instructions don't have immediates in the first arg
+      return { instr[2], maybe_reg(instr[3]) }
+   end
+end
 
 -- Update the ends of intervals based on variable occurrences in
 -- the "control" ast
@@ -82,19 +104,10 @@ local function live_intervals(instrs)
 
          intervals[name] = interval
          table.insert(order, interval)
+      end
 
-         -- movs/loads also read registers, so update endpoint
-         if type(instr[3]) == "string" then
-            intervals[instr[3]].finish = idx
-         end
-
-      -- update liveness endpoint for instructions that read
-      elseif not non_read_ops[itype] then
-         for i=2, #instr do
-            if type(instr[i]) == "string" then
-               intervals[instr[i]].finish = idx
-            end
-         end
+      for _, reg in ipairs(reads_from(instr)) do
+         intervals[reg].finish = idx
       end
    end
 
