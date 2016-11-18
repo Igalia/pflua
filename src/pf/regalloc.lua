@@ -162,8 +162,8 @@ local function delete_useless_movs(ir, alloc)
       if instr[1] == "mov" then
          if alloc[instr[2]] == alloc[instr[3]] then
             -- It's faster just to convert these to
-            -- noops than to re-number the table
-            ir[idx] = { "noop" }
+            -- nops than to re-number the table
+            ir[idx] = { "nop" }
          end
       end
    end
@@ -496,7 +496,7 @@ function selftest()
                        { { "label", 1 },
                          { "load", "r1", 12, 2 },
                          { "load", "r2", 14, 2 },
-                         { "noop" },
+                         { "nop" },
                          { "mul", "r3", "r2" },
                          { "cmp", "r3", 1 },
                          { "cjmp", "!=", 4 },

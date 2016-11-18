@@ -20,6 +20,7 @@
 --   * sub-i
 --   * mul
 --   * mul-i
+--   * div
 --   * and
 --   * and-i
 --   * or
@@ -36,7 +37,7 @@
 --   * cjmp
 --   * jmp
 --   * ret-true, ret-false
---   * noop (inserted by register allocation)
+--   * nop (inserted by register allocation)
 
 module(...,package.seeall)
 

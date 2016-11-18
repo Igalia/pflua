@@ -382,7 +382,7 @@ local function compile(instructions, alloc, dump)
             | jmp =>(2)
          end
 
-      elseif itype == "noop" then
+      elseif itype == "nop" then
          -- don't output anything
 
       else
