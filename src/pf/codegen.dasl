@@ -1,3 +1,10 @@
+-- This module implements code generation for the dynasm backend of
+-- Pflua. It takes the result of instruction selection (selection.lua)
+-- and register allocation (regalloc.lua) and generates a function with
+-- x64 assembly.
+--
+-- Currently assumes a Unix ABI/calling convention.
+
 module(..., package.seeall)
 
 local ffi = require("ffi")
