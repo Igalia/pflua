@@ -40,9 +40,9 @@ function compile_filter(filter_str, opts)
       expr = anf.convert_anf(expr)
       expr = ssa.convert_ssa(expr)
       if opts.native then
-	 return codegen.load(expr, opts.source or false)
+         return codegen.load(expr, opts.source or false)
       elseif opts.source then
-	 return backend.emit_lua(expr)
+         return backend.emit_lua(expr)
       else
          return backend.emit_and_load(expr, filter_str)
       end
