@@ -382,18 +382,23 @@ local function compile(instructions, alloc, dump)
          --       registers for most other operations?
          | mov Rd(reg), Rd(reg)
 
-      elseif itype == "ret-true" then
-         | =>(0):
-         | mov al, 0x1
-         if idx ~= #instructions then
-            | jmp =>(2)
+      elseif itype == "ret-true" or itype == "ret-false" then
+         if itype == "ret-true" then
+            | =>(0):
+            | mov al, 0x1
+         elseif itype == "ret-false" then
+            | =>(1):
+            | mov al, 0x0
          end
 
-      elseif itype == "ret-false" then
-         | =>(1):
-         | mov al, 0x0
          if idx ~= #instructions then
-            | jmp =>(2)
+            -- if there's no cleanup required due to spilling or callee
+            -- save registers, then just return instead of jmping
+            if spilled_space == 0 and #to_pop == 0 then
+               | ret
+            else
+               | jmp =>(2)
+            end
          end
 
       elseif itype == "nop" then
