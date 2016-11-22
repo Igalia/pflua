@@ -89,6 +89,12 @@ local function compile(instructions, alloc, dump)
       | sub rsp, spilled_space
    end
 
+   -- if the length variable got spilled, we need to explicitly initialize
+   -- the stack slot for it
+   if alloc.spills["len"] then
+      | mov [rsp + alloc.spills["len"] * stack_slot_size], rsi
+   end
+
    for idx, instr in ipairs(instructions) do
       local itype = instr[1]
 
