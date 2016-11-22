@@ -1,5 +1,10 @@
 -- Implements register allocation for pflua's native backend
 --
+-- Follows the algorithm described in:
+--    "Linear scan register allocation"
+--    Poletto and Sarkar
+--    https://dl.acm.org/citation.cfm?id=330250
+--
 -- The result of register allocation is a table that describes
 -- the register allocated for the given virtual registers, e.g.:
 --
@@ -7,7 +12,9 @@
 --     v2  = 2, -- %rdx
 --     r3  = 0, -- %rax
 --     len = 6, -- %rsi
---     callee_saves = {}
+--     callee_saves = {},
+--     spills = { v3 = 0, v4 = 1 },
+--     spill_registers = { 3, 4 }
 --   }
 --
 -- The callee_saves field lists the callee-save registers that are
@@ -25,8 +32,14 @@
 -- before using callee-save registers
 --   * %rbx, %r12-%r15
 --
--- Currently spilling doesn't work (it complicates code generation) and
--- a spill case will just error.
+-- The spills and spill_registers fields are used for spilling registers
+-- to memory if that becomes necessary. When the first register is spilled,
+-- two additional registers are spilled (and put into spill_registers) so
+-- that they can be used to move data from/to memory and registers.
+--
+-- The spills field keeps track of the stack slots (numbered from 0)
+-- that are used for spilled registers. Variables should only be mapped
+-- in one of the main allocation table or in the spills table.
 
 module(...,package.seeall)
 
