@@ -34,13 +34,16 @@ local handle_spill = utils.set("cmp", "add", "add-i", "sub", "sub-i",
 -- in bytes
 local stack_slot_size = 8
 
+-- amount to add to convert IR label into asm label
+local label_offset = 2
+
 local function compile_cjmp(Dst, op, target)
    if target == "true-label" then
       target = 0
    elseif target == "false-label" then
       target = 1
    else
-      target = target + 2
+      target = target + label_offset
    end
 
    if op == "=" then
@@ -63,7 +66,7 @@ local function compile(instructions, alloc, dump)
 
    -- number of =>(...) style labels
    -- reserve three labels 0-2 for return cases
-   local maxpc = 3 + instructions.max_label
+   local maxpc = label_offset + instructions.max_label + 1
    Dst:growpc(maxpc)
 
    -- push callee-save registers if we use any
@@ -118,7 +121,7 @@ local function compile(instructions, alloc, dump)
 
       -- the core code generation logic starts here
       if itype == "label" then
-         local lnum = instr[2] + 2
+         local lnum = instr[2] + label_offset
          |=>(lnum):
 
       elseif itype == "cjmp" then
@@ -138,7 +141,7 @@ local function compile(instructions, alloc, dump)
             elseif instr[2] == "false-label" then
                | jmp =>(1)
             else
-               | jmp =>(instr[2] + 2)
+               | jmp =>(instr[2] + label_offset)
             end
          end
 
