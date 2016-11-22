@@ -535,8 +535,4 @@ function selftest()
           spills = { r12 = 1, r13 = 0, r14 = 2 },
           len = 6, callee_saves = utils.set(3, 12, 13, 14, 15),
           spill_registers = { 15, 14 } })
-
-   local function test(instrs, expected)
-      utils.assert_equals(expected, allocate(instrs))
-   end
 end
