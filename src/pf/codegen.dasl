@@ -137,9 +137,13 @@ local function compile(instructions, alloc, dump)
             -- don't output anything
          else
             if instr[2] == "true-label" then
-               | jmp =>(0)
+               if next_instr[1] ~= "ret-true" then
+                  | jmp =>(0)
+               end
             elseif instr[2] == "false-label" then
-               | jmp =>(1)
+               if next_instr[1] ~= "ret-false" then
+                  | jmp =>(1)
+               end
             else
                | jmp =>(instr[2] + label_offset)
             end
@@ -618,8 +622,8 @@ function selftest()
                  { "cmp", "r2", 0 },
                  { "cjmp", ">", "true-label" },
                  { "jmp", "false-label" },
-                 { "ret-true" },
-                 { "ret-false" } }
+                 { "ret-false" },
+                 { "ret-true" } }
    example_5.max_label = 4
 
    assert(test(example_5, arp_pkts[1]))
