@@ -70,3 +70,37 @@ end
 
 ```
 
+## Native pflang compilation
+
+```
+7f5f7444d000  4883FE22          cmp rsi, +0x22
+7f5f7444d004  7C50              jl 0x7f5f7444d056
+7f5f7444d006  0FB7470C          movzx eax, word [rdi+0xc]
+7f5f7444d00a  4883F808          cmp rax, +0x08
+7f5f7444d00e  750F              jnz 0x7f5f7444d01f
+7f5f7444d010  0FB64F17          movzx ecx, byte [rdi+0x17]
+7f5f7444d014  4881F984000000    cmp rcx, 0x84
+7f5f7444d01b  743C              jz 0x7f5f7444d059
+7f5f7444d01d  EB37              jmp 0x7f5f7444d056
+7f5f7444d01f  4883FE36          cmp rsi, +0x36
+7f5f7444d023  7C31              jl 0x7f5f7444d056
+7f5f7444d025  4881F886DD0000    cmp rax, 0xdd86
+7f5f7444d02c  7528              jnz 0x7f5f7444d056
+7f5f7444d02e  0FB64714          movzx eax, byte [rdi+0x14]
+7f5f7444d032  4881F884000000    cmp rax, 0x84
+7f5f7444d039  7502              jnz 0x7f5f7444d03d
+7f5f7444d03b  EB1C              jmp 0x7f5f7444d059
+7f5f7444d03d  4883FE37          cmp rsi, +0x37
+7f5f7444d041  7C13              jl 0x7f5f7444d056
+7f5f7444d043  4883F82C          cmp rax, +0x2c
+7f5f7444d047  750D              jnz 0x7f5f7444d056
+7f5f7444d049  0FB64736          movzx eax, byte [rdi+0x36]
+7f5f7444d04d  4881F884000000    cmp rax, 0x84
+7f5f7444d054  7403              jz 0x7f5f7444d059
+7f5f7444d056  B000              mov al, 0x0
+7f5f7444d058  C3                ret
+7f5f7444d059  B001              mov al, 0x1
+7f5f7444d05b  C3                ret
+
+```
+

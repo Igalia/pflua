@@ -92,3 +92,43 @@ end
 
 ```
 
+## Native pflang compilation
+
+```
+7fe7dc90a000  4883FE36          cmp rsi, +0x36
+7fe7dc90a004  0F8C5D000000      jl 0x7fe7dc90a067
+7fe7dc90a00a  0FB7770C          movzx esi, word [rdi+0xc]
+7fe7dc90a00e  4881FE86DD0000    cmp rsi, 0xdd86
+7fe7dc90a015  7550              jnz 0x7fe7dc90a067
+7fe7dc90a017  8B7716            mov esi, [rdi+0x16]
+7fe7dc90a01a  4883FE00          cmp rsi, +0x00
+7fe7dc90a01e  7520              jnz 0x7fe7dc90a040
+7fe7dc90a020  8B771A            mov esi, [rdi+0x1a]
+7fe7dc90a023  4883FE00          cmp rsi, +0x00
+7fe7dc90a027  7517              jnz 0x7fe7dc90a040
+7fe7dc90a029  8B771E            mov esi, [rdi+0x1e]
+7fe7dc90a02c  4883FE00          cmp rsi, +0x00
+7fe7dc90a030  750E              jnz 0x7fe7dc90a040
+7fe7dc90a032  8B7722            mov esi, [rdi+0x22]
+7fe7dc90a035  4881FE00000001    cmp rsi, 0x01000000
+7fe7dc90a03c  7502              jnz 0x7fe7dc90a040
+7fe7dc90a03e  EB2A              jmp 0x7fe7dc90a06a
+7fe7dc90a040  8B7726            mov esi, [rdi+0x26]
+7fe7dc90a043  4883FE00          cmp rsi, +0x00
+7fe7dc90a047  751E              jnz 0x7fe7dc90a067
+7fe7dc90a049  8B772A            mov esi, [rdi+0x2a]
+7fe7dc90a04c  4883FE00          cmp rsi, +0x00
+7fe7dc90a050  7515              jnz 0x7fe7dc90a067
+7fe7dc90a052  8B772E            mov esi, [rdi+0x2e]
+7fe7dc90a055  4883FE00          cmp rsi, +0x00
+7fe7dc90a059  750C              jnz 0x7fe7dc90a067
+7fe7dc90a05b  8B7732            mov esi, [rdi+0x32]
+7fe7dc90a05e  4881FE00000001    cmp rsi, 0x01000000
+7fe7dc90a065  7403              jz 0x7fe7dc90a06a
+7fe7dc90a067  B000              mov al, 0x0
+7fe7dc90a069  C3                ret
+7fe7dc90a06a  B001              mov al, 0x1
+7fe7dc90a06c  C3                ret
+
+```
+
