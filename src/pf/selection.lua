@@ -64,15 +64,10 @@ end
 --
 -- Virtual registers are given names prefixed with "r" as in "r1".
 -- SSA variables remain prefixed with "v"
-local function select_block(blocks, block, new_register, instructions, next_label)
+local function select_block(block, new_register, instructions, next_label, jmp_map)
    local this_label = block.label
    local control    = block.control
    local bindings   = block.bindings
-
-   -- these control whether to emit pseudo-instructions for doing
-   -- 'return true' or 'return false' at the very end.
-   -- (since they may not be needed if the result is always true or false)
-   local emit_true, emit_false
 
    local function emit(instr)
       table.insert(instructions, instr)
@@ -81,26 +76,17 @@ local function select_block(blocks, block, new_register, instructions, next_labe
    -- emit a jmp, looking up the next block and replace the jump target if
    -- the next block would immediately jmp anyway (via a return statement)
    local function emit_jmp(target_label, condition)
-      local target_block = blocks[target_label]
 
-      if target_block.control[1] == "return" then
-         if target_block.control[2][1] == "true" then
-            if condition then
-               emit({ "cjmp", condition, "true-label" })
-            else
-               emit({ "jmp", "true-label" })
-            end
-            emit_true = true
-            return
-         elseif target_block.control[2][1] == "false" then
-            if condition then
-               emit({ "cjmp", condition, "false-label" })
-            else
-               emit({ "jmp", "false-label" })
-            end
-            emit_false = true
-            return
+      -- if the target label is one that was deleted by the return processing
+      -- pass, then patch the jump up as appropriate
+      local jmp_entry = jmp_map[target_label]
+      if jmp_entry then
+         if condition then
+            emit({ "cjmp", condition, jmp_entry })
+         else
+            emit({ "jmp", jmp_entry })
          end
+         return
       end
 
       if condition then
@@ -373,8 +359,6 @@ local function select_block(blocks, block, new_register, instructions, next_labe
    else
       error(string.format("NYI op %s", control[1]))
    end
-
-   return emit_true, emit_false
 end
 
 local function make_new_register(reg_num)
@@ -391,21 +375,62 @@ function print_selection(ir)
    utils.pp({ "instructions", ir })
 end
 
+-- removes blocks that just return constant true/false and return a new
+-- SSA order (with returns removed), a map for redirecting jmps, and two
+-- booleans indicating whether to produce true/false return code
+local function process_returns(ssa)
+   -- these control whether to emit pseudo-instructions for doing
+   -- 'return true' or 'return false' at the very end.
+   -- (since they may not be needed if the result is always true or false)
+   local emit_true, emit_false = false, false
+   local return_map = {}
+
+   -- clone to ease testing without side effects
+   local order  = utils.dup(ssa.order)
+   local blocks = ssa.blocks
+   local len    = #order
+
+   -- proceed in reverse order to allow easy deletion
+   for i=1, len do
+      local idx     = len - i + 1
+      local label   = order[idx]
+      local block   = blocks[label]
+      local control = block.control
+
+      if control[1] == "return" then
+         if control[2][1] == "true" then
+            emit_true = true
+            return_map[label] = "true-label"
+            table.remove(order, idx)
+         elseif control[2][1] == "false" then
+            emit_false = true
+            return_map[label] = "false-label"
+            table.remove(order, idx)
+         else
+            -- a return block with a non-trivial expression requires both
+            -- true and false return labels
+            emit_true = true
+            emit_false = true
+         end
+      end
+   end
+
+   return order, return_map, emit_true, emit_false
+end
+
 function select(ssa)
    local blocks = ssa.blocks
    local instructions = { max_label = 0 }
-   local emit_true, emit_false
 
    local reg_num = 1
    local new_register = make_new_register(reg_num)
 
-   for idx, label in pairs(ssa.order) do
-      local next_label = ssa.order[idx+1]
-      local et, ef =
-         select_block(blocks, blocks[label], new_register,
-                      instructions, next_label)
-      emit_true = et or emit_true
-      emit_false = ef or emit_false
+   local order, jmp_map, emit_true, emit_false = process_returns(ssa)
+
+   for idx, label in pairs(order) do
+      local next_label = order[idx+1]
+      select_block(blocks[label], new_register, instructions,
+                   next_label, jmp_map)
    end
 
    if emit_false then
@@ -540,8 +565,8 @@ function selftest()
           { "load", "r3", 20, 1 },
           { "mov", "v2", "r3" },
           { "cmp", "v2", 6 },
-          { "cjmp", "!=", 13 },
-          { "jmp", "true-label" },
+          { "cjmp", "=", "true-label" },
+          { "jmp", 13 },
           { "label", 13 },
           { "cmp", "len", 55 },
           { "cjmp", "<", "false-label" },
