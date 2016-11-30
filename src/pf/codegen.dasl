@@ -736,6 +736,10 @@ function selftest()
    assert(test("ip[0:1] >> 1 == 0x22", v4_pkts[1]))
    assert(not test("ip[0:1] >> 1 == 0x21", v4_pkts[1]))
 
+   -- test for a bug where large shift rhs was a problem
+   assert(test("ip[0] << 1 - 2 == 0", v4_pkts[1]))
+   assert(test("ip[0] >> 1 - 2 == 0", v4_pkts[1]))
+
    -- tests for >>/<< with register args
    assert(test("ip[0] << ip[9] == 4416", v4_pkts[1]))
    assert(test("ip[0] >> ip[9] == 0x1", v4_pkts[1]))
