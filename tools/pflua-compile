@@ -10,12 +10,13 @@ local utils = require("pf.utils")
 
 function usage()
    local content = [=[
-Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua] <expression>
+Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua | --native | --match] <expression>
 
 Options:
    --bpf-asm   Print libpcap-generated BPF asm code for the pflang <expression>
    --bpf-lua   Print Lua code compiled from BPF for the pflang <expression>
    --lua       Print Lua code compiled directly for the pflang <expression> (DEFAULT)
+   --native    Print dynasm-generated asm code for the pflang <expression>
    --match     Print Lua code compiled from the pfmatch <expression>
 
    -O0         Disable optimizations. (Optimizations are on by default) ]=]
