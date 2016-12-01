@@ -62,27 +62,27 @@ end
 ## Native pflang compilation
 
 ```
-7fc6cff3e000  4883FE36          cmp rsi, +0x36
-7fc6cff3e004  7C44              jl 0x7fc6cff3e04a
-7fc6cff3e006  0FB7770C          movzx esi, word [rdi+0xc]
-7fc6cff3e00a  4881FE86DD0000    cmp rsi, 0xdd86
-7fc6cff3e011  7537              jnz 0x7fc6cff3e04a
-7fc6cff3e013  8B7716            mov esi, [rdi+0x16]
-7fc6cff3e016  48B8FFFFFFFF0000. mov rax, 0x00000000ffffffff
-7fc6cff3e020  4839C6            cmp rsi, rax
-7fc6cff3e023  7525              jnz 0x7fc6cff3e04a
-7fc6cff3e025  8B471A            mov eax, [rdi+0x1a]
-7fc6cff3e028  48BEEEEEEEEE0000. mov rsi, 0x00000000eeeeeeee
-7fc6cff3e032  4839F0            cmp rax, rsi
-7fc6cff3e035  7513              jnz 0x7fc6cff3e04a
-7fc6cff3e037  8B771E            mov esi, [rdi+0x1e]
-7fc6cff3e03a  4881E6FFFFC000    and rsi, 0x00c0ffff
-7fc6cff3e041  4881FE00010000    cmp rsi, 0x100
-7fc6cff3e048  7403              jz 0x7fc6cff3e04d
-7fc6cff3e04a  B000              mov al, 0x0
-7fc6cff3e04c  C3                ret
-7fc6cff3e04d  B001              mov al, 0x1
-7fc6cff3e04f  C3                ret
+7f772e248000  4883FE36          cmp rsi, +0x36
+7f772e248004  7C44              jl 0x7f772e24804a
+7f772e248006  0FB7770C          movzx esi, word [rdi+0xc]
+7f772e24800a  4881FE86DD0000    cmp rsi, 0xdd86
+7f772e248011  7537              jnz 0x7f772e24804a
+7f772e248013  8B7716            mov esi, [rdi+0x16]
+7f772e248016  48B8FFFFFFFF0000. mov rax, 0x00000000ffffffff
+7f772e248020  4839C6            cmp rsi, rax
+7f772e248023  7525              jnz 0x7f772e24804a
+7f772e248025  8B471A            mov eax, [rdi+0x1a]
+7f772e248028  48BEEEEEEEEE0000. mov rsi, 0x00000000eeeeeeee
+7f772e248032  4839F0            cmp rax, rsi
+7f772e248035  7513              jnz 0x7f772e24804a
+7f772e248037  8B771E            mov esi, [rdi+0x1e]
+7f772e24803a  4881E6FFFFC000    and rsi, 0x00c0ffff
+7f772e248041  4881FE00010000    cmp rsi, 0x100
+7f772e248048  7403              jz 0x7f772e24804d
+7f772e24804a  B000              mov al, 0x0
+7f772e24804c  C3                ret
+7f772e24804d  B001              mov al, 0x1
+7f772e24804f  C3                ret
 
 ```
 

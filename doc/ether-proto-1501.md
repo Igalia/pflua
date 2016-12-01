@@ -41,15 +41,15 @@ end
 ## Native pflang compilation
 
 ```
-7f01050c6000  4883FE0E          cmp rsi, +0x0e
-7f01050c6004  7C0D              jl 0x7f01050c6013
-7f01050c6006  0FB7770C          movzx esi, word [rdi+0xc]
-7f01050c600a  4881FE05DD0000    cmp rsi, 0xdd05
-7f01050c6011  7403              jz 0x7f01050c6016
-7f01050c6013  B000              mov al, 0x0
-7f01050c6015  C3                ret
-7f01050c6016  B001              mov al, 0x1
-7f01050c6018  C3                ret
+7f5ed57bc000  4883FE0E          cmp rsi, +0x0e
+7f5ed57bc004  7C0D              jl 0x7f5ed57bc013
+7f5ed57bc006  0FB7770C          movzx esi, word [rdi+0xc]
+7f5ed57bc00a  4881FE05DD0000    cmp rsi, 0xdd05
+7f5ed57bc011  7403              jz 0x7f5ed57bc016
+7f5ed57bc013  B000              mov al, 0x0
+7f5ed57bc015  C3                ret
+7f5ed57bc016  B001              mov al, 0x1
+7f5ed57bc018  C3                ret
 
 ```
 
