@@ -292,30 +292,31 @@ local function compile(instructions, alloc, dump)
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          | xor Rq(reg1), Rq(reg2)
 
-      elseif itype == "shl" then
+      elseif itype == "shl" or itype == "shr" then
+         local do_push = true
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         -- TODO: we want to emit shlx here but dynasm doesn't
-         --       support it, so for now we emit this loop code
-         --| shlx Rq(reg1), Rq(reg1), Rq(reg2)
-         | cmp Rq(reg2), 0
-         | jz >2
-         |1:
-         | shl Rq(reg1), 1
-         | sub Rq(reg2), 1
-         | jnz <1
-         |2:
 
-      elseif itype == "shr" then
-         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
-         -- TODO: see comment above
-         --| shrx Rq(reg1), Rq(reg1), Rq(reg2)
-         | cmp Rq(reg2), 0
-         | jz >2
-         |1:
-         | shr Rq(reg1), 1
-         | sub Rq(reg2), 1
-         | jnz <1
-         |2:
+         -- shl/shr only accept %cl as the count register, so we
+         -- potentially need to save %rcx on the stack (unless/until
+         -- register allocation can take this into account)
+         | push rcx
+         | mov cl, Rb(reg2)
+         -- when the shift was going to write to %rcx, we need
+         -- to switch to writing to the stack
+         if reg1 == 1 then
+         else
+            if itype == "shl" then
+               | shl qword [rsp], cl
+            else
+               | shr qword [rsp], cl
+            end
+         end
+            if itype == "shl" then
+               | shl Rq(reg1), cl
+            else
+               | shr Rq(reg1), cl
+            end
+         | pop rcx
 
       elseif itype == "add-i" then
          local reg = alloc[instr[2]]
@@ -365,13 +366,12 @@ local function compile(instructions, alloc, dump)
 
       elseif itype == "shl-i" then
          local reg = alloc[instr[2]]
-         | shl Rq(reg), instr[3]
+         -- mask to five bits since shl ignores the rest
+         | shl Rq(reg), bit.band(instr[3], 31)
 
       elseif itype == "shr-i" then
          local reg = alloc[instr[2]]
-         -- NB: have to use Rq here because we use shr to implement division
-         --     using 64-bit arithmetic
-         | shr Rq(reg), instr[3]
+         | shr Rq(reg), bit.band(instr[3], 31)
 
       elseif itype == "ntohs" then
          local reg = alloc[instr[2]]
@@ -737,13 +737,18 @@ function selftest()
    assert(not test("ip[0:1] >> 1 == 0x21", v4_pkts[1]))
 
    -- test for a bug where large shift rhs was a problem
-   assert(test("ip[0] << 1 - 2 == 0", v4_pkts[1]))
+   assert(not test("ip[0] << 1 - 2 == 0", v4_pkts[1]))
+   assert(not test("ip[0] << 1 - 2 == 0", v4_pkts[1], "no optimize"))
    assert(test("ip[0] >> 1 - 2 == 0", v4_pkts[1]))
 
    -- tests for >>/<< with register args
    assert(test("ip[0] << ip[9] == 4416", v4_pkts[1]))
    assert(test("ip[0] >> ip[9] == 0x1", v4_pkts[1]))
    assert(test("ip[0] >> ip[1] == 0x45", v4_pkts[1]))
+
+   -- test that shifts mask the count appropriately
+   assert(test("ip[0] >> ip[5] == 34", v4_pkts[1]))
+   assert(test("ip[0] << ip[5] == 138", v4_pkts[1]))
 
    assert(test("", v4_pkts[1]))
    assert(test("", arp_pkts[1]))

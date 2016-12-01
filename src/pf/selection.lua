@@ -214,13 +214,7 @@ local function select_block(block, new_register, instructions, next_label, jmp_m
             local imm = expr[3]
             local tmp = new_register()
             emit({ "mov", tmp, reg2 })
-            if imm <= 8 then
-               emit({ "shl-i", tmp, imm })
-            else
-               local tmp2 = new_register()
-               emit({ "mov", tmp2, imm })
-               emit({ "shl", tmp, tmp2 })
-            end
+            emit({ "shl-i", tmp, imm })
             return tmp
 
          else
@@ -249,13 +243,7 @@ local function select_block(block, new_register, instructions, next_label, jmp_m
             local imm = expr[3]
             local tmp = new_register()
             emit({ "mov", tmp, reg2 })
-            if imm <= 8 then
-               emit({ "shr-i", tmp, imm })
-            else
-               local tmp2 = new_register()
-               emit({ "mov", tmp2, imm })
-               emit({ "shr", tmp, tmp2 })
-            end
+            emit({ "shr-i", tmp, imm })
             return tmp
 
          else
