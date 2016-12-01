@@ -41,3 +41,11 @@ end
 
 ```
 
+## Native pflang compilation
+
+```
+7f707626d000  B000              mov al, 0x0
+7f707626d002  C3                ret
+
+```
+

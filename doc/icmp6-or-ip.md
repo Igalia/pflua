@@ -66,3 +66,33 @@ end
 
 ```
 
+## Native pflang compilation
+
+```
+7f97ad46a000  4883FE0E          cmp rsi, +0x0e
+7f97ad46a004  7C3D              jl 0x7f97ad46a043
+7f97ad46a006  4883FE36          cmp rsi, +0x36
+7f97ad46a00a  7C2D              jl 0x7f97ad46a039
+7f97ad46a00c  0FB7470C          movzx eax, word [rdi+0xc]
+7f97ad46a010  4881F886DD0000    cmp rax, 0xdd86
+7f97ad46a017  7520              jnz 0x7f97ad46a039
+7f97ad46a019  0FB64714          movzx eax, byte [rdi+0x14]
+7f97ad46a01d  4883F83A          cmp rax, +0x3a
+7f97ad46a021  7423              jz 0x7f97ad46a046
+7f97ad46a023  4883FE37          cmp rsi, +0x37
+7f97ad46a027  7C10              jl 0x7f97ad46a039
+7f97ad46a029  4883F82C          cmp rax, +0x2c
+7f97ad46a02d  750A              jnz 0x7f97ad46a039
+7f97ad46a02f  0FB64736          movzx eax, byte [rdi+0x36]
+7f97ad46a033  4883F83A          cmp rax, +0x3a
+7f97ad46a037  740D              jz 0x7f97ad46a046
+7f97ad46a039  0FB7470C          movzx eax, word [rdi+0xc]
+7f97ad46a03d  4883F808          cmp rax, +0x08
+7f97ad46a041  7403              jz 0x7f97ad46a046
+7f97ad46a043  B000              mov al, 0x0
+7f97ad46a045  C3                ret
+7f97ad46a046  B001              mov al, 0x1
+7f97ad46a048  C3                ret
+
+```
+

@@ -52,3 +52,26 @@ end
 
 ```
 
+## Native pflang compilation
+
+```
+7fc1c6e25000  4883FE12          cmp rsi, +0x12
+7fc1c6e25004  7C2C              jl 0x7fc1c6e25032
+7fc1c6e25006  0FB7770C          movzx esi, word [rdi+0xc]
+7fc1c6e2500a  66C1CE08          ror si, 0x08
+7fc1c6e2500e  480FB7F6          movzx rsi, si
+7fc1c6e25012  4881FEDC050000    cmp rsi, 0x5dc
+7fc1c6e25019  7F17              jg 0x7fc1c6e25032
+7fc1c6e2501b  0FB7770E          movzx esi, word [rdi+0xe]
+7fc1c6e2501f  4881FEFEFE0000    cmp rsi, 0xfefe
+7fc1c6e25026  750A              jnz 0x7fc1c6e25032
+7fc1c6e25028  0FB67711          movzx esi, byte [rdi+0x11]
+7fc1c6e2502c  4883FE2F          cmp rsi, +0x2f
+7fc1c6e25030  7403              jz 0x7fc1c6e25035
+7fc1c6e25032  B000              mov al, 0x0
+7fc1c6e25034  C3                ret
+7fc1c6e25035  B001              mov al, 0x1
+7fc1c6e25037  C3                ret
+
+```
+

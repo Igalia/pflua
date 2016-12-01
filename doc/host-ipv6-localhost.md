@@ -92,3 +92,42 @@ end
 
 ```
 
+## Native pflang compilation
+
+```
+7f3176ecb000  4883FE36          cmp rsi, +0x36
+7f3176ecb004  7C5B              jl 0x7f3176ecb061
+7f3176ecb006  0FB7770C          movzx esi, word [rdi+0xc]
+7f3176ecb00a  4881FE86DD0000    cmp rsi, 0xdd86
+7f3176ecb011  754E              jnz 0x7f3176ecb061
+7f3176ecb013  8B7716            mov esi, [rdi+0x16]
+7f3176ecb016  4883FE00          cmp rsi, +0x00
+7f3176ecb01a  751E              jnz 0x7f3176ecb03a
+7f3176ecb01c  8B771A            mov esi, [rdi+0x1a]
+7f3176ecb01f  4883FE00          cmp rsi, +0x00
+7f3176ecb023  7515              jnz 0x7f3176ecb03a
+7f3176ecb025  8B771E            mov esi, [rdi+0x1e]
+7f3176ecb028  4883FE00          cmp rsi, +0x00
+7f3176ecb02c  750C              jnz 0x7f3176ecb03a
+7f3176ecb02e  8B7722            mov esi, [rdi+0x22]
+7f3176ecb031  4881FE00000001    cmp rsi, 0x01000000
+7f3176ecb038  742A              jz 0x7f3176ecb064
+7f3176ecb03a  8B7726            mov esi, [rdi+0x26]
+7f3176ecb03d  4883FE00          cmp rsi, +0x00
+7f3176ecb041  751E              jnz 0x7f3176ecb061
+7f3176ecb043  8B772A            mov esi, [rdi+0x2a]
+7f3176ecb046  4883FE00          cmp rsi, +0x00
+7f3176ecb04a  7515              jnz 0x7f3176ecb061
+7f3176ecb04c  8B772E            mov esi, [rdi+0x2e]
+7f3176ecb04f  4883FE00          cmp rsi, +0x00
+7f3176ecb053  750C              jnz 0x7f3176ecb061
+7f3176ecb055  8B7732            mov esi, [rdi+0x32]
+7f3176ecb058  4881FE00000001    cmp rsi, 0x01000000
+7f3176ecb05f  7403              jz 0x7f3176ecb064
+7f3176ecb061  B000              mov al, 0x0
+7f3176ecb063  C3                ret
+7f3176ecb064  B001              mov al, 0x1
+7f3176ecb066  C3                ret
+
+```
+
