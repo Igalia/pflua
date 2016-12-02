@@ -459,7 +459,7 @@ local function expand_ip6_proto(expr)
 end
 
 local function expand_ip_proto(expr)
-   return { 'or', has_ipv4_protocol(expr[2]), has_ipv6_protocol(expr[2]) }
+   return { 'or', expand_ip4_proto(expr), expand_ip6_proto(expr) }
 end
 
 -- ISO
@@ -1205,7 +1205,7 @@ function expand_bool(expr, dlt)
       local expander = primitive_expanders[expr[1]]
       assert(expander, "unimplemented primitive: "..expr[1])
       local expanded = expander(expr, dlt)
-      return expand_bool(expander(expr, dlt), dlt)
+      return expand_bool(expanded, dlt)
    end
 end
 
@@ -1236,6 +1236,10 @@ function selftest ()
       expand(parse("ether[0] = 2"), 'EN10MB'))
    assert_equals(expand(parse("src 1::ff11"), 'EN10MB'),
       expand(parse("src host 1::ff11"), 'EN10MB'))
+   assert_equals(expand(parse("proto \\sctp"), 'EN10MB'),
+      expand(parse("ip proto \\sctp or ip6 proto \\sctp"), 'EN10MB'))
+   assert_equals(expand(parse("proto \\tcp"), 'EN10MB'),
+      expand(parse("ip proto \\tcp or ip6 proto \\tcp"), 'EN10MB'))
    -- Could check this, but it's very large
    expand(parse("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)"),
           "EN10MB")
