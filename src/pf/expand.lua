@@ -1205,7 +1205,7 @@ function expand_bool(expr, dlt)
       local expander = primitive_expanders[expr[1]]
       assert(expander, "unimplemented primitive: "..expr[1])
       local expanded = expander(expr, dlt)
-      return expand_bool(expander(expr, dlt), dlt)
+      return expand_bool(expanded, dlt)
    end
 end
 
