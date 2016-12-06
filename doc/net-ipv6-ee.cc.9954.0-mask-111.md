@@ -94,49 +94,47 @@ return function(P,length)
    if cast("uint32_t*", P+46)[0] ~= 0 then return false end
    return band(cast("uint32_t*", P+50)[0],65279) == 21657
 end
-
 ```
 
 ## Native pflang compilation
 
 ```
-7f62aa975000  4883FE36          cmp rsi, +0x36
-7f62aa975004  0F8C7F000000      jl 0x7f62aa975089
-7f62aa97500a  0FB7770C          movzx esi, word [rdi+0xc]
-7f62aa97500e  4881FE86DD0000    cmp rsi, 0xdd86
-7f62aa975015  0F856E000000      jnz 0x7f62aa975089
-7f62aa97501b  8B7716            mov esi, [rdi+0x16]
-7f62aa97501e  48B800EE00CC0000. mov rax, 0x00000000cc00ee00
-7f62aa975028  4839C6            cmp rsi, rax
-7f62aa97502b  7525              jnz 0x7f62aa975052
-7f62aa97502d  8B471A            mov eax, [rdi+0x1a]
-7f62aa975030  4883F800          cmp rax, +0x00
-7f62aa975034  751C              jnz 0x7f62aa975052
-7f62aa975036  8B471E            mov eax, [rdi+0x1e]
-7f62aa975039  4883F800          cmp rax, +0x00
-7f62aa97503d  7513              jnz 0x7f62aa975052
-7f62aa97503f  8B4722            mov eax, [rdi+0x22]
-7f62aa975042  4881E0FFFE0000    and rax, 0xfeff
-7f62aa975049  4881F899540000    cmp rax, 0x5499
-7f62aa975050  743A              jz 0x7f62aa97508c
-7f62aa975052  8B4726            mov eax, [rdi+0x26]
-7f62aa975055  48BE00EE00CC0000. mov rsi, 0x00000000cc00ee00
-7f62aa97505f  4839F0            cmp rax, rsi
-7f62aa975062  7525              jnz 0x7f62aa975089
-7f62aa975064  8B772A            mov esi, [rdi+0x2a]
-7f62aa975067  4883FE00          cmp rsi, +0x00
-7f62aa97506b  751C              jnz 0x7f62aa975089
-7f62aa97506d  8B772E            mov esi, [rdi+0x2e]
-7f62aa975070  4883FE00          cmp rsi, +0x00
-7f62aa975074  7513              jnz 0x7f62aa975089
-7f62aa975076  8B7732            mov esi, [rdi+0x32]
-7f62aa975079  4881E6FFFE0000    and rsi, 0xfeff
-7f62aa975080  4881FE99540000    cmp rsi, 0x5499
-7f62aa975087  7403              jz 0x7f62aa97508c
-7f62aa975089  B000              mov al, 0x0
-7f62aa97508b  C3                ret
-7f62aa97508c  B001              mov al, 0x1
-7f62aa97508e  C3                ret
-
+7f0865825000  4883FE36          cmp rsi, +0x36
+7f0865825004  0F8C7F000000      jl 0x7f0865825089
+7f086582500a  0FB7770C          movzx esi, word [rdi+0xc]
+7f086582500e  4881FE86DD0000    cmp rsi, 0xdd86
+7f0865825015  0F856E000000      jnz 0x7f0865825089
+7f086582501b  8B7716            mov esi, [rdi+0x16]
+7f086582501e  48B800EE00CC0000. mov rax, 0x00000000cc00ee00
+7f0865825028  4839C6            cmp rsi, rax
+7f086582502b  7525              jnz 0x7f0865825052
+7f086582502d  8B471A            mov eax, [rdi+0x1a]
+7f0865825030  4883F800          cmp rax, +0x00
+7f0865825034  751C              jnz 0x7f0865825052
+7f0865825036  8B471E            mov eax, [rdi+0x1e]
+7f0865825039  4883F800          cmp rax, +0x00
+7f086582503d  7513              jnz 0x7f0865825052
+7f086582503f  8B4722            mov eax, [rdi+0x22]
+7f0865825042  4881E0FFFE0000    and rax, 0xfeff
+7f0865825049  4881F899540000    cmp rax, 0x5499
+7f0865825050  743A              jz 0x7f086582508c
+7f0865825052  8B4726            mov eax, [rdi+0x26]
+7f0865825055  48BE00EE00CC0000. mov rsi, 0x00000000cc00ee00
+7f086582505f  4839F0            cmp rax, rsi
+7f0865825062  7525              jnz 0x7f0865825089
+7f0865825064  8B772A            mov esi, [rdi+0x2a]
+7f0865825067  4883FE00          cmp rsi, +0x00
+7f086582506b  751C              jnz 0x7f0865825089
+7f086582506d  8B772E            mov esi, [rdi+0x2e]
+7f0865825070  4883FE00          cmp rsi, +0x00
+7f0865825074  7513              jnz 0x7f0865825089
+7f0865825076  8B7732            mov esi, [rdi+0x32]
+7f0865825079  4881E6FFFE0000    and rsi, 0xfeff
+7f0865825080  4881FE99540000    cmp rsi, 0x5499
+7f0865825087  7403              jz 0x7f086582508c
+7f0865825089  B000              mov al, 0x0
+7f086582508b  C3                ret
+7f086582508c  B001              mov al, 0x1
+7f086582508e  C3                ret
 ```
 

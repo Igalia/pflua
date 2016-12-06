@@ -38,14 +38,12 @@ end
 return function(P,length)
    return false
 end
-
 ```
 
 ## Native pflang compilation
 
 ```
-7f707626d000  B000              mov al, 0x0
-7f707626d002  C3                ret
-
+7f2ba1387000  B000              mov al, 0x0
+7f2ba1387002  C3                ret
 ```
 

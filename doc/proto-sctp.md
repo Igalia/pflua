@@ -70,38 +70,36 @@ return function(P,length)
    if v2 ~= 44 then return false end
    return P[54] == 132
 end
-
 ```
 
 ## Native pflang compilation
 
 ```
-7fc73f3c2000  4883FE22          cmp rsi, +0x22
-7fc73f3c2004  7C4C              jl 0x7fc73f3c2052
-7fc73f3c2006  0FB7470C          movzx eax, word [rdi+0xc]
-7fc73f3c200a  4883F808          cmp rax, +0x08
-7fc73f3c200e  750D              jnz 0x7fc73f3c201d
-7fc73f3c2010  0FB64F17          movzx ecx, byte [rdi+0x17]
-7fc73f3c2014  4881F984000000    cmp rcx, 0x84
-7fc73f3c201b  7438              jz 0x7fc73f3c2055
-7fc73f3c201d  4883FE36          cmp rsi, +0x36
-7fc73f3c2021  7C2F              jl 0x7fc73f3c2052
-7fc73f3c2023  4881F886DD0000    cmp rax, 0xdd86
-7fc73f3c202a  7526              jnz 0x7fc73f3c2052
-7fc73f3c202c  0FB64714          movzx eax, byte [rdi+0x14]
-7fc73f3c2030  4881F884000000    cmp rax, 0x84
-7fc73f3c2037  741C              jz 0x7fc73f3c2055
-7fc73f3c2039  4883FE37          cmp rsi, +0x37
-7fc73f3c203d  7C13              jl 0x7fc73f3c2052
-7fc73f3c203f  4883F82C          cmp rax, +0x2c
-7fc73f3c2043  750D              jnz 0x7fc73f3c2052
-7fc73f3c2045  0FB64736          movzx eax, byte [rdi+0x36]
-7fc73f3c2049  4881F884000000    cmp rax, 0x84
-7fc73f3c2050  7403              jz 0x7fc73f3c2055
-7fc73f3c2052  B000              mov al, 0x0
-7fc73f3c2054  C3                ret
-7fc73f3c2055  B001              mov al, 0x1
-7fc73f3c2057  C3                ret
-
+7fdeec219000  4883FE22          cmp rsi, +0x22
+7fdeec219004  7C4C              jl 0x7fdeec219052
+7fdeec219006  0FB7470C          movzx eax, word [rdi+0xc]
+7fdeec21900a  4883F808          cmp rax, +0x08
+7fdeec21900e  750D              jnz 0x7fdeec21901d
+7fdeec219010  0FB64F17          movzx ecx, byte [rdi+0x17]
+7fdeec219014  4881F984000000    cmp rcx, 0x84
+7fdeec21901b  7438              jz 0x7fdeec219055
+7fdeec21901d  4883FE36          cmp rsi, +0x36
+7fdeec219021  7C2F              jl 0x7fdeec219052
+7fdeec219023  4881F886DD0000    cmp rax, 0xdd86
+7fdeec21902a  7526              jnz 0x7fdeec219052
+7fdeec21902c  0FB64714          movzx eax, byte [rdi+0x14]
+7fdeec219030  4881F884000000    cmp rax, 0x84
+7fdeec219037  741C              jz 0x7fdeec219055
+7fdeec219039  4883FE37          cmp rsi, +0x37
+7fdeec21903d  7C13              jl 0x7fdeec219052
+7fdeec21903f  4883F82C          cmp rax, +0x2c
+7fdeec219043  750D              jnz 0x7fdeec219052
+7fdeec219045  0FB64736          movzx eax, byte [rdi+0x36]
+7fdeec219049  4881F884000000    cmp rax, 0x84
+7fdeec219050  7403              jz 0x7fdeec219055
+7fdeec219052  B000              mov al, 0x0
+7fdeec219054  C3                ret
+7fdeec219055  B001              mov al, 0x1
+7fdeec219057  C3                ret
 ```
 
