@@ -600,6 +600,7 @@ function selftest()
    arp_pkts = savefile.load_packets("../tests/data/arp.pcap")
    v4_pkts = savefile.load_packets("../tests/data/v4.pcap")
    v6_pkts = savefile.load_packets("../tests/data/v6.pcap")
+   telnet_pkts = savefile.load_packets("../tests/data/telnet-cooked.pcap")
 
    -- not an arp packet
    local alloc_1 = { len = 6, r1 = 0, callee_saves = {}, spills = {} }
@@ -777,6 +778,13 @@ function selftest()
    assert(test('ip[0]+ip[1]+ip[2]+ip[3]+ip[4]+ip[5]+ip[6]+ip[7]+\
                 ip[8]+ip[9]+ip[10]+ip[11]=775',
                v4_pkts[1]))
+
+   -- this test (from issue #215) exposed some bugs in spill handling and
+   -- pretty thoroughly exercises spilling too
+   local test_file = io.open("../tests/test-215.pflang")
+   local test_filter = test_file:read()
+   assert(test(test_filter, telnet_pkts[1]))
+   assert(not test(test_filter, telnet_pkts[3]))
 
    -- test to make sure that callee-save registers work properly and
    -- don't interfere with context
