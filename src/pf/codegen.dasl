@@ -110,8 +110,8 @@ local function compile(instructions, alloc, dump)
          for i = 2, #instr do
             if type(instr[i]) == "string" then
                if alloc.spills[instr[i]] then
-                  local reg  = alloc.spill_registers[i - 1]
-                  local slot = alloc.spills[instr[i]]
+                  local reg  = assert(alloc.spill_registers[i - 1])
+                  local slot = assert(alloc.spills[instr[i]])
 
                   | mov Rq(reg), [rsp + slot * stack_slot_size]
                   -- if we need to write, record that and do it later
@@ -235,20 +235,33 @@ local function compile(instructions, alloc, dump)
          end
 
       elseif itype == "mov" then
-         local dst = alloc[instr[2]]
-         local spill  = alloc.spills[instr[2]]
+         local dst   = alloc[instr[2]]
+         local spill = alloc.spills[instr[2]]
+         local arg   = instr[3]
 
          if not spill then
-            if type(instr[3]) == "number" then
-               | mov Rd(dst), instr[3]
+            if type(arg) == "number" then
+               | mov Rd(dst), arg
             else
-               | mov Rd(dst), Rd(alloc[instr[3]])
+               local spill_arg = alloc.spills[arg]
+               if not spill_arg then
+                  | mov Rq(dst), Rq(alloc[arg])
+               else
+                  | mov Rq(dst), [rsp + spill_arg * stack_slot_size]
+               end
             end
          else
-            if type(instr[3]) == "number" then
-               | mov [rsp + spill * stack_slot_size], dword instr[3]
+            if type(arg) == "number" then
+               | mov [rsp + spill * stack_slot_size], dword arg
             else
-               | mov [rsp + spill * stack_slot_size], Rq(alloc[instr[3]])
+               local spill_arg = alloc.spills[arg]
+               if not spill_arg then
+                  | mov [rsp + spill * stack_slot_size], Rq(alloc[arg])
+               else
+                  local spill_reg = alloc.spill_registers[1]
+                  | mov Rq(spill_reg), [rsp + spill_arg * stack_slot_size]
+                  | mov [rsp + spill * stack_slot_size], Rq(spill_reg)
+               end
             end
          end
 
