@@ -63,39 +63,37 @@ return function(P,length)
    if (v1 + 23) > length then return false end
    return P[(v1 + 22)] < 8
 end
-
 ```
 
 ## Native pflang compilation
 
 ```
-7fc86d79f000  4883FE2A          cmp rsi, +0x2a
-7fc86d79f004  7C4A              jl 0x7fc86d79f050
-7fc86d79f006  0FB7470C          movzx eax, word [rdi+0xc]
-7fc86d79f00a  4883F808          cmp rax, +0x08
-7fc86d79f00e  7540              jnz 0x7fc86d79f050
-7fc86d79f010  0FB64717          movzx eax, byte [rdi+0x17]
-7fc86d79f014  4883F809          cmp rax, +0x09
-7fc86d79f018  7536              jnz 0x7fc86d79f050
-7fc86d79f01a  0FB74714          movzx eax, word [rdi+0x14]
-7fc86d79f01e  4881E01FFF0000    and rax, 0xff1f
-7fc86d79f025  4883F800          cmp rax, +0x00
-7fc86d79f029  7525              jnz 0x7fc86d79f050
-7fc86d79f02b  0FB6470E          movzx eax, byte [rdi+0xe]
-7fc86d79f02f  4883E00F          and rax, +0x0f
-7fc86d79f033  48C1E002          shl rax, 0x02
-7fc86d79f037  89C1              mov ecx, eax
-7fc86d79f039  4883C117          add rcx, +0x17
-7fc86d79f03d  4839F1            cmp rcx, rsi
-7fc86d79f040  7F0E              jg 0x7fc86d79f050
-7fc86d79f042  4883C016          add rax, +0x16
-7fc86d79f046  0FB60407          movzx eax, byte [rdi+rax]
-7fc86d79f04a  4883F808          cmp rax, +0x08
-7fc86d79f04e  7C03              jl 0x7fc86d79f053
-7fc86d79f050  B000              mov al, 0x0
-7fc86d79f052  C3                ret
-7fc86d79f053  B001              mov al, 0x1
-7fc86d79f055  C3                ret
-
+7f6e99147000  4883FE2A          cmp rsi, +0x2a
+7f6e99147004  7C4A              jl 0x7f6e99147050
+7f6e99147006  0FB7470C          movzx eax, word [rdi+0xc]
+7f6e9914700a  4883F808          cmp rax, +0x08
+7f6e9914700e  7540              jnz 0x7f6e99147050
+7f6e99147010  0FB64717          movzx eax, byte [rdi+0x17]
+7f6e99147014  4883F809          cmp rax, +0x09
+7f6e99147018  7536              jnz 0x7f6e99147050
+7f6e9914701a  0FB74714          movzx eax, word [rdi+0x14]
+7f6e9914701e  4881E01FFF0000    and rax, 0xff1f
+7f6e99147025  4883F800          cmp rax, +0x00
+7f6e99147029  7525              jnz 0x7f6e99147050
+7f6e9914702b  0FB6470E          movzx eax, byte [rdi+0xe]
+7f6e9914702f  4883E00F          and rax, +0x0f
+7f6e99147033  48C1E002          shl rax, 0x02
+7f6e99147037  89C1              mov ecx, eax
+7f6e99147039  4883C117          add rcx, +0x17
+7f6e9914703d  4839F1            cmp rcx, rsi
+7f6e99147040  7F0E              jg 0x7f6e99147050
+7f6e99147042  4883C016          add rax, +0x16
+7f6e99147046  0FB60407          movzx eax, byte [rdi+rax]
+7f6e9914704a  4883F808          cmp rax, +0x08
+7f6e9914704e  7C03              jl 0x7f6e99147053
+7f6e99147050  B000              mov al, 0x0
+7f6e99147052  C3                ret
+7f6e99147053  B001              mov al, 0x1
+7f6e99147055  C3                ret
 ```
 

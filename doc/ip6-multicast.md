@@ -41,24 +41,22 @@ return function(P,length)
    if cast("uint16_t*", P+12)[0] ~= 56710 then return false end
    return P[38] == 255
 end
-
 ```
 
 ## Native pflang compilation
 
 ```
-7f9db26f0000  4883FE36          cmp rsi, +0x36
-7f9db26f0004  7C1A              jl 0x7f9db26f0020
-7f9db26f0006  0FB7770C          movzx esi, word [rdi+0xc]
-7f9db26f000a  4881FE86DD0000    cmp rsi, 0xdd86
-7f9db26f0011  750D              jnz 0x7f9db26f0020
-7f9db26f0013  0FB67726          movzx esi, byte [rdi+0x26]
-7f9db26f0017  4881FEFF000000    cmp rsi, 0xff
-7f9db26f001e  7403              jz 0x7f9db26f0023
-7f9db26f0020  B000              mov al, 0x0
-7f9db26f0022  C3                ret
-7f9db26f0023  B001              mov al, 0x1
-7f9db26f0025  C3                ret
-
+7f0b5442c000  4883FE36          cmp rsi, +0x36
+7f0b5442c004  7C1A              jl 0x7f0b5442c020
+7f0b5442c006  0FB7770C          movzx esi, word [rdi+0xc]
+7f0b5442c00a  4881FE86DD0000    cmp rsi, 0xdd86
+7f0b5442c011  750D              jnz 0x7f0b5442c020
+7f0b5442c013  0FB67726          movzx esi, byte [rdi+0x26]
+7f0b5442c017  4881FEFF000000    cmp rsi, 0xff
+7f0b5442c01e  7403              jz 0x7f0b5442c023
+7f0b5442c020  B000              mov al, 0x0
+7f0b5442c022  C3                ret
+7f0b5442c023  B001              mov al, 0x1
+7f0b5442c025  C3                ret
 ```
 
