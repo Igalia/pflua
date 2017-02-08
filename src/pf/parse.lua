@@ -833,6 +833,7 @@ local primitives = {
    type = parse_wlan_type,
    subtype = parse_wlan_subtype,
    dir = unary(enum_arg_parser(wlan_directions)),
+   vlanid = unary(parse_int_arg),
    vlan = parse_optional_int,
    mpls = parse_optional_int,
    pppoed = nullary(),
@@ -1179,6 +1180,8 @@ function selftest ()
                { 'net', { 'ipv4/len', { 'ipv4', 192, 0, 0, 0 }, 8 } })
    parse_test("net  192",
                { 'net', { 'ipv4/len', { 'ipv4', 192, 0, 0, 0 }, 8 } })
+   parse_test("vlanid 444",
+              { 'vlanid', 444 })
 
    local function parse_error_test(str, expected_err)
       local ok, actual_err = pcall(parse, str)

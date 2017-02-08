@@ -103,6 +103,9 @@ local ETHER_PAYLOAD    = 14
 local IP_FLAGS         = 6
 local IP_PROTOCOL      = 9
 
+-- 802.1Q
+local VLAN_TPID = 33024 -- 0x8100
+
 -- Minimum payload checks insert a byte access to the last byte of the
 -- minimum payload size.  Since the comparison should fold (because it
 -- will always be >= 0), we will be left with just an eager assertion on
@@ -846,6 +849,14 @@ local function expand_psnp(expr)
    return expand_isis_protocol(L1_PSNP, L2_PSNP)
 end
 
+-- VLAN
+
+local function expand_vlanid(expr)
+   return { 'and', 
+            has_ether_protocol(VLAN_TPID), 
+            { '=', { '&', { '[ether]', ETHER_TYPE + 2, 2 }, 0xfff }, expr[2] } }
+end
+
 local primitive_expanders = {
    dst = expand_dst_host,
    dst_host = expand_dst_host,
@@ -981,6 +992,7 @@ local primitive_expanders = {
    type_subtype = unimplemented,
    subtype = unimplemented,
    dir = unimplemented,
+   vlanid = expand_vlanid,
    vlan = unimplemented,
    mpls = unimplemented,
    pppoed = unimplemented,
